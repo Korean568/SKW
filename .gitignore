@@ -1,0 +1,3 @@
+.claude/
+*.txt
+__pycache__/
