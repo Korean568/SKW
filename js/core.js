@@ -74,7 +74,9 @@ const cache = new Map();
 export function loadGLB(url, onProgress) {
   if (!cache.has(url)) {
     cache.set(url, new Promise((res, rej) => {
-      loader.load(encodeURI(url), res, e => onProgress && onProgress(e.loaded, e.total), err => {
+      // 아티팩트 버전은 .glb 대신 같은 내용의 .gltf.json 을 씀
+      const real = window.SKW_JSON_ASSETS ? url.replace(/\.glb$/, '.gltf.json') : url;
+      loader.load(encodeURI(real), res, e => onProgress && onProgress(e.loaded, e.total), err => {
         cache.delete(url);
         rej(new Error('파일을 불러오지 못했습니다: ' + url));
       });
