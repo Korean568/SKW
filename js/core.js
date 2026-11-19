@@ -101,8 +101,9 @@ export function loadGLB(url, onProgress) {
   if (!cache.has(url)) {
     cache.set(url, new Promise((res, rej) => {
       // 아티팩트 버전은 .glb 대신 같은 내용의 .gltf.json 을 씀
-      const real = window.SKW_JSON_ASSETS ? url.replace(/\.glb$/, '.gltf.json') : url;
-      loader.load(encodeURI(real), res, e => onProgress && onProgress(e.loaded, e.total), err => {
+      let real = window.SKW_JSON_ASSETS ? url.replace(/\.glb$/, '.gltf.json') : url;
+      real = encodeURI(real) + (window.SKW_VERSION ? '?v=' + window.SKW_VERSION : '');
+      loader.load(real, res, e => onProgress && onProgress(e.loaded, e.total), err => {
         cache.delete(url);
         rej(new Error('파일을 불러오지 못했습니다: ' + url));
       });

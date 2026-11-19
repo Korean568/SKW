@@ -223,7 +223,7 @@ export const CHAPTERS = [
       { type: 'move', id: 'lee_jayong', to: [-2.6, -6.6] },
       { type: 'fade', out: false, duration: 0.8 },
       { type: 'wait', seconds: 1.6 },
-      { type: 'missile', from: [45, 80, 25], to: [-3.6, 0.6, -5.1], duration: 1.6, size: 1.2, burn: 'van' },
+      { type: 'missile', from: [45, 80, 25], to: [-3.6, 0.6, -5.1], duration: 2.2, size: 2.2, burn: 'van' },
       { type: 'kill', id: ['lee_jayong', 'player'] },
       { type: 'wait', seconds: 1.1 },
       { type: 'blackout', seconds: 3, wake: false },

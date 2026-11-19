@@ -1,7 +1,7 @@
 // ───────────────────────────────────────────────────────────────
 //  fx.js — 총구 불꽃, 예광탄, 피격 이펙트, 효과음(WebAudio 합성)
 // ───────────────────────────────────────────────────────────────
-import { THREE, G, rand } from './core.js';
+import { THREE, G, rand, groundAt } from './core.js';
 
 // ════════════════ 시각 효과 ════════════════
 function radialTexture(inner, outer) {
@@ -42,6 +42,9 @@ export function resetFX() {
   fires.length = 0;
   for (const m of missiles) m.mesh.removeFromParent();
   missiles.length = 0;
+  for (const w of waves) w.mesh.removeFromParent(); waves.length = 0;
+  for (const d of debris) d.mesh.removeFromParent(); debris.length = 0;
+  for (const c of scorches) c.removeFromParent(); scorches.length = 0;
   G.shake = 0;
   if (muzzleLight && !muzzleLight.parent) G.scene.add(muzzleLight);
   if (boomLight && !boomLight.parent) G.scene.add(boomLight);
@@ -111,10 +114,10 @@ export function impact(pos, normal, kind = 'dust') {
 
 export function updateFX(dt) {
   if (muzzleLight) muzzleLight.intensity = Math.max(0, muzzleLight.intensity - dt * 120);
-  if (boomLight) boomLight.intensity = Math.max(0, boomLight.intensity - dt * 60);
   G.shake = Math.max(0, (G.shake || 0) - dt * 1.2);
   updateFires(dt);
   updateMissiles(dt);
+  updateBlast(dt);
   for (let i = live.length - 1; i >= 0; i--) {
     const f = live[i];
     f.t += dt;
@@ -129,7 +132,7 @@ export function updateFX(dt) {
     else {
       if (f.fade) f.obj.material.opacity = 1 - p;
       if (f.grow) f.obj.scale.multiplyScalar(1 + f.grow * dt);
-      if (f.v) f.obj.position.addScaledVector(f.v, dt);
+      if (f.v) { if (f.g) f.v.y -= f.g * dt; f.obj.position.addScaledVector(f.v, dt); }
     }
   }
 }
@@ -261,26 +264,111 @@ const fires = [];
 const missiles = [];
 
 export function explosion(pos, size = 1) {
-  if (!boomLight) { boomLight = new THREE.PointLight(0xffa040, 0, 40, 1.6); G.scene.add(boomLight); }
   if (!boomLight.parent) G.scene.add(boomLight);
-  boomLight.position.copy(pos).y += 1.5;
-  boomLight.intensity = 60 * size;
-  for (let i = 0; i < 10; i++) {
+  boomLight.position.copy(pos).y += 2;
+  boomLight.distance = 45 + 25 * size;
+  boomLight.intensity = 260 * size;
+  boomDecay = 0;
+  const V = (x, y, z) => new THREE.Vector3(x, y, z);
+  const gy = groundAt(pos.x, pos.z, pos.y + 1, 10, G.groundColliders) ?? pos.y - 0.5;   // 실제 바닥 높이 (차 지붕 말고)
+  // 1) 첫 섬광
+  const fl = getSprite(texFlash, true);
+  fl.position.copy(pos).y += 1;
+  fl.scale.setScalar(16 * size);
+  live.push({ obj: fl, type: 'sprite', t: 0, life: 0.18, fade: true, grow: 2 });
+  // 2) 불덩어리 (빠르게 커지는 안쪽 + 천천히 피어오르는 바깥)
+  for (let i = 0; i < 26; i++) {
     const s = getSprite(texFire, true);
-    s.position.copy(pos).add(new THREE.Vector3(rand(-1, 1), rand(0, 1.5), rand(-1, 1)).multiplyScalar(size));
-    const k = rand(1.5, 3) * size;
-    s.scale.set(k, k, k);
-    live.push({ obj: s, type: 'sprite', t: 0, life: rand(0.4, 0.8), fade: true, grow: 1.6, v: new THREE.Vector3(rand(-3, 3), rand(2, 6), rand(-3, 3)).multiplyScalar(size) });
+    const inner = i < 12;
+    s.position.copy(pos).add(V(rand(-1.2, 1.2), rand(0.2, 2.2), rand(-1.2, 1.2)).multiplyScalar(size));
+    s.scale.setScalar(rand(inner ? 2.5 : 3.5, inner ? 4.5 : 7) * size);
+    s.material.rotation = rand(0, 6.28);
+    live.push({ obj: s, type: 'sprite', t: 0, life: rand(inner ? 0.35 : 0.7, inner ? 0.6 : 1.3), fade: true, grow: inner ? 2.2 : 0.9,
+      v: V(rand(-5, 5), rand(3, 10), rand(-5, 5)).multiplyScalar(size * (inner ? 0.6 : 1)) });
   }
-  for (let i = 0; i < 14; i++) {
+  // 3) 불똥
+  for (let i = 0; i < 40; i++) {
+    const s = getSprite(texSpark, true);
+    s.position.copy(pos).y += 0.8;
+    s.scale.setScalar(rand(0.12, 0.3));
+    live.push({ obj: s, type: 'sprite', t: 0, life: rand(0.8, 1.8), fade: true, grow: 0,
+      v: V(rand(-1, 1), rand(0.3, 1.4), rand(-1, 1)).normalize().multiplyScalar(rand(8, 22) * size), g: 9 });
+  }
+  // 4) 연기 기둥 (오래 남음)
+  for (let i = 0; i < 30; i++) {
     const s = getSprite(texSmoke, false);
-    s.position.copy(pos).add(new THREE.Vector3(rand(-1.5, 1.5), rand(0.5, 2.5), rand(-1.5, 1.5)).multiplyScalar(size));
-    const k = rand(2, 4) * size;
-    s.scale.set(k, k, k);
-    live.push({ obj: s, type: 'sprite', t: 0, life: rand(3, 6), fade: true, grow: 0.35, v: new THREE.Vector3(rand(-0.6, 0.6), rand(0.8, 2), rand(-0.6, 0.6)) });
+    s.position.copy(pos).add(V(rand(-2, 2), rand(0.5, 3), rand(-2, 2)).multiplyScalar(size));
+    s.scale.setScalar(rand(3, 6) * size);
+    s.material.rotation = rand(0, 6.28);
+    live.push({ obj: s, type: 'sprite', t: -rand(0, 0.5), life: rand(5, 9), fade: true, grow: 0.25,
+      v: V(rand(-0.8, 0.8), rand(1.2, 3.2), rand(-0.8, 0.8)) });
   }
-  G.shake = Math.min(2, (G.shake || 0) + 1.4 * size);
-  sfxBoom();
+  // 5) 땅을 따라 퍼지는 먼지
+  for (let i = 0; i < 16; i++) {
+    const a = i / 16 * Math.PI * 2;
+    const s = getSprite(texPuff, false);
+    s.position.copy(pos).y += 0.4;
+    s.scale.setScalar(2.2 * size);
+    live.push({ obj: s, type: 'sprite', t: 0, life: rand(1.5, 2.5), fade: true, grow: 0.8, v: V(Math.cos(a) * 9, 0.4, Math.sin(a) * 9).multiplyScalar(size) });
+  }
+  // 6) 충격파 고리
+  const ring = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: 0xfff1d0, transparent: true, opacity: 0.7, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }));
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.set(pos.x, gy + 0.3, pos.z);
+  G.scene.add(ring);
+  waves.push({ mesh: ring, t: 0, size });
+  // 7) 파편
+  for (let i = 0; i < 28; i++) {
+    const m = new THREE.Mesh(debrisGeo, debrisMat);
+    m.position.copy(pos).y += 0.6;
+    m.scale.set(rand(0.4, 1.6), rand(0.3, 1), rand(0.4, 1.6)).multiplyScalar(size);
+    m.castShadow = true;
+    G.scene.add(m);
+    debris.push({ mesh: m, v: V(rand(-1, 1), rand(0.6, 1.6), rand(-1, 1)).normalize().multiplyScalar(rand(6, 16) * size), spin: V(rand(-9, 9), rand(-9, 9), rand(-9, 9)), ground: gy, life: 8 });
+  }
+  // 8) 바닥 그을음
+  const sc = new THREE.Mesh(scorchGeo, scorchMat);
+  sc.rotation.x = -Math.PI / 2;
+  sc.position.set(pos.x, gy + 0.03, pos.z);
+  sc.scale.setScalar(size);
+  G.scene.add(sc);
+  scorches.push(sc);
+  G.shake = Math.min(3.5, (G.shake || 0) + 2.6 * size);
+  sfxBoom(size);
+}
+const ringGeo = new THREE.RingGeometry(0.85, 1, 48);
+const debrisGeo = new THREE.BoxGeometry(0.22, 0.12, 0.18);
+const debrisMat = new THREE.MeshStandardMaterial({ color: 0x2b2826, roughness: 0.9 });
+const scorchGeo = new THREE.CircleGeometry(4.5, 32);
+const scorchMat = new THREE.MeshBasicMaterial({ color: 0x050403, transparent: true, opacity: 0.75, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 });
+const waves = [], debris = [], scorches = [];
+let boomDecay = 0;
+function updateBlast(dt) {
+  boomDecay += dt;
+  if (boomLight) boomLight.intensity = boomLight.intensity * Math.exp(-dt * 4.5);
+  for (let i = waves.length - 1; i >= 0; i--) {
+    const w = waves[i];
+    w.t += dt;
+    const k = w.t / 0.7;
+    w.mesh.scale.setScalar(1 + k * 22 * w.size);
+    w.mesh.material.opacity = 0.7 * Math.max(0, 1 - k);
+    if (k >= 1) { w.mesh.removeFromParent(); w.mesh.material.dispose(); waves.splice(i, 1); }
+  }
+  for (let i = debris.length - 1; i >= 0; i--) {
+    const d = debris[i];
+    d.life -= dt;
+    if (d.v) {
+      d.v.y -= 18 * dt;
+      d.mesh.position.addScaledVector(d.v, dt);
+      d.mesh.rotation.x += d.spin.x * dt; d.mesh.rotation.y += d.spin.y * dt; d.mesh.rotation.z += d.spin.z * dt;
+      if (d.mesh.position.y < d.ground + 0.05) {
+        d.mesh.position.y = d.ground + 0.05;
+        d.v.y *= -0.3; d.v.x *= 0.5; d.v.z *= 0.5; d.spin.multiplyScalar(0.5);
+        if (Math.abs(d.v.y) < 1) d.v = null;       // 멈춤
+      }
+    }
+    if (d.life <= 0) { d.mesh.removeFromParent(); debris.splice(i, 1); }
+  }
 }
 
 /** 계속 타오르는 불 (챕터가 끝나면 사라짐) */
@@ -314,11 +402,33 @@ function updateFires(dt) {
   }
 }
 
-const missileGeo = new THREE.CylinderGeometry(0.12, 0.18, 1.8, 8).rotateX(Math.PI / 2);
+function buildMissile() {
+  const g = new THREE.Group();
+  const body = new THREE.MeshStandardMaterial({ color: 0x5b6052, metalness: 0.4, roughness: 0.55 });
+  const dark = new THREE.MeshStandardMaterial({ color: 0x2a2c2e, metalness: 0.5, roughness: 0.5 });
+  const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 3.2, 14).rotateX(Math.PI / 2), body);
+  const nose = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.9, 14).rotateX(Math.PI / 2), dark);
+  nose.position.z = 2.05;
+  g.add(tube, nose);
+  for (let k = 0; k < 4; k++) {
+    const fin = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.7, 0.6), dark);
+    fin.position.z = -1.3;
+    fin.rotation.z = k * Math.PI / 2;
+    fin.position.x = Math.sin(k * Math.PI / 2) * 0.35; fin.position.y = Math.cos(k * Math.PI / 2) * 0.35;
+    g.add(fin);
+  }
+  const flame = new THREE.Sprite(new THREE.SpriteMaterial({ map: texFlash, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
+  flame.position.z = -1.9;
+  flame.scale.setScalar(2.2);
+  g.add(flame);
+  g.userData.flame = flame;
+  g.traverse(o => { if (o.isMesh) o.castShadow = true; });
+  return g;
+}
 /** 미사일: from → to 로 날아가 폭발. 도착하면 resolve */
 export function missile(from, to, dur, size = 1) {
   return new Promise(res => {
-    const mesh = new THREE.Mesh(missileGeo, new THREE.MeshStandardMaterial({ color: 0x55585a, metalness: 0.5, roughness: 0.5 }));
+    const mesh = buildMissile();
     mesh.position.copy(from);
     mesh.lookAt(to);
     G.scene.add(mesh);
@@ -332,17 +442,19 @@ function updateMissiles(dt) {
     m.t += dt;
     const k = Math.min(1, m.t / m.dur);
     m.mesh.position.lerpVectors(m.from, m.to, k * k);
+    const fl = m.mesh.userData.flame;
+    fl.scale.setScalar(rand(1.8, 2.8));
     m.trail -= dt;
-    if (m.trail <= 0) {
-      m.trail = 0.02;
+    while (m.trail <= 0) {
+      m.trail += 0.012;
       const s = getSprite(texSmoke, false);
-      s.position.copy(m.mesh.position);
-      s.scale.setScalar(0.7);
-      live.push({ obj: s, type: 'sprite', t: 0, life: 1.6, fade: true, grow: 1.2 });
+      s.position.copy(m.mesh.position).add(new THREE.Vector3(rand(-0.2, 0.2), rand(-0.2, 0.2), rand(-0.2, 0.2)));
+      s.scale.setScalar(rand(1.2, 1.8));
+      live.push({ obj: s, type: 'sprite', t: 0, life: 3, fade: true, grow: 0.9 });
       const f = getSprite(texFire, true);
       f.position.copy(m.mesh.position);
-      f.scale.setScalar(0.8);
-      live.push({ obj: f, type: 'sprite', t: 0, life: 0.08, fade: true });
+      f.scale.setScalar(1.4);
+      live.push({ obj: f, type: 'sprite', t: 0, life: 0.12, fade: true });
     }
     if (k >= 1) {
       m.mesh.removeFromParent();
@@ -353,24 +465,30 @@ function updateMissiles(dt) {
   }
 }
 
-export function sfxBoom() {
-  noise(2.5, { freq: 300, vol: 1.0, attack: 0.005, decay: 2.3 });
-  noise(0.4, { freq: 2500, vol: 0.6, decay: 0.35 });
-  tone(70, 1.6, { vol: 0.8, to: 25, type: 'sine' });
+export function sfxBoom(size = 1) {
+  const v = Math.min(1.4, 0.8 + size * 0.3);
+  noise(0.08, { type: 'highpass', freq: 1500, vol: v, attack: 0.001, decay: 0.08 });     // 처음 '쾅'
+  noise(3.5, { freq: 260, vol: v, attack: 0.004, decay: 3.2 });                          // 굉음
+  noise(2.2, { freq: 900, vol: v * 0.5, attack: 0.01, decay: 1.6, when: 0.03 });          // 잔해 소리
+  tone(55, 2.4, { vol: v * 0.9, to: 22, type: 'sine' });                                   // 저음
+  tone(90, 0.6, { vol: v * 0.6, to: 30, type: 'triangle' });
+  noise(1.5, { type: 'bandpass', freq: 3000, q: 0.6, vol: 0.25, attack: 0.3, decay: 1.4, when: 0.4 });   // 파편 떨어지는 소리
 }
 export function sfxWhistle(dur) {
   if (!ac) return;
   const t = ac.currentTime;
   const o = ac.createOscillator();
-  o.type = 'sine';
-  o.frequency.setValueAtTime(1800, t);
-  o.frequency.exponentialRampToValueAtTime(500, t + dur);
+  o.type = 'sawtooth';
+  o.frequency.setValueAtTime(1500, t);
+  o.frequency.exponentialRampToValueAtTime(380, t + dur);
+  const f = ac.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 2200;
   const g = ac.createGain();
   g.gain.setValueAtTime(0.001, t);
-  g.gain.exponentialRampToValueAtTime(0.18, t + dur * 0.8);
+  g.gain.exponentialRampToValueAtTime(0.3, t + dur * 0.85);
   g.gain.linearRampToValueAtTime(0, t + dur);
-  o.connect(g); g.connect(master);
+  o.connect(f); f.connect(g); g.connect(master);
   o.start(t); o.stop(t + dur + 0.05);
+  noise(dur, { freq: 600, vol: 0.4, attack: dur * 0.9, decay: dur });                     // 다가오는 로켓 소리
 }
 /** 이명 (삐—) */
 export function sfxRing(dur = 4) { tone(3600, dur, { vol: 0.12, type: 'sine' }); }
