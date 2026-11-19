@@ -52,6 +52,10 @@
 //   { type:'sound', name:'kick'|'gunshot'|'boom' }
 //   { type:'map', id:'seoul_ruins' }                챕터 도중 맵 바꾸기 (화면이 까말 때 쓰면 자연스러움)
 //   { type:'wake' }                                  blackout 에 wake:false 를 줬을 때 깨어나기
+//   { type:'choice', options:[ {label:'처형', to:'execute'}, {label:'거절', to:'refuse'} ] }
+//         → 화면에 선택 버튼 (클릭 또는 1·2 키). 고른 버튼의 to 와 같은 이름의 label 로 이동
+//   { type:'label', name:'execute' }                선택지가 이동할 위치 표시
+//   { type:'jump', to:'execute' }                    그 label 로 바로 이동
 //
 //  [챕터 옵션]
 //   player:'dongmu'                  이 챕터 주인공
@@ -184,7 +188,7 @@ export const CHAPTERS = [
 
       // ── 편의점 안 ──
       { type: 'prop', id: 'tv', model: 'tv', pos: [-1.65, 2.25, -15.4], rot: -90,
-        text: ['리충성, 김준호 국무위원장 총살', '오늘 오전 3시경 · 대한민국 공격 우려'] },
+        text: ['리충성, 김준호 국무위원장 살해', '오늘 오전 3시경 · 대한민국 공격 우려'] },
       { type: 'actor', who: 'colonel_mask', pos: [-6.4, -16.2], rot: 0 },
       { type: 'actor', who: 'park_changwon', pos: [-6.4, -13.9], rot: 180 },
       { type: 'actor', who: 'lee_jayong', pos: [-3.3, -16.9], rot: -45 },
@@ -205,7 +209,7 @@ export const CHAPTERS = [
       { type: 'player', rot: 90 },
       { type: 'camera', from: [-4.6, 1.75, -14.4], to: [-3.5, 1.95, -15.0], lookAt: [-1.6, 2.2, -15.4], duration: 3 },
       { type: 'dialogue', lines: [
-        { name: '뉴스 앵커', text: '속보입니다. 오늘 오전 3시경, 리충성이라는 인민군이 김준호 국무위원장을 총살했습니다. 이것으로 인해 대한민국 공격이 우려되며...', radio: true },
+        { name: '뉴스 앵커', text: '속보입니다. 오늘 오전 3시경, 리충성이라는 인민군이 김준호 국무위원장을 살해했습니다. 이것으로 인해 대한민국 공격이 우려되며...', radio: true },
       ] },
       { type: 'actor', who: 'park_changwon', pos: [-5.4, -12.2], rot: 160 },
       { type: 'dialogue', lines: [
@@ -360,12 +364,29 @@ export const CHAPTERS = [
       { type: 'fade', out: false, duration: 1 },
       { type: 'dialogue', lines: [
         { text: '그리고 결국 그 한명을 동무가 직접 처형하게 된다' },
-        { who: 'dongmu', text: '못하겠소.' },
-        { who: 'ri_oksun', text: '그럼 배반자와 함께 죽으시오.', anim: 'Command' },
+        { who: 'ri_oksun', text: '처형하라우.', anim: 'Command' },
       ] },
+      // ── 선택: 처형 / 거절 ──
+      { type: 'choice', options: [ { label: '처형', to: 'execute' }, { label: '거절', to: 'refuse' } ] },
+
+      // 선택-거절
+      { type: 'label', name: 'refuse' },
+      { type: 'dialogue', lines: [ { who: 'ri_oksun', text: '그럼 배반자와 함께 죽으시오.', anim: 'Command' } ] },
       { type: 'shoot', from: 'g1', at: 'player', shots: 2, wait: false },
       { type: 'shoot', from: 'g2', at: 'target', shots: 2 },
       { type: 'wait', seconds: 2.5 },
+      { type: 'fade', out: true, duration: 2.5 },
+      { type: 'end' },
+
+      // 선택-처형 (직접 보여주지 않고 암전 + 총소리)
+      { type: 'label', name: 'execute' },
+      { type: 'fade', out: true, duration: 0.15 },
+      { type: 'sound', name: 'gunshot' },
+      { type: 'kill', id: 'target' },
+      { type: 'wait', seconds: 1.5 },
+      { type: 'fade', out: false, duration: 1.5 },
+      { type: 'dialogue', lines: [ { who: 'ri_oksun', text: '남은 배반자들도 다 처리하라우. 마을도 싹다 불태우고.', anim: 'Command' } ] },
+      { type: 'wait', seconds: 1 },
       { type: 'fade', out: true, duration: 2.5 },
       { type: 'end' },
     ],

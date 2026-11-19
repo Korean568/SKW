@@ -203,6 +203,31 @@ function updateTyping(dt) {
 }
 export const dialogueOpen = () => !!dlg;
 
+// ── 선택지 ───────────────────────────────────────────────────
+let choiceRes = null;
+/** 버튼을 보여주고 고른 번호(0부터)를 돌려줌 */
+export function choice(labels, text) {
+  const box = $('choice');
+  $('choice-text').textContent = text || '';
+  const list = $('choice-list');
+  list.innerHTML = '';
+  labels.forEach((l, i) => {
+    const b = document.createElement('button');
+    b.innerHTML = `<kbd>${i + 1}</kbd> ${escapeHTML(l)}`;
+    b.onclick = () => pickChoice(i);
+    list.appendChild(b);
+  });
+  box.classList.remove('hidden');
+  return new Promise(res => { choiceRes = res; });
+}
+export function pickChoice(i) {
+  if (!choiceRes || i >= $('choice-list').children.length) return;
+  const r = choiceRes; choiceRes = null;
+  $('choice').classList.add('hidden');
+  r(i);
+}
+export function hideChoice() { choiceRes = null; $('choice').classList.add('hidden'); }
+
 // ── 무전 자막 (게임 진행 중, 자동으로 넘어감) ──────────────────
 export async function radio(lines, isCancelled) {
   const box = $('radio');

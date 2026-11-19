@@ -38,6 +38,7 @@ function guard(promise) {
 export function skipWait() { for (const w of waiters) w.skip = true; UI.skipDialogue(); }
 export function cancelRunner() {
   if (token) token.cancelled = true;
+  UI.hideChoice();
   UI.skipDialogue();
   UI.endDialogue();
   tickRunner();
@@ -54,7 +55,8 @@ export async function runChapter(ch, from, onComplete) {
       G.stepIndex = i;
       const s = steps[i];
       if (s.type === 'end') break;
-      await exec(s, i, tok);
+      const jump = await exec(s, i, tok);
+      if (typeof jump === 'number') i = jump - 1;     // 선택지 / jump 로 이동
     }
     check(tok);
     onComplete && onComplete();
@@ -343,6 +345,25 @@ async function exec(s, i, tok) {
       UI.blur(0, s.blur ?? 4);
       break;
 
+    case 'choice': {
+      // { type:'choice', text:'', options:[ {label:'처형', to:'execute'}, ... ] }
+      const prev = G.mode;
+      G.mode = 'choice';
+      UI.letterbox(true);
+      document.exitPointerLock && document.exitPointerLock();
+      const k = await guard(UI.choice((s.options || []).map(o => o.label), s.text));
+      G.mode = prev === 'play' ? 'play' : 'cutscene';
+      const to = s.options[k] && s.options[k].to;
+      if (to) return findLabel(to);
+      break;
+    }
+
+    case 'label':
+      break;
+
+    case 'jump':
+      return findLabel(s.to);
+
     case 'waitLanding':
       await waitUntil(() => !U.parasInAir());
       break;
@@ -350,6 +371,12 @@ async function exec(s, i, tok) {
     default:
       console.warn('알 수 없는 step type:', s.type);
   }
+}
+
+function findLabel(name) {
+  const idx = G.chapter.steps.findIndex(x => x.type === 'label' && x.name === name);
+  if (idx < 0) throw new Error(`label '${name}' 을(를) 찾을 수 없습니다`);
+  return idx;
 }
 
 function endCutscene() {

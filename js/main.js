@@ -268,6 +268,7 @@ function bindInput() {
     if (e.repeat) { input.keys.add(e.code); return; }
     input.keys.add(e.code);
     FX.initAudio();
+    if (G.mode === 'choice' && !G.paused && /^Digit[1-9]$/.test(e.code)) UI.pickChoice(+e.code.slice(5) - 1);
     if (G.mode === 'dialogue' && !G.paused) {
       if (e.code === 'Space' || e.code === 'Enter') UI.advance();
       if (e.code === 'Tab') UI.skipDialogue();
@@ -283,7 +284,7 @@ function bindInput() {
   addEventListener('keyup', e => input.keys.delete(e.code));
   addEventListener('blur', () => { input.keys.clear(); input.fire = input.aim = false; });
   document.addEventListener('mousedown', e => {
-    if (e.target.closest && e.target.closest('#screens')) return;
+    if (e.target.closest && (e.target.closest('#screens') || e.target.closest('#choice'))) return;
     FX.initAudio();
     if (G.paused) return;
     if (G.mode === 'dialogue' && e.button === 0) UI.advance();
