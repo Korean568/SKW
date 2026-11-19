@@ -6,14 +6,14 @@ import { GAME, CHARACTERS, MAPS, PROPS, CHAPTERS } from './story.js';
 import * as FX from './fx.js';
 import * as UI from './ui.js';
 import { $ } from './ui.js';
-import { Character, Player, updatePlayer, updateUnits, removeUnit, killUnit, createUnit } from './units.js';
+import { Character, Player, updatePlayer, updateUnits, removeUnit, killUnit, createUnit, clearKnives } from './units.js';
 import { initWorld, setMap, updateWorld, updateProps, clearProps, getGLTF } from './world.js';
 import { runChapter, tickRunner, cancelRunner, skipWait } from './runner.js';
 import * as VM from './viewmodel.js';
 import * as GFX from './gfx.js';
 
 const clock = new THREE.Clock();
-const input = { keys: new Set(), fire: false, aim: false, dx: 0, dy: 0 };
+const input = { keys: new Set(), fire: false, aim: false, dx: 0, dy: 0, wheel: 0 };
 let locked = false;
 let freeMouse = false;   // 포인터 잠금이 안 되는 환경(임베드 등)에서는 마우스 이동만으로 조준
 
@@ -114,17 +114,20 @@ function chapterAssets(ch) {
     if (Array.isArray(s)) { s.forEach(visit); return; }
     if (s.who && CHARACTERS[s.who]) chars.add(s.who);
     if (s.type === 'prop' && PROPS[s.model] && PROPS[s.model].file) props.add(s.model);
+    if (s.type === 'map' && MAPS[s.id]) props.add('map:' + s.id);
     if (s.enemies) for (const e of s.enemies) chars.add(e.who || 'nk_soldier');
     for (const k of ['steps', 'lines', 'enemies', 'waves']) if (s[k]) visit(s[k]);
   };
   visit(ch.steps);
-  return [MAPS[ch.map].file, ...[...chars].map(k => CHARACTERS[k].file), ...[...props].map(k => PROPS[k].file)];
+  return [MAPS[ch.map].file, ...[...chars].map(k => CHARACTERS[k].file),
+    ...[...props].map(k => k.startsWith('map:') ? MAPS[k.slice(4)].file : PROPS[k].file)];
 }
 
 function clearWorld() {
   for (const u of [...G.units]) removeUnit(u);
   if (G.player) { G.player.char.dispose(); G.player = null; }
   clearProps();
+  clearKnives();
   FX.resetFX();
   UI.objective(''); UI.waypoint(null); UI.bossBar(null); UI.clearRadio(); UI.hideTitleCard();
   UI.blur(0, 0);
@@ -151,8 +154,10 @@ async function startChapter(idx) {
     await setMap(ch.map);
     const pk = ch.player || GAME.player;
     const gltf = await getGLTF(pk);
-    G.player = new Player(new Character(pk, CHARACTERS[pk], gltf));
+    G.player = new Player(new Character(pk, CHARACTERS[pk], gltf), { weapons: ch.weapons });
+    if (ch.playerNoWeapon) G.player.char.setNoWeapon(true);
     VM.buildViewmodel(gltf);
+    VM.setWeapon(G.player.weapon);
     const st = ch.start || { pos: [0, 0], rot: 0 };
     G.player.place(st.pos, st.rot || 0);
     G.time = 0;
@@ -181,6 +186,9 @@ function restartCheckpoint() {
   const p = G.player;
   p.alive = true; p.hp = p.maxHp; p.mag = p.magSize; p.reloadT = 0; p.lastHurt = -99;
   p.resetPlate();
+  p.throwCount = p.throwMax;
+  p.char.pose = null;
+  clearKnives();
   p.char.revive();
   p.hidden = false;
   UI.blur(0, 0);
@@ -288,6 +296,7 @@ function bindInput() {
     if (e.button === 2) input.aim = false;
   });
   document.addEventListener('contextmenu', e => e.preventDefault());
+  addEventListener('wheel', e => { if (G.mode === 'play') input.wheel += Math.sign(e.deltaY); }, { passive: true });
   document.addEventListener('pointerlockerror', () => { freeMouse = true; });
   document.addEventListener('mousemove', e => {
     if (!locked && !(freeMouse && G.mode === 'play' && !G.paused)) return;
@@ -424,6 +433,7 @@ function step(dt) {
   GFX.render(dt);
   if (fpPlay) VM.render(G.renderer);
   input.dx = input.dy = 0;
+  input.wheel = 0;
   // 디버그 표시
   fpsN++; fpsT += dt;
   if (fpsT > 0.5) { fps = Math.round(fpsN / fpsT); fpsN = 0; fpsT = 0; }

@@ -43,6 +43,21 @@
 //   { type:'propMove', id:'heli', to:[x,y,z], rot:0, duration:5, wait:true }        소품 이동
 //   { type:'rotor', id:'heli', on:false }                헬기 날개 회전 켜기/끄기
 //   { type:'checkpoint' }        죽으면 여기서 다시 시작
+//   { type:'player', visible:false, pos:[x,z], rot:90, y:-60, down:true, up:true }   주인공 숨기기/옮기기/쓰러뜨리기
+//   { type:'shoot', from:'g1', at:'player', shots:3, wait:true }   정해진 사람이 쏘고 맞은 사람은 쓰러짐
+//   { type:'pose', id:'player', pose:'kneel' }     무릎 꿇기 (pose:null 로 풀기)
+//   { type:'kill', id:['lee_jayong'] }              그 자리에서 쓰러짐
+//   { type:'missile', from:[x,y,z], to:[x,y,z], burn:'van' }     미사일 + 폭발
+//   { type:'blackout', seconds:3 }                  기절(번쩍 → 암전 → 이명 → 깨어남)
+//   { type:'sound', name:'kick'|'gunshot'|'boom' }
+//   { type:'map', id:'seoul_ruins' }                챕터 도중 맵 바꾸기 (화면이 까말 때 쓰면 자연스러움)
+//   { type:'wake' }                                  blackout 에 wake:false 를 줬을 때 깨어나기
+//
+//  [챕터 옵션]
+//   player:'dongmu'                  이 챕터 주인공
+//   weapons:['knife','throwknife']   무기 (기본 소총). 1·2 키 / 휠로 바꿈
+//   playerNoWeapon:true              주인공 몸에 붙은 총 숨기기
+//   noFire:true                      사격 금지
 //   { type:'end' }               챕터 클리어
 //
 //  [애니메이션]
@@ -81,9 +96,13 @@ export const CHARACTERS = {
   ko_hyeokmyeong_ROK: { file: 'character/ROK/ko_hyeokmyeong_ROK.glb', name: '고혁명', rank: '', team: 'ROK' },
   // 인민군
   nk_soldier:         { file: 'character/NK/nk_soldier.glb',          name: '인민군 병사', rank: '', team: 'NK' },
-  ri_chungsong:       { file: 'character/NK/Lee(Ri)_chungsong.glb',   name: '리충성', rank: '', team: 'NK' },
+  ri_chungsong:       { file: 'character/NK/Lee(Ri)_chungsong.glb',   name: '리충성', rank: '최고령도자', team: 'NK' },
   ri_oksun:           { file: 'character/NK/Lee(Ri)_oksun.glb',       name: '리옥선', rank: '', team: 'NK' },
   kim_junho:          { file: 'character/NK/kim_junho.glb',           name: '김준호', rank: '', team: 'NK' },
+  // 고위간부 3명 = 김준호 모델에 옷 색만 바꿈 (recolor: { 재질이름: 색 })
+  official1:          { file: 'character/NK/kim_junho.glb', name: '고위간부 1', rank: '', team: 'NK', recolor: { camo: 0x2b3446, vest: 0x1e2533 } },
+  official2:          { file: 'character/NK/kim_junho.glb', name: '고위간부 2', rank: '', team: 'NK', recolor: { camo: 0x55585c, vest: 0x3f4245, hair: 0x9c9a96 } },
+  official3:          { file: 'character/NK/kim_junho.glb', name: '고위간부 3', rank: '', team: 'NK', recolor: { camo: 0x4a4632, vest: 0x36331f } },
   ko_hyeokmyeong_NK:  { file: 'character/NK/ko_hyeokmyeong_NK.glb',   name: '고혁명', rank: '', team: 'NK' },
   dongmu:             { file: 'character/NK/nk_soldier.glb',          name: '동무', rank: '', team: 'NK' },   // 스토리 2 주인공
   nk_civilian_man:    { file: 'character/NK/nk_civilian_man.glb',     name: '주민', rank: '', team: null },
@@ -207,12 +226,14 @@ export const CHAPTERS = [
       { type: 'missile', from: [45, 80, 25], to: [-3.6, 0.6, -5.1], duration: 1.6, size: 1.2, burn: 'van' },
       { type: 'kill', id: ['lee_jayong', 'player'] },
       { type: 'wait', seconds: 1.1 },
-      { type: 'blackout', seconds: 3 },
+      { type: 'blackout', seconds: 3, wake: false },
+      { type: 'map', id: 'seoul_ruins' },          // 미사일 후 거리가 폐허로
 
       // ── 김민철이 기절했다가 일어난다 ──
       { type: 'actor', who: 'park_changwon', pos: [-3.4, -8.0], rot: 30 },
       { type: 'actor', who: 'colonel_mask', pos: [-7.6, -7.6], rot: 60 },
       { type: 'player', visible: false, up: true, rot: 60 },
+      { type: 'wake' },
       { type: 'camera', from: [-6.2, 0.3, -9.0], to: [-6.1, 1.5, -9.1], lookAt: [-3.2, 0.6, -7.0], lookAtTo: [-3.3, 1.3, -7.6], duration: 3.5 },
       { type: 'player', visible: true },
       { type: 'dialogue', lines: [
@@ -342,7 +363,135 @@ export const CHAPTERS = [
         { who: 'dongmu', text: '못하겠소.' },
         { who: 'ri_oksun', text: '그럼 배반자와 함께 죽으시오.', anim: 'Command' },
       ] },
-      { type: 'blackout', sound: 'gunshot', flash: false, ring: 0, fade: 0.05, seconds: 3, wake: false },
+      { type: 'shoot', from: 'g1', at: 'player', shots: 2, wait: false },
+      { type: 'shoot', from: 'g2', at: 'target', shots: 2 },
+      { type: 'wait', seconds: 2.5 },
+      { type: 'fade', out: true, duration: 2.5 },
+      { type: 'end' },
+    ],
+  },
+
+  // ───────────── 스토리 3 - 북한 주석궁 : 다시 현재 북한으로 ─────────────
+  //  맵: 금수산 태양궁전 내부. 대회의실(x 12~23, z -55~-45) → 중앙홀 → 남쪽 상황실 → 집무실(x 24~35, z -55~-45)
+  {
+    title: '스토리 3',
+    name: '북한 주석궁 : 다시 현재 북한으로',
+    map: 'kumsusan',
+    player: 'ri_chungsong',
+    playerNoWeapon: true,
+    weapons: ['knife', 'throwknife'],
+    start: { pos: [22.7, -49.75], rot: -90 },
+    steps: [
+      { type: 'fade', out: true, duration: 0 },
+      { type: 'title', text: '스토리 3 - 북한 주석궁 : 다시 현재 북한으로', sub: '-조선민주주의인민공화국편-', duration: 5, wait: true },
+      { type: 'dialogue', lines: [
+        { text: '리충성은 자신의 누나가 남한을 침략하는 것이 내키지 않는다.' },
+        { text: '그래서 리충성은 대회의를 시작한다' },
+      ] },
+
+      // ── 대회의 ──
+      { type: 'actor', who: 'official1', pos: [15.5, -52.3], rot: 0 },
+      { type: 'actor', who: 'official2', pos: [19.5, -52.3], rot: 0 },
+      { type: 'actor', who: 'official3', pos: [17.5, -46.8], rot: 180 },
+      { type: 'camera', from: [13.0, 2.6, -46.2], lookAt: [19.5, 1.2, -50], duration: 0 },
+      { type: 'fade', out: false, duration: 1.5 },
+      { type: 'dialogue', lines: [
+        { who: 'ri_chungsong', text: '동무들, 폭력을 쓰고 싶소 비폭력적으로 해결하고 싶소?' },
+        { who: 'official2', name: '고위간부들', text: '당연히 비폭력적아닙네까?' },
+        { who: 'ri_chungsong', text: '그러면 지금 조선이 남조선을 침략하는 것에 어떻게 생각하오?' },
+        { who: 'official1', text: '전쟁을 멈추고 서로 평화적으로 해결해야합네다.' },
+        { who: 'official2', text: '맞는 말이오.' },
+        { who: 'official3', text: '그러려면 리옥선 동지를 막아야 하는데...' },
+        { who: 'ri_chungsong', text: '그럼 이만 회의를 마치겠소.' },
+      ] },
+
+      // ── 리충성이 나간다 ──
+      { type: 'goto', pos: [9.0, -49.6], radius: 1.6, text: '회의실에서 나가라' },
+
+      // ── 리옥선의 부하들이 들이닥친다 → 고위간부 전원 사망 ──
+      { type: 'actor', who: 'nk_soldier', id: 'k1', pos: [26.5, -49.0], rot: -90, anim: 'Aim' },
+      { type: 'actor', who: 'nk_soldier', id: 'k2', pos: [26.5, -50.6], rot: -90, anim: 'Aim' },
+      { type: 'actor', who: 'nk_soldier', id: 'k3', pos: [27.6, -49.8], rot: -90, anim: 'Aim' },
+      { type: 'camera', from: [12.6, 2.1, -47.0], lookAt: [21.5, 1.3, -50], duration: 0 },
+      { type: 'move', id: 'k1', to: [22.3, -48.6], run: true },
+      { type: 'move', id: 'k2', to: [22.3, -51.0], run: true },
+      { type: 'move', id: 'k3', to: [21.8, -49.8], run: true, wait: true },
+      { type: 'shoot', from: 'k1', at: 'official1', shots: 3, wait: false },
+      { type: 'shoot', from: 'k2', at: 'official2', shots: 3, wait: false },
+      { type: 'shoot', from: 'k3', at: 'official3', shots: 3 },
+      { type: 'wait', seconds: 1.2 },
+
+      // ── 회의실에서 나간 리충성도 위험에 처한다 → 고혁명이 외친다 ──
+      { type: 'remove', id: 'k1' }, { type: 'remove', id: 'k2' }, { type: 'remove', id: 'k3' },
+      { type: 'spawn', enemies: [
+        { who: 'nk_soldier', pos: [-6, -52], rot: 90, alert: true, group: 'w1' },
+        { who: 'nk_soldier', pos: [-9, -46], rot: 90, alert: true, group: 'w1' },
+        { who: 'nk_soldier', pos: [-8, -40], rot: 90, alert: true, group: 'w1' },
+        { who: 'nk_soldier', pos: [-4, -35], rot: 90, alert: true, group: 'w1' },
+        { who: 'nk_soldier', pos: [-1, -29.5], rot: 180, alert: true, group: 'w1' },
+        { who: 'nk_soldier', pos: [-11, -33.5], rot: 60, alert: true, group: 'w1' },
+      ] },
+      { type: 'actor', who: 'ko_hyeokmyeong_NK', id: 'go', pos: [6.5, -41.5], rot: 160, gun: 'pistol' },
+      { type: 'camera', from: [3.2, 2.2, -36.6], lookAt: [7.5, 1.5, -45.5], duration: 0 },
+      { type: 'dialogue', lines: [
+        { who: 'ko_hyeokmyeong_NK', text: '리충성 동지! 빨리 이쪽으로 오십시오!', anim: 'Wave' },
+        { who: 'ri_chungsong', text: '알갔소!' },
+      ] },
+      { type: 'checkpoint' },
+      { type: 'goto', pos: [6.5, -42.8], radius: 2.0, text: '고혁명에게 달려가라' },
+      { type: 'ally', who: 'ko_hyeokmyeong_NK', id: 'go', follow: false, accuracy: 1.5, dmg: 55 },
+      { type: 'dialogue', lines: [
+        { who: 'ko_hyeokmyeong_NK', text: '저를 따라오십시오.' },
+        { who: 'ri_chungsong', text: '알갔소.' },
+      ] },
+
+      // ── 고혁명이 적을 처리하고, 리충성은 못 잡은 적을 단검으로 ──
+      { type: 'eliminate', text: '고혁명이 못 잡은 적을 처리하라', group: 'w1' },
+      { type: 'dialogue', lines: [
+        { who: 'ko_hyeokmyeong_NK', text: '집무실까지 경호해드리겠습네다.' },
+        { who: 'ri_chungsong', text: '고맙소.' },
+      ] },
+      { type: 'checkpoint' },
+      { type: 'move', id: 'go', to: [12.6, -37.6], run: true },
+      { type: 'spawn', enemies: [
+        { who: 'nk_soldier', pos: [21.5, -35.2], rot: -90, group: 'w2' },
+        { who: 'nk_soldier', pos: [14.4, -40.3], rot: 0, group: 'w2' },
+        { who: 'nk_soldier', pos: [29.5, -37.5], rot: -90, group: 'w2' },
+        { who: 'nk_soldier', pos: [33.5, -37.6], rot: -90, group: 'w2' },
+        { who: 'nk_soldier', pos: [29.6, -41.6], rot: -120, group: 'w2' },
+      ] },
+      { type: 'goto', pos: [10.5, -37.6], radius: 2.0, text: '고혁명을 따라가라' },
+      { type: 'move', id: 'go', to: [17.0, -37.6], run: true },
+      { type: 'eliminate', text: '고혁명이 못 잡은 적을 처리하라', group: 'w2' },
+
+      // ── 집무실 도착, 고혁명은 남은 적을 처리하러 간다 ──
+      { type: 'move', id: 'go', to: [26.5, -37.6], run: true },
+      { type: 'goto', pos: [29.75, -42.6], radius: 1.4, text: '집무실로 가라' },
+      { type: 'move', id: 'go', to: [12.6, -37.6], run: true },
+      { type: 'fade', out: true, duration: 0.8 },
+      { type: 'remove', id: 'go' },
+
+      // ── 양쪽 팔이 잡히고 리옥선 앞에 무릎 꿇린다 ──
+      { type: 'actor', who: 'ri_oksun', pos: [31.2, -49.75], rot: -90 },
+      { type: 'actor', who: 'nk_soldier', id: 'h1', pos: [27.6, -48.9], rot: 90, anim: 'Stand' },
+      { type: 'actor', who: 'nk_soldier', id: 'h2', pos: [27.6, -50.6], rot: 90, anim: 'Stand' },
+      { type: 'actor', who: 'nk_soldier', id: 'h3', pos: [30.3, -47.4], rot: -130, anim: 'Aim' },
+      { type: 'player', pos: [28.1, -49.75], rot: 90 },
+      { type: 'pose', id: 'player', pose: 'kneel' },
+      { type: 'camera', from: [31.9, 1.75, -48.3], lookAt: [28.1, 0.95, -49.75], duration: 0 },
+      { type: 'fade', out: false, duration: 1 },
+      { type: 'dialogue', lines: [
+        { who: 'ri_chungsong', text: '누이! 이게 무슨 정신나간 짓이오!', cam: false },
+        { who: 'ri_oksun', text: '조선은 강한 독재자가 필요하오.' },
+        { who: 'ri_chungsong', text: '틀렸소! 우린 공화국이 락원이 되길 바래서 반역을 한거잖소?', cam: false },
+        { who: 'ri_oksun', text: '이게 바로 락원으로 가는 길이오. 리.충.성.' },
+      ] },
+
+      // ── 리충성이 총을 맞고 사망한다 ──
+      { type: 'camera', from: [26.0, 2.0, -53.8], lookAt: [28.6, 0.8, -49.5], duration: 0 },
+      { type: 'shoot', from: 'h3', at: 'player', shots: 2 },
+      { type: 'wait', seconds: 2.5 },
+      { type: 'fade', out: true, duration: 2.5 },
       { type: 'end' },
     ],
   },

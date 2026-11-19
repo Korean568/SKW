@@ -398,3 +398,9 @@ export function playSound(name) {
   else if (name === 'boom') sfxBoom();
   else if (name === 'ring') sfxRing(4);
 }
+
+// 단검 소리
+export function sfxSwish() { noise(0.16, { type: 'bandpass', freq: 2600, q: 0.8, vol: 0.35, attack: 0.03, decay: 0.15 }); }
+export function sfxStab() { noise(0.12, { freq: 900, vol: 0.55, decay: 0.1 }); tone(120, 0.12, { vol: 0.35, to: 60 }); }
+export function sfxClink() { tone(2400, 0.12, { vol: 0.12, type: 'triangle' }); tone(3300, 0.1, { vol: 0.08, type: 'triangle', when: 0.02 }); }
+export function sfxPickup() { tone(990, 0.06, { vol: 0.1, type: 'triangle' }); tone(1480, 0.08, { vol: 0.08, type: 'triangle', when: 0.05 }); }

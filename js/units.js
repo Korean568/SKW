@@ -52,7 +52,19 @@ export class Character {
     this.model = SkeletonUtils.clone(gltf.scene);
     this.root.add(this.model);
     this.model.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = false; } });
+    // 옷 색 바꾸기: def.recolor = { 재질이름: 0xRRGGBB }
+    if (def.recolor) this.model.traverse(o => {
+      if (!o.isMesh) return;
+      const fix = m => { if (def.recolor[m.name] == null) return m; const c = m.clone(); c.color.setHex(def.recolor[m.name]); return c; };
+      o.material = Array.isArray(o.material) ? o.material.map(fix) : fix(o.material);
+    });
     this.weapon = this.model.getObjectByName('Weapon');
+    this.noWeapon = !!def.noWeapon;
+    this.bones = {};
+    for (const n of ['hips', 'L_thigh', 'R_thigh', 'L_shin', 'R_shin', 'L_foot', 'R_foot', 'R_hand', 'R_foreArm']) this.bones[n] = this.model.getObjectByName(n);
+    this.hipsY0 = this.bones.hips ? this.bones.hips.position.y : 0;
+    this.pose = null;
+    this.pistol = null;
     this.hasRifle = !!this.weapon && gltf.animations.some(a => a.name === 'Fire');
     this.spine = this.model.getObjectByName('spine');
     this.chest = this.model.getObjectByName('chest');
@@ -64,7 +76,70 @@ export class Character {
     for (const c of gltf.animations) this.actions[c.name] = this.mixer.clipAction(c);
     this.cur = null; this.curName = '';
     this.fallT = -1;
+    this.canShoot = this.hasRifle;
+    this.combatAnim = 'Fire';
     this.play(this.hasRifle ? 'Idle_Rifle' : 'Idle', { fade: 0 });
+    if (this.weapon && this.noWeapon) this.weapon.visible = false;
+  }
+  /** 총 모델 숨기기 (story.js 의 noWeapon) */
+  setNoWeapon(on) { this.noWeapon = on; if (this.weapon) this.weapon.visible = !on && !NO_WEAPON_ANIMS.has(this.curName); }
+  /** 권총을 오른손에 쥐여줌 (총 없는 캐릭터용) */
+  attachPistol() {
+    if (this.pistol) return;
+    const g = new THREE.Group();
+    const metal = new THREE.MeshStandardMaterial({ color: 0x1d1f22, metalness: 0.7, roughness: 0.4 });
+    const grip = new THREE.MeshStandardMaterial({ color: 0x3b2a1c, roughness: 0.8 });
+    const slide = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.035, 0.19), metal); slide.position.set(0, 0.02, 0.07);
+    const handle = new THREE.Mesh(new THREE.BoxGeometry(0.028, 0.1, 0.04), grip); handle.position.set(0, -0.035, -0.005); handle.rotation.x = 0.25;
+    g.add(slide, handle);
+    g.traverse(o => { if (o.isMesh) o.castShadow = true; });
+    this.pistolTip = new THREE.Object3D(); this.pistolTip.position.set(0, 0.02, 0.17); g.add(this.pistolTip);
+    G.scene.add(g);
+    this.pistol = g;
+    this.canShoot = true;
+    this.combatAnim = 'Command';
+  }
+  updatePistol() {
+    if (!this.pistol) return;
+    const h = this.bones.R_hand, f = this.bones.R_foreArm;
+    this.pistol.visible = this.root.visible && !!this.root.parent;
+    if (!h || !f) return;
+    this.root.updateMatrixWorld(true);
+    h.getWorldPosition(_ph); f.getWorldPosition(_pf);
+    _pd.subVectors(_ph, _pf).normalize();
+    this.pistol.position.copy(_ph).addScaledVector(_pd, 0.07);
+    this.pistol.lookAt(_ph.addScaledVector(_pd, 2));
+  }
+  /** 무릎 꿇기 등 자세 (애니메이션 위에 덮어씀) */
+  applyPose() {
+    const B = this.bones;
+    if (this.pose !== 'kneel' || !B.hips || !B.L_shin) {
+      if (B.hips && B.hips.position.y !== this.hipsY0) B.hips.position.y = this.hipsY0;
+      return;
+    }
+    if (this.kneelSign == null) this.calibrateKneel();
+    const k = this.kneelSign;
+    _pe.set(-0.12, 0, 0); B.L_thigh.quaternion.setFromEuler(_pe); B.R_thigh.quaternion.setFromEuler(_pe);
+    _pe.set(1.5 * k, 0, 0); B.L_shin.quaternion.setFromEuler(_pe); B.R_shin.quaternion.setFromEuler(_pe);
+    _pe.set(0.45 * k, 0, 0); if (B.L_foot) { B.L_foot.quaternion.setFromEuler(_pe); B.R_foot.quaternion.setFromEuler(_pe); }
+    B.hips.position.y = this.hipsY0 - this.kneelDrop;
+  }
+  /** 정강이를 어느 방향으로 접어야 발이 뒤로 가는지 한 번 계산 */
+  calibrateKneel() {
+    const B = this.bones;
+    const save = B.L_shin.quaternion.clone();
+    const footZ = sign => {
+      B.L_shin.quaternion.setFromEuler(_pe.set(1.5 * sign, 0, 0));
+      this.model.updateMatrixWorld(true);
+      const kn = this.model.worldToLocal(B.L_shin.getWorldPosition(new THREE.Vector3()));
+      const ft = this.model.worldToLocal((B.L_foot || B.L_shin).getWorldPosition(new THREE.Vector3()));
+      return ft.z - kn.z;
+    };
+    this.kneelSign = footZ(1) < footZ(-1) ? 1 : -1;
+    B.L_shin.quaternion.copy(save);
+    this.model.updateMatrixWorld(true);
+    const kn = B.L_shin.getWorldPosition(new THREE.Vector3()), ft = (B.L_foot || B.L_shin).getWorldPosition(new THREE.Vector3());
+    this.kneelDrop = Math.max(0.3, Math.min(0.6, kn.distanceTo(ft) / Math.max(0.001, this.root.scale.y)));
   }
   resolve(name) {
     if (this.actions[name]) return name;
@@ -83,7 +158,7 @@ export class Character {
     a.clampWhenFinished = once;
     a.fadeIn(fade).play();
     this.cur = a; this.curName = name;
-    if (this.weapon) this.weapon.visible = !NO_WEAPON_ANIMS.has(name);
+    if (this.weapon) this.weapon.visible = !this.noWeapon && !NO_WEAPON_ANIMS.has(name);
   }
   update(dt) {
     if (this.fallT >= 0) {
@@ -93,19 +168,25 @@ export class Character {
         this.model.rotation.x = -Math.PI / 2 * k;
         this.model.position.y = 0.16 * k;
       }
+      this.updatePistol();
       return;
     }
     this.mixer.update(dt);
+    this.applyPose();
+    this.updatePistol();
   }
   muzzle(out) {
+    if (this.pistol) { this.updatePistol(); return this.pistolTip.getWorldPosition(out); }
     if (!this.muzzleBone) return out.copy(this.root.position).y += 1.4;
     this.root.updateMatrixWorld(true);
     return out.copy(this.muzzleLocal).applyMatrix4(this.muzzleBone.matrixWorld);
   }
   fall() { this.fallT = 0; }
   revive() { this.fallT = -1; this.model.rotation.x = 0; this.model.position.y = 0; }
-  dispose() { this.root.removeFromParent(); this.mixer.stopAllAction(); }
+  dispose() { this.root.removeFromParent(); this.mixer.stopAllAction(); if (this.pistol) this.pistol.removeFromParent(); }
 }
+
+const _ph = new THREE.Vector3(), _pf = new THREE.Vector3(), _pd = new THREE.Vector3(), _pe = new THREE.Euler();
 
 // ── 공통 유닛 헬퍼 ───────────────────────────────────────────
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3(), _m = new THREE.Vector3();
@@ -135,6 +216,11 @@ export class Player {
     this.aiming = false; this.moving = false; this.sprinting = false;
     this.heat = 0;
     this.plateBroken = false; this.brokenHits = 0; this.plateT = 0;
+    // 무기: 'rifle' | 'knife' | 'throwknife'
+    this.weapons = opts.weapons && opts.weapons.length ? opts.weapons : ['rifle'];
+    this.wi = 0;
+    this.throwMax = opts.throwMax || 8; this.throwCount = this.throwMax;
+    this.meleeT = 0; this.prevFire = false;
     this.alive = true;
     G.scene.add(char.root);
   }
@@ -170,6 +256,7 @@ export class Player {
     UI.plate(this);
     G.onPlayerDeath && G.onPlayerDeath();
   }
+  get weapon() { return this.weapons[this.wi]; }
   resetPlate() { this.plateBroken = false; this.brokenHits = 0; this.plateT = 0; UI.plate(this); }
 }
 
@@ -208,7 +295,15 @@ export function updatePlayer(p, dt, inp) {
     UI.plate(p);
   }
   const plating = p.plateT > 0;
-  p.aiming = canAct && inp.aim && p.reloadT <= 0 && !plating;
+  // 무기 바꾸기: 1·2·3 키 / 마우스 휠
+  if (canAct && p.weapons.length > 1 && !plating) {
+    let ni = p.wi;
+    for (let i = 0; i < p.weapons.length; i++) if (inp.keys.has('Digit' + (i + 1))) ni = i;
+    if (inp.wheel) ni = (p.wi + (inp.wheel > 0 ? 1 : -1) + p.weapons.length) % p.weapons.length;
+    if (ni !== p.wi) { p.wi = ni; p.reloadT = 0; VM.setWeapon(p.weapon); UI.ammo(p); FX.sfxUI(); }
+  }
+  const melee = p.weapon !== 'rifle';
+  p.aiming = canAct && inp.aim && p.reloadT <= 0 && !plating && !melee;
   const wantFire = canAct && inp.fire && !plating && !(G.chapter && G.chapter.noFire);
   p.moving = mf !== 0 || mr !== 0;
   p.sprinting = p.moving && canAct && inp.keys.has('ShiftLeft') && mf > 0 && !p.aiming && !wantFire;
@@ -232,12 +327,21 @@ export function updatePlayer(p, dt, inp) {
   if (p.reloadT > 0) {
     p.reloadT -= dt;
     if (p.reloadT <= 0) { p.mag = p.magSize; UI.ammo(p); }
-  } else if (canAct && !plating && inp.keys.has('KeyR') && p.mag < p.magSize) startReload(p);
+  } else if (canAct && !plating && !melee && inp.keys.has('KeyR') && p.mag < p.magSize) startReload(p);
 
   // 사격
   p.heat = Math.max(0, p.heat - dt * 2.5);
   p.recoil = Math.max(0, (p.recoil || 0) - dt * 0.25 - (p.recoil || 0) * dt * 8);
-  if (wantFire && p.reloadT <= 0 && p.fireCD <= 0) {
+  p.meleeT -= dt;
+  const press = wantFire && !p.prevFire;
+  p.prevFire = wantFire;
+  if (melee) {
+    if (press && p.meleeT <= 0) {
+      if (p.weapon === 'knife') { meleeAttack(p); p.meleeT = 0.45; p.lastFire = G.time; }
+      else if (p.throwCount > 0) { throwKnife(p); p.meleeT = 0.4; p.lastFire = G.time; }
+      else FX.sfxEmpty();
+    }
+  } else if (wantFire && p.reloadT <= 0 && p.fireCD <= 0) {
     if (p.mag <= 0) { FX.sfxEmpty(); p.fireCD = 0.25; startReload(p); }
     else playerShoot(p);
   }
@@ -381,8 +485,10 @@ export function createUnit(kind, key, def, gltf, spec = {}) {
     follow: kind === 'ally' ? spec.follow !== false : false,
     slot: 0, moveTarget: null, moveRun: false, onArrive: null,
     anim: spec.anim || null,
+    dmg: spec.dmg || 0,
     spec,
   };
+  if (spec.gun === 'pistol') ch.attachPistol();
   placeUnit(u, spec.pos || [0, 0], spec.rot, spec.y);
   if (u.prone) ch.play('Prone_Fire', { fade: 0 });
   else if (u.anim) ch.play(u.anim, { fade: 0 });
@@ -412,6 +518,7 @@ function alertNear(e) {
 const MAX_SHOOTERS = 3;   // 동시에 플레이어를 쏠 수 있는 적 수
 export function updateUnits(dt) {
   const active = G.mode === 'play';
+  updateKnives(dt);
   let corpses = 0;
   // 플레이어에게 가까운 적 몇 명만 사격 허가
   if (G.player) {
@@ -429,7 +536,7 @@ export function updateUnits(dt) {
       continue;
     }
     if (u.kind === 'enemy') active ? updateEnemy(u, dt) : idleAnim(u);
-    else if (u.kind === 'ally' && active && u.char.hasRifle) updateAlly(u, dt);
+    else if (u.kind === 'ally' && active && u.char.canShoot) updateAlly(u, dt);
     else updateActor(u, dt);
     u.char.root.rotation.y = u.yaw;
     u.char.update(dt);
@@ -535,8 +642,8 @@ function updateAlly(u, dt) {
   }
   if (!t) { if (!u.follow) idleAnim(u); return; }
   u.yaw = angleLerp(u.yaw, yawTo(u.pos, t.pos), dt * 8);
-  u.char.play(moving ? 'Walk_Rifle' : 'Fire');
-  shootLogic(u, t, dt, 0.5);
+  u.char.play(moving ? 'Walk_Rifle' : u.char.combatAnim);
+  shootLogic(u, t, dt, 0.5 * u.accuracy);
 }
 
 function chooseTarget(e) {
@@ -544,7 +651,7 @@ function chooseTarget(e) {
   let best = p && p.alive ? p : null;
   let bd = best ? e.pos.distanceTo(p.pos) * 0.75 : 1e9;
   for (const o of G.units) {
-    if (o.kind !== 'ally' || !o.alive || !o.char.hasRifle) continue;
+    if (o.kind !== 'ally' || !o.alive || !o.char.canShoot) continue;
     const d = o.pos.distanceTo(e.pos);
     if (d < bd) { bd = d; best = o; }
   }
@@ -651,7 +758,7 @@ function fireAt(u, tgt, baseAcc) {
   if (wall) { FX.impact(wall.point, wall.normal, 'dust'); return; }
   if (!hit) return;
   if (tgt === G.player) tgt.damage(rand(5, 8), u.pos, Math.random() < PLATE.enemyHeadChance);
-  else if (tgt.kind === 'enemy') { damageUnit(tgt, rand(30, 45), u.pos, false); FX.impact(_c, null, 'blood'); }
+  else if (tgt.kind === 'enemy') { damageUnit(tgt, u.dmg || rand(30, 45), u.pos, false); FX.impact(_c, null, 'blood'); }
 }
 
 // 연출: 걸어가기
@@ -739,4 +846,127 @@ export function scriptedKill(u) {
   u.hp = 0;
   u.deadAt = G.time;
   u.char.fall();
+}
+
+// ════════════════ 단검 / 투척단검 ════════════════
+const _kf = new THREE.Vector3(), _kd = new THREE.Vector3();
+function meleeAttack(p) {
+  VM.swing('stab');
+  _kf.set(Math.sin(p.camYaw), 0, Math.cos(p.camYaw));
+  let best = null, bd = 2.5;
+  for (const u of G.units) {
+    if (u.kind !== 'enemy' || !u.alive) continue;
+    _kd.set(u.pos.x - p.pos.x, 0, u.pos.z - p.pos.z);
+    const d = _kd.length();
+    if (d > bd || Math.abs(u.pos.y - p.pos.y) > 1.6) continue;
+    if (d > 0.3 && _kd.divideScalar(d).dot(_kf) < 0.6) continue;   // 앞쪽 약 53° 안
+    best = u; bd = d;
+  }
+  G.stats.shots++;
+  if (!best) { FX.sfxSwish(); return; }
+  G.stats.hits++;
+  chestOf(best, _c);
+  FX.impact(_c, null, 'blood');
+  const killed = damageUnit(best, best.boss ? 90 : 300, p.pos, true);
+  UI.hitmarker(false, killed);
+  FX.sfxStab();
+}
+
+const knives = [];
+function throwKnife(p) {
+  VM.swing('throw');
+  FX.sfxSwish();
+  p.throwCount--;
+  UI.ammo(p);
+  G.stats.shots++;
+  const cam = G.camera;
+  const pos = new THREE.Vector3(); cam.getWorldPosition(pos);
+  const dir = new THREE.Vector3(); cam.getWorldDirection(dir);
+  pos.addScaledVector(dir, 0.4).y -= 0.08;
+  const mesh = VM.buildKnifeMesh(1.0, true);
+  mesh.position.copy(pos);
+  G.scene.add(mesh);
+  knives.push({ mesh, pos, vel: dir.multiplyScalar(32).add(new THREE.Vector3(0, 0.8, 0)), state: 'fly', t: 0 });
+}
+function restKnife(k, at, normal) {
+  k.state = 'rest';
+  k.pos.copy(at);
+  k.mesh.position.copy(at);
+  if (normal) { k.mesh.lookAt(_kd.copy(at).sub(normal)); }      // 벽에 꽂힘
+  else { k.mesh.rotation.set(Math.PI / 2, rand(0, 6.28), 0, 'YXZ'); k.mesh.position.y += 0.03; }
+}
+function updateKnives(dt) {
+  const p = G.player;
+  for (let i = knives.length - 1; i >= 0; i--) {
+    const k = knives[i];
+    if (k.state === 'fly') {
+      k.t += dt;
+      k.vel.y -= 7 * dt;
+      const len = k.vel.length() * dt;
+      _kd.copy(k.vel).normalize();
+      const wall = raycast(k.pos, _kd, len);
+      const hit = hitUnits(k.pos, _kd, wall ? wall.distance : len, u => u.kind === 'enemy');
+      if (hit) {
+        G.stats.hits++;
+        FX.impact(hit.point, null, 'blood');
+        const killed = damageUnit(hit.unit, hit.head ? 999 : (hit.unit.boss ? 80 : 300), p ? p.pos : k.pos, true);
+        UI.hitmarker(hit.head, killed);
+        FX.sfxStab();
+        const gy = hit.unit.pos.y;
+        restKnife(k, new THREE.Vector3(hit.unit.pos.x + rand(-0.3, 0.3), gy + 0.02, hit.unit.pos.z + rand(-0.3, 0.3)), null);
+        continue;
+      }
+      if (wall) {
+        FX.impact(wall.point, wall.normal, 'dust');
+        FX.sfxClink();
+        if (wall.normal.y > 0.7) restKnife(k, wall.point, null);
+        else restKnife(k, wall.point.clone().addScaledVector(_kd, -0.05), wall.normal);
+        continue;
+      }
+      k.pos.addScaledVector(k.vel, dt);
+      k.mesh.position.copy(k.pos);
+      k.mesh.lookAt(_kf.copy(k.pos).add(k.vel));
+      k.mesh.rotateX(k.t * 25);
+      if (k.t > 4) restKnife(k, k.pos.clone(), null);
+    } else if (p && p.alive) {
+      // 주워 담기
+      const dx = k.pos.x - p.pos.x, dz = k.pos.z - p.pos.z, dy = k.pos.y - p.pos.y;
+      if (Math.hypot(dx, dz) < 1.4 && dy > -1 && dy < 2.6 && p.throwCount < p.throwMax && p.weapons.includes('throwknife')) {
+        p.throwCount++;
+        k.mesh.removeFromParent();
+        knives.splice(i, 1);
+        FX.sfxPickup();
+        UI.ammo(p);
+      }
+    }
+  }
+}
+export function clearKnives() { for (const k of knives) k.mesh.removeFromParent(); knives.length = 0; }
+
+// ════════════════ 연출: 정해진 대상에게 사격 ════════════════
+/** shooter 가 target 을 shots 발 쏨. kill 이면 첫 발에 쓰러짐. wait(초) 함수를 받아 순서대로 실행 */
+export async function scriptedShoot(shooter, target, shots, kill, waitFn) {
+  if (!shooter || !target) return;
+  shooter.yaw = yawTo(shooter.pos, target.pos);
+  shooter.char.root.rotation.y = shooter.yaw;
+  shooter.char.play(shooter.char.combatAnim || 'Fire', { fade: 0.1 });
+  await waitFn(0.25);
+  const tgtChest = () => (target === G.player
+    ? _c.copy(target.pos).setY(target.pos.y + (target.char.pose === 'kneel' ? 0.85 : 1.3))
+    : chestOf(target, _c));
+  for (let k = 0; k < shots; k++) {
+    shooter.char.muzzle(_m);
+    const end = tgtChest().clone();
+    FX.muzzleFlash(_m, false);
+    FX.tracer(_m, end);
+    FX.sfxShot(_m.distanceTo(G.camera.position), false);
+    FX.impact(end, null, 'blood');
+    if (k === 0 && kill) {
+      if (target === G.player) { target.char.pose = null; target.char.fall(); }
+      else scriptedKill(target);
+    }
+    await waitFn(0.16);
+  }
+  await waitFn(0.4);
+  if (shooter.alive) shooter.char.play(shooter.anim || (shooter.char.hasRifle ? 'Aim' : 'Idle'), { fade: 0.3 });
 }

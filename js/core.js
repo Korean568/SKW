@@ -71,7 +71,33 @@ function onResize() {
 // ── 에셋 로딩 (캐시) ─────────────────────────────────────────
 const loader = new GLTFLoader();
 const cache = new Map();
+function loadOne(real, onProgress) {
+  return new Promise((res, rej) => loader.load(encodeURI(real), res, e => onProgress && onProgress(e.loaded, e.total), rej));
+}
+/** 여러 조각으로 나뉜 파일(아티팩트용 큰 맵)을 하나로 합침 — 같은 이름의 노드끼리 합쳐짐 */
+async function loadSplit(parts, onProgress) {
+  const prog = parts.map(() => [0, 1]);
+  const list = await Promise.all(parts.map((p, i) => loadOne(p, (l, t) => {
+    prog[i] = [l, t || l || 1];
+    onProgress && onProgress(prog.reduce((s, x) => s + x[0], 0), prog.reduce((s, x) => s + x[1], 0));
+  })));
+  const base = list[0];
+  for (const other of list.slice(1)) {
+    for (const node of [...other.scene.children]) {
+      const same = base.scene.getObjectByName(node.name);
+      if (same) { for (const c of [...node.children]) same.add(c); if (node.isMesh) same.add(node); }
+      else base.scene.add(node);
+    }
+  }
+  return base;
+}
+
 export function loadGLB(url, onProgress) {
+  const split = window.SKW_SPLIT && window.SKW_SPLIT[url];
+  if (split && !cache.has(url)) {
+    cache.set(url, loadSplit(split, onProgress).catch(() => { cache.delete(url); throw new Error('파일을 불러오지 못했습니다: ' + url); }));
+    return cache.get(url);
+  }
   if (!cache.has(url)) {
     cache.set(url, new Promise((res, rej) => {
       // 아티팩트 버전은 .glb 대신 같은 내용의 .gltf.json 을 씀

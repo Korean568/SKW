@@ -6,7 +6,7 @@ import { CHARACTERS } from './story.js';
 import * as U from './units.js';
 import * as UI from './ui.js';
 import * as FX from './fx.js';
-import { getGLTF, createProp, setCine, burnProp } from './world.js';
+import { getGLTF, createProp, setCine, burnProp, setMap } from './world.js';
 
 class Cancelled extends Error {}
 
@@ -175,6 +175,9 @@ async function exec(s, i, tok) {
         if (s.rot != null) u.yaw = s.rot * DEG;
         if (s.anim !== undefined) { u.anim = s.anim; if (s.anim) u.char.play(s.anim); }
       }
+      if (s.gun === 'pistol') u.char.attachPistol();
+      if (s.accuracy) u.accuracy = s.accuracy;
+      if (s.dmg) u.dmg = s.dmg;
       if (s.type === 'ally') {
         u.follow = s.follow !== false;
         u.invulnerable = s.invulnerable !== false;
@@ -287,6 +290,22 @@ async function exec(s, i, tok) {
       break;
     }
 
+    case 'shoot': {
+      // { type:'shoot', from:'g1', at:'player'|id, shots:3, kill:true, wait:true }
+      const shooter = U.findUnit(s.from);
+      const target = s.at === 'player' ? G.player : U.findUnit(s.at);
+      const job = U.scriptedShoot(shooter, target, s.shots || 3, s.kill !== false, sec => waitTime(sec));
+      if (s.wait !== false) await job; else job.catch(() => {});
+      break;
+    }
+
+    case 'pose': {
+      // { type:'pose', id:'player'|id, pose:'kneel' } / pose:null 로 해제
+      const u = s.id === 'player' ? G.player : U.findUnit(s.id);
+      if (u) u.char.pose = s.pose || null;
+      break;
+    }
+
     case 'sound':
       FX.playSound(s.name);
       if (s.shake) G.shake = Math.min(2, (G.shake || 0) + s.shake);
@@ -305,6 +324,24 @@ async function exec(s, i, tok) {
       }
       break;
     }
+
+    case 'map': {
+      // { type:'map', id:'seoul_ruins' } — 챕터 도중 맵 바꾸기 (사람·소품은 그대로)
+      await setMap(s.id);
+      check(tok);
+      for (const pr of G.props.values()) G.colliders.push(...pr.colliders);
+      const reground = u => { if (u && u.pos.y > -20) { u.pos.y = spawnGround(u.pos.x, u.pos.z); u.vy = 0; } };
+      reground(G.player);
+      G.units.forEach(reground);
+      break;
+    }
+
+    case 'wake':
+      // 기절 후 깨어나기 (blackout 에 wake:false 를 줬을 때)
+      UI.blur(8, 0);
+      UI.fade(false, s.duration ?? 2.5);
+      UI.blur(0, s.blur ?? 4);
+      break;
 
     case 'waitLanding':
       await waitUntil(() => !U.parasInAir());

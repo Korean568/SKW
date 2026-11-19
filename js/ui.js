@@ -54,10 +54,24 @@ export function enemyCount() {
   $('enemy-count').textContent = n ? `남은 적: ${n}` : '';
 }
 
+const WEAPON_NAMES = { rifle: '소총', knife: '단검', throwknife: '투척단검' };
 export function ammo(p) {
-  $('ammo-mag').textContent = p.mag;
-  $('ammo-mag').classList.toggle('low', p.mag <= 8);
-  $('reload-hint').classList.toggle('on', p.mag <= 8 && p.reloadT <= 0);
+  const w = p.weapon || 'rifle';
+  const el = $('ammo');
+  el.classList.toggle('melee', w === 'knife');
+  $('weapon-name').textContent = p.weapons && p.weapons.length > 1
+    ? p.weapons.map((k, i) => `${i + 1} ${WEAPON_NAMES[k] || k}`).join('   ·   ') : '';
+  $('weapon-name').dataset.cur = WEAPON_NAMES[w] || '';
+  if (w === 'rifle') {
+    $('ammo-mag').textContent = p.mag; $('ammo-res').textContent = '∞';
+    $('ammo-mag').classList.toggle('low', p.mag <= 8);
+  } else if (w === 'throwknife') {
+    $('ammo-mag').textContent = p.throwCount; $('ammo-res').textContent = p.throwMax;
+    $('ammo-mag').classList.toggle('low', p.throwCount <= 2);
+  } else {
+    $('ammo-mag').textContent = '단검'; $('ammo-res').textContent = '';
+    $('ammo-mag').classList.remove('low');
+  }
 }
 
 let hitT = 0;
@@ -118,7 +132,7 @@ export function updateHUD(dt) {
     $('crosshair').classList.toggle('aim', p.aiming);
     $('crosshair').classList.toggle('hidden', p.sprinting || G.mode !== 'play');
     $('reload-hint').textContent = p.reloadT > 0 ? '재장전 중…' : 'R 재장전';
-    $('reload-hint').classList.toggle('on', p.reloadT > 0 || p.mag <= 8);
+    $('reload-hint').classList.toggle('on', p.weapon === 'rifle' && (p.reloadT > 0 || p.mag <= 8));
   }
   hurtAmt = Math.max(0, hurtAmt - dt * 0.8);
   const low = p ? Math.max(0, 1 - p.hp / 45) : 0;

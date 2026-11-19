@@ -204,3 +204,9 @@ kbd { display: inline-block; min-width: 26px; padding: 2px 7px; margin-right: 4p
 
 #hud.nofire #ammo, #hud.nofire #crosshair, #hud.nofire #reload-hint { display: none !important; }
 #dialogue, #titlecard { z-index: 45; }
+
+/* 무기 이름 / 근접무기 */
+#weapon-name { font-size: 12px; color: var(--muted); letter-spacing: .08em; margin-bottom: 2px; }
+#weapon-name:empty { display: none; }
+#ammo.melee .sep, #ammo.melee #ammo-res { display: none; }
+#ammo.melee #ammo-mag { font-size: 32px; }
