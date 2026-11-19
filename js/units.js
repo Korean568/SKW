@@ -226,6 +226,7 @@ export class Player {
   }
   place(pos2, rotDeg, y) {
     placeUnit(this, pos2, rotDeg, y);
+    this.safe = this.pos.clone();
     this.camYaw = this.yaw; this.camPitch = -0.05; this.vy = 0;
   }
   /** head: 머리에 맞았는지. 방탄판이 깨진 상태면 몸 2발 / 머리 1발에 사망 */
@@ -316,6 +317,9 @@ export function updatePlayer(p, dt, inp) {
   const speed = p.sprinting ? SPEED.run : (p.aiming || p.reloadT > 0 || plating) ? SPEED.aim : SPEED.walk;
   moveWithCollision(p.pos, _dir.x * speed * dt, _dir.z * speed * dt, 0.35);
   applyGravity(p, dt);
+  // 바닥 없는 곳으로 떨어지면 마지막으로 서 있던 곳으로 되돌림
+  if (p.grounded) { (p.safe || (p.safe = new THREE.Vector3())).copy(p.pos); }
+  else if (p.safe && p.pos.y < p.safe.y - 8) { p.pos.copy(p.safe); p.vy = 0; }
 
   // 몸 방향 (1인칭: 항상 보는 방향)
   const combat = p.aiming || wantFire || G.time - p.lastFire < 0.6;

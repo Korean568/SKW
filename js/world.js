@@ -220,6 +220,10 @@ function buildRoom(s) {
   box(gap, H - 2.0, 0.12, wall, 0, 2.0 + (H - 2.0) / 2, D / 2);    // 문 위
   box(0.08, 2.0, 0.16, wood, -gap / 2 - 0.04, 1.0, D / 2);         // 문틀
   box(0.08, 2.0, 0.16, wood, gap / 2 + 0.04, 1.0, D / 2);
+  // 문 밖 = 밝은 햇빛 (이 판이 문을 막아서 밖으로 못 나감)
+  const day = new THREE.Mesh(new THREE.BoxGeometry(gap + 0.1, 2.05, 0.06), new THREE.MeshBasicMaterial({ color: 0xfff6e2 }));
+  day.position.set(0, 1.0, D / 2 + 0.12);
+  g.add(day);
   // 부서진 문짝
   const door = box(0.9, 1.9, 0.05, wood, 0.55, 0.06, D / 2 - 0.6); door.rotation.x = -Math.PI / 2 + 0.08; door.position.y = 0.08;
   for (const x of [-2.2, 0, 2.2]) box(0.16, 0.14, D, wood, x, H - 0.07, 0);   // 서까래
