@@ -50,6 +50,17 @@ npm run build        # index.html (자기해제 압축, 약 66KB)
 npm run build:raw    # 압축 없이 minify 만 (약 114KB, 코드가 그대로 보임)
 ```
 
+### 개발용 검증 도구 (선택)
+`source/` 에는 헤드리스 Chromium(Playwright)으로 화면과 오류를 확인하는 스크립트도 들어 있습니다. `npm i -D playwright` 후 `source/` 에서 실행합니다.
+
+| 명령 | 내용 |
+|---|---|
+| `node shot.js "step&mods=all&q=HIGH" out.png` | 소스(`dev.html`)를 바로 띄워 몇 프레임 렌더하고 오류·콘솔 출력 |
+| `node poses.js shots --q LOW,HIGH --only p1,p5` | 고정 장면(항해·발사·CIWS·피격·섬·상공 시점 등) 렌더 |
+| `node verify.js index.html` | 빌드 결과 검증: 등급 전환, 등급별 전투, 시나리오 완주, 실제 입력, 미지원 안내 |
+
+`stubs.js` 는 일부 모듈만 띄울 때 빈자리를 채우는 대역이고, `CONTRACT.md` 는 모듈 간 약속(API·좌표계·렌더 순서)을 적은 문서입니다.
+
 ## 내 컴퓨터에서 실행하기
 ```
 python tools/serve.py
