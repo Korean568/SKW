@@ -193,7 +193,8 @@ fn shadowAt(P: vec3f, N: vec3f) -> f32 { // 1 = 햇빛, 0 = 그림자 (3x3 PCF, 
 }
 fn cloudVis(P: vec3f) -> f32 { // 구름 그림자: 1 = 햇빛, 0 = 완전 그늘 (맵이 없으면 1)
   if (g.cmap.w < .5) { return 1.0; }
-  return textureSampleLevel(cloudTex, linSamp, (P.xz - g.cmap.xy) * g.cmap.z + .5, 0.0).r;
+  // 태양이 낮으면 그림자가 수 km 로 늘어져 흐려짐 → 구름량에 따른 평균 밝기로 수렴 (해 질 녘 윤슬이 조각나지 않게)
+  return mix(1.0 - .45 * g.fog.y, textureSampleLevel(cloudTex, linSamp, (P.xz - g.cmap.xy) * g.cmap.z + .5, 0.0).r, saturate(g.sun.y * 6.0 - .4));
 }
 fn gerstner(p: vec2f, t: f32) -> vec3f { // 기준 수면 변위 (JS G.waveAt 과 동일한 6파)
   var d = vec3f(0.0);
@@ -382,7 +383,12 @@ G.boot = async () => {
     const hasTS = adapter.features.has('timestamp-query');
     const dev = G.dev = await adapter.requestDevice({ requiredFeatures: hasTS ? ['timestamp-query'] : [] }); G.adapter = adapter;
     dev.addEventListener('uncapturederror', e => G.err('[GPU] ' + e.error.message));
-    dev.lost.then(i => { if (i.reason !== 'destroyed') G.fatal('GPU 장치 연결이 끊어졌습니다', `<p>${i.message || ''}</p><p>페이지를 새로고침(F5) 해 주세요.</p>`); });
+    dev.lost.then(i => { // 드라이버 재시작·절전 복귀 등으로 장치를 잃으면 한 번은 자동으로 새로고침 (30초 안에 또 끊기면 안내만 표시)
+      if (i.reason === 'destroyed') return;
+      G.fatal('GPU 장치 연결이 끊어졌습니다', `<p>${i.message || ''}</p><p>페이지를 새로고침(F5) 해 주세요.</p>`);
+      const t = Date.now(), go = () => { if (!document.hidden) { sessionStorage.skw_r = t; location.reload(); } };
+      try { if (!(t - sessionStorage.skw_r < 3e4)) { go(); addEventListener('visibilitychange', go); } } catch (e) { }
+    });
     const cv = G.canvas = document.getElementById('c'); G.ctx = cv.getContext('webgpu'); G.fmt = navigator.gpu.getPreferredCanvasFormat();
     G.ctx.configure({ device: dev, format: G.fmt, alphaMode: 'opaque' });
     const U = GPUTextureUsage, S = GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT | GPUShaderStage.COMPUTE;

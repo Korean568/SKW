@@ -15,7 +15,8 @@ fn fade(y: f32, t: f32) -> f32 { // 대기 원근
   return exp(-t * g.fog.x * (1.0 + 2.0 * g.fog.z) * .25) * smoothstep(.03, .1, y);
 }
 fn low() -> f32 { return 1.0 - smoothstep(0.0, .3, g.sun.y); } // 낮은 태양
-fn sunc() -> vec3f { return g.sunCol.rgb * mix(vec3f(1.0), vec3f(1.0, .78, .55), low()); }
+fn sunc() -> vec3f { let c = g.sunCol.rgb; // 낮: 흰빛 · 낮은 태양: 금빛
+  return mix(mix(c, vec3f(dot(c, vec3f(.3, .6, .1))), .8), c * vec3f(1.0, .78, .55), low()); }
 fn amb() -> vec3f { return skyBase(normalize(vec3f(-g.sun.x, .6, -g.sun.z))) * .75 + g.sunCol.rgb * .05; }`;
   const SKY = `
 fn fb(q: vec2f, oct: i32) -> f32 {
@@ -34,19 +35,18 @@ fn C(uv: vec2f) -> vec4f { return textureSampleLevel(cl, linSamp, uv, 0.0); }
     let h = hash33(floor(sp)); let d = length(fract(sp) - .5 - (h - .5) * .6);
     c += vec3f(.7, .85, 1.0) * ni * step(.98, h.x) * h.y * (1.0 - smoothstep(0.0, sw, d)) * .06 / (sw * sw) * smoothstep(0.0, .25, v.y);
   }
-  // 광륜 (수평선에서 0 = 안개색)
   c += S * (pow(mu, 5000.0) * 4.0 + pow(mu, 700.0) * (1.0 + .6 * lo) + pow(mu, 70.0) * (.12 + .15 * lo)) * smoothstep(0.0, .05, v.y);
   if (g.sun.w > .5 && v.y > 0.0) { // 권운 (9 km, 얇고 길게)
     let t = 9000.0 / (v.y + .08); let p = (g.cam.xz + v.xz * t + drift() * 2.0) / 9000.0;
     let a = smoothstep(.5, .95, fb(p * vec2f(.6, 2.6) + fb(p * 1.3, 2) * 1.2, 3)) * (.2 + .4 * g.fog.y) * exp(-t * 2e-5) * smoothstep(.02, .22, v.y);
     c = mix(c, S * (.28 + 1.6 * pow(mu, 5.0)) + amb(), a);
   }
-  // 적운: 4탭 텐트(지터 상쇄) → 풀해상도 침식(또렷한 윤곽)
+  // 적운: 4탭 텐트 → 풀해상도 침식
   let d = .5 / vec2f(textureDimensions(cl)); let e = vec2f(d.x, -d.y); let uv = clamp(i.uv, d * 2.0, 1.0 - d * 2.0);
   let k = (C(uv + d) + C(uv - d) + C(uv + e) + C(uv - e)) * .25; let D = drift();
   let q = (g.cam.xyz + v * 9000.0 + vec3f(D.x, 0.0, D.y)) / 1500.0;
   let n = mix(V(q), V(q * 3.1), .3);
-  let a = smoothstep(n * .7 - .15, n * .7 + .25, k.a) * fade(v.y, (2200.0 - g.cam.y) / max(v.y, .03));
+  let a = smoothstep(n * .7 - .1, n * .7 + .5, k.a) * fade(v.y, (2200.0 - g.cam.y) / max(v.y, .03));
   let T = 1.0 - a;
   c += S * smoothstep(0.0, ew, r) * (3.0 + 9.0 * sqrt(max(r, 0.0))) * smoothstep(-.03, .03, v.y) * T * T;
   return vec4f(c * T + k.rgb / max(k.a, 1e-3) * (.7 + .6 * n) * a, 1.0);
@@ -57,15 +57,16 @@ fn dens(p: vec3f, fine: bool) -> f32 { // 밀도 (슬랩 1500–3500 m)
   if (h < 0.0 || h > 1.0) { return 0.0; }
   let w = n2(q / 7000.0); let hh = h / (.3 + .7 * w);
   var d = V(vec3f(q / 8000.0, h * .26)) - cov() - (.5 - w) * .75 - .2 * hh * hh;
-  if (fine && d > -.1) { d += (V(vec3f(q / 1300.0, h * 1.5)) - .5) * .3; }
-  return clamp(d * 6.0, 0.0, 1.0) * smoothstep(0.0, .05, h) * (1.0 - smoothstep(.75, 1.0, hh));
+  if (fine && d > 0.0) { d += (V(vec3f(q / 1300.0, h * 1.5)) - .6) * .35 * min(d * 8.0, 1.0); } // 세부는 본체 안쪽만
+  d = clamp(d * 7.0, 0.0, 1.0);
+  return d * d * smoothstep(0.0, .05, h) * (1.0 - smoothstep(.75, 1.0, hh));
 }
 fn hg(mu: f32, k: f32) -> f32 { return (1.0 - k * k) / pow(1.0 + k * k - 2.0 * k * mu, 1.5); }
 @fragment fn fs(i: FSOut) -> @location(0) vec4f { // rgb = 색×불투명도
   let rd = viewRay(i.uv);
   if (rd.y < .03 || g.fog.y <= 0.0) { return vec4f(0.0); }
   let s = g.sun.xyz; let mu = dot(rd, s); let A = amb(); let S = sunc(); let lo = low(); let hi = g.sun.w > 1.5;
-  let ph = mix(hg(mu, -.3), hg(mu, .5), .65) + hg(mu, .85) * (.04 + .05 * lo); // + 역광 은빛 테두리
+  var ph = mix(hg(mu, -.3), hg(mu, .5), .5) + hg(mu, .85) * (.04 + .05 * lo); ph *= 1.5 / (1.0 + .22 * ph); // 은빛 테두리 · 무릎
   let N = i32(14.0 + 8.5 * g.sun.w * g.sun.w); let dt = 2000.0 / rd.y / f32(N); // 14 / 22 / 48 스텝
   var t = max(1500.0 - g.cam.y, 0.0) / rd.y + dt * fract(dot(i.pos.xy, vec2f(.5, .75))); // 정적 2×2 지터
   var T = 1.0; var L = vec3f(0.0);
@@ -76,10 +77,10 @@ fn hg(mu: f32, k: f32) -> f32 { return (1.0 - k * k) / pow(1.0 + k * k - 2.0 * k
       for (var j = 1; j < select(3, 5, hi); j++) { od += dens(p + s * f32(j * j) * select(80.0, 35.0, hi), false) * f32(2 * j - 1) * select(1.0, .45, hi); }
       let h = (p.y - 1500.0) / 2000.0;
       let lt = (ph * exp(-od) + .22 * exp(-od * .2) + .05 * exp(-od * .04)) // 다중 산란
-        * (1.0 - .7 * exp(-d * 6.0 - od * 2.0) * (.5 - .5 * mu)); // 파우더
+        * (1.0 - .5 * exp(-d * 6.0 - od * 2.0) * (.5 - .5 * mu)); // 파우더
       let e = exp(-d * .009 * dt);
-      // 어두운 밑면 · 낮은 태양: 주황 밑면
-      L += (S * (lt + vec3f(.3, .13, .1) * lo * (1.0 - h)) + A * (.25 + 1.1 * h) * (1.0 - .5 * d)) * T * (1.0 - e);
+      // 밝은 꼭대기 · 어두운 밑면 (낮은 태양: 주황)
+      L += (S * (lt * (.6 + .6 * h) + vec3f(.3, .13, .1) * lo * (1.0 - h)) + A * (.25 + 1.1 * h) * (1.0 - .5 * d)) * T * (1.0 - e);
       T *= e;
       if (T < .02) { break; }
     }
@@ -124,7 +125,6 @@ fn hg(mu: f32, k: f32) -> f32 { return (1.0 - k * k) / pow(1.0 + k * k - 2.0 * k
       const m = G.shader(COMMON + VOL, 'cloud');
       bgl = G.dev.createBindGroupLayout({ entries: [{ binding: 0, visibility: 2, texture: {} }, { binding: 1, visibility: 2, texture: { viewDimension: '3d' } }] });
       this.nv = noise3(); this.pv = pipe(m, 'fs'); this.pm = pipe(m, 'fm'); this.bv = bind(G.dummyView, this.nv);
-      // 그림자 맵 패스용 그룹 0 (맵 미바인딩)
       this.b0 = G.dev.createBindGroup({ layout: G.bgl0, entries: [{ buffer: G.globalsBuf }, G.dummyDepthView, G.shadowSamp, G.noiseView, G.linSamp, G.dummyView].map((resource, binding) => ({ binding, resource })) });
     },
     onQuality(Q) { // 그림자 맵 256²/512² (LOW 없음)

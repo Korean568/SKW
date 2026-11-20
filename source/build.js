@@ -1,9 +1,11 @@
 // 단일 HTML 빌드: template.html + core.js + mod_*.js → index.html
 //   node build.js [출력 경로]            압축 빌드 (WGSL 축약 + JS/CSS minify) — 기본 출력 ../index.html
 //   node build.js [출력 경로] --readable 읽기 쉬운 빌드 (디버깅용)
+//   node build.js [출력 경로] --raw      자기해제 압축 없이 minify 만 (JS 가 그대로 보임)
 //   --stubs : 아직 없는 모듈을 stubs.js 로 채움 (개발용)
+// 기본 빌드는 minify 한 JS 를 gzip + base64 로 담고, 브라우저 내장 DecompressionStream 으로 풀어 실행하는 자기해제 방식 (외부 라이브러리 없음)
 const fs = require('fs'), path = require('path'), zlib = require('zlib'), D = __dirname;
-const out = process.argv[2] && !process.argv[2].startsWith('--') ? process.argv[2] : path.join(D, '..', 'index.html'), stubs = process.argv.includes('--stubs'), readable = process.argv.includes('--readable');
+const out = process.argv[2] && !process.argv[2].startsWith('--') ? process.argv[2] : path.join(D, '..', 'index.html'), stubs = process.argv.includes('--stubs'), readable = process.argv.includes('--readable'), raw = process.argv.includes('--raw');
 const MODS = ['gpu', 'sky', 'post', 'ocean', 'mesh', 'models', 'fx', 'audio', 'game'];
 const strip = s => s.replace(/^'use strict';\s*/, '').trimEnd();
 const read = f => strip(fs.readFileSync(path.join(D, f), 'utf8'));
@@ -47,12 +49,15 @@ for (const m of MODS) {
 if (stubs) code += '\n\n' + read('stubs.js');
 code += '\n\nG.boot();';
 let html = fs.readFileSync(path.join(D, 'template.html'), 'utf8');
-const srcKB = Buffer.byteLength(code) / 1024;
+const srcKB = Buffer.byteLength(code) / 1024; let rawKB = 0;
 if (readable) html = html.replace('/*__CODE__*/', () => "'use strict';\n" + code);
 else {
   let esbuild; try { esbuild = require('esbuild'); } catch (e) { esbuild = require(path.join(D, '..', 'tools', 'node_modules', 'esbuild')); }
   const [w, cnt] = shrinkWgsl(code);
-  const js = esbuild.transformSync(`(()=>{'use strict';${w}\n})();`, { minify: true, target: 'es2022', legalComments: 'none' }).code.trim();
+  let js = esbuild.transformSync(`(()=>{'use strict';${w}\n})();`, { minify: true, target: 'es2022', legalComments: 'none' }).code.trim();
+  rawKB = Buffer.byteLength(js) / 1024;
+  // 자기해제: gzip → base64. DecompressionStream 이 없는 구형 브라우저는 WebGPU 도 없으므로 같은 안내를 표시
+  if (!raw) js = `(async()=>{if(!self.DecompressionStream)return document.body.insertAdjacentHTML("beforeend","<div id=fatal><div><h1>이 브라우저에서는 실행할 수 없습니다</h1><p>WebGPU 를 지원하는 최신 Chrome · Edge · Safari 가 필요합니다.</p></div></div>");(0,eval)(await new Response(new Blob([Uint8Array.from(atob("${zlib.gzipSync(Buffer.from(js), { level: 9 }).toString('base64')}"),c=>c.charCodeAt(0))]).stream().pipeThrough(new DecompressionStream("gzip"))).text())})()`;
   const css = (_, s) => '<style>' + esbuild.transformSync(s, { loader: 'css', minify: true }).code.trim();
   html = html.replace(/<style>([^]*?)(?=<\/style>)/, css).replace(/>\s+</g, '><').replace('/*__CODE__*/', () => js).replace(/<script>\s+/, '<script>').replace(/\s+<\/script>/, '</script>');
   console.log(`  WGSL 템플릿 ${cnt}개 축약`);
@@ -60,4 +65,4 @@ else {
 fs.writeFileSync(out, html);
 for (const [k, v] of rep) console.log(`  ${k.padEnd(8)} ${(v / 1024).toFixed(1)} KB`);
 const b = Buffer.byteLength(html);
-console.log(`=> ${out}  ${(b / 1024).toFixed(1)} KB (${b} bytes)${readable ? ' 읽기용' : ''} · 소스 ${srcKB.toFixed(1)} KB · gzip ${(zlib.gzipSync(html, { level: 9 }).length / 1024).toFixed(1)} KB`);
+console.log(`=> ${out}  ${(b / 1024).toFixed(1)} KB (${b} bytes)${readable ? ' 읽기용' : raw ? ' (압축 안 함)' : ` 자기해제 압축 · 풀린 JS ${rawKB.toFixed(1)} KB`} · 소스 ${srcKB.toFixed(1)} KB · gzip ${(zlib.gzipSync(html, { level: 9 }).length / 1024).toFixed(1)} KB`);

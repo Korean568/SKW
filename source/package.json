@@ -4,6 +4,7 @@
   "description": "Second Korean Wars — 해상 반격: WebGPU 단일 HTML 게임 (소스 → index.html 빌드)",
   "scripts": {
     "build": "node build.js",
+    "build:raw": "node build.js --raw",
     "build:readable": "node build.js --readable"
   },
   "devDependencies": {

@@ -29,6 +29,7 @@ CIWS(근접 방어)는 자동으로 작동합니다.
 
 ## 소스와 빌드
 `index.html` 은 `source/` 폴더의 읽기 쉬운 소스를 압축해 만든 결과물입니다 (직접 고치지 마세요).
+용량을 줄이려고 minify 한 코드를 gzip 으로 한 번 더 묶어 넣고, 브라우저 내장 기능(`DecompressionStream`)으로 풀어 실행합니다 — 외부 라이브러리는 쓰지 않습니다.
 
 | 파일 | 내용 |
 |---|---|
@@ -45,7 +46,8 @@ CIWS(근접 방어)는 자동으로 작동합니다.
 ```
 cd source
 npm install
-npm run build
+npm run build        # index.html (자기해제 압축, 약 64KB)
+npm run build:raw    # 압축 없이 minify 만 (약 111KB, 코드가 그대로 보임)
 ```
 
 ## 내 컴퓨터에서 실행하기
