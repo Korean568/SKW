@@ -229,6 +229,7 @@
     cam.el = G.clamp(cam.el, .02, 1.45); cam.d = G.clamp(cam.d, 90, 5000); shake = Math.max(0, shake - dt * 1.6);
     const c = [P.p[0] + rnd(-1, 1) * shake * 5, 14 + rnd(-1, 1) * shake * 5, P.p[2]], o = dir(cam.az, cam.el);
     G.cam.target = c; G.cam.pos = [c[0] + o[0] * cam.d, Math.max(c[1] + o[1] * cam.d, G.waveAt(c[0] + o[0] * cam.d, c[2] + o[2] * cam.d) + 3), c[2] + o[2] * cam.d];
+    if (cam.free) { G.cam.pos = cam.free[0]; G.cam.target = cam.free[1]; } // 검증용 고정 시점
     G.shadowFocus = P.p;
     // 소리
     const warn = state === 'play' && inc < 4500;
@@ -241,6 +242,7 @@
     const x = ui.x, W = innerWidth, H = innerHeight, cv = ui.cv; if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
     x.clearRect(0, 0, W, H); ui.hit.style.opacity *= .94;
     ui.obj.style.display = ui.st.style.display = ui.keys.style.display = state === 'title' ? 'none' : '';
+    ui.keys.style.opacity = T < 25 || ui.help ? .7 : 0;
     if (state !== 'play') return;
     x.font = '12px ui-monospace,Consolas,monospace'; x.lineWidth = 1.5; x.textAlign = 'center';
     for (const e of E) { // 표적 표시: 미사일 ◇ 빨강, 항공기 △ 주황, 수상·지상 □ 노랑
@@ -277,21 +279,23 @@
       + `대공 SAM <b>${P.sam}</b> · 대함 SSM <b>${P.ssm}</b> · 함포 <b>${P.gun}</b> · CIWS <b>자동</b> · 격파 <b>${S.kills}</b>`
       + (live(sel) ? `<br>표적 <b style="color:#fff">${sel.name}</b> ${(V3.dist(sel.p, P.p) / 1000).toFixed(1)}km — ${sel.k === 'msl' || sel.k === 'jet' ? 'Space: SAM' : 'Space: SSM · F: 함포'}` : '');
   }
-  function over(text, col) { ui.ov.style.display = ''; ui.ov.innerHTML = `<div><h1 style="color:${col}">${text}</h1><h2>격파 ${S.kills} · 선체 ${Math.max(0, P.hp | 0)}%</h2><button>다시 출격</button></div>`; G.sfx.loop('siren', 0); }
-  function start() { reset(); state = 'play'; paused = 0; ui.ov.style.display = 'none'; G.sfx.init(); G.sfx.music('calm'); }
+  function over(text, col) { G.canvas.className = 'bl'; ui.ov.style.display = ''; ui.ov.innerHTML = `<div><h1 style="color:${col}">${text}</h1><h2>격파 ${S.kills} · 선체 ${Math.max(0, P.hp | 0)}%</h2><button>다시 출격</button></div>`; G.sfx.loop('siren', 0); }
+  function start() { reset(); state = 'play'; paused = 0; ui.ov.style.display = 'none'; G.canvas.className = ''; G.sfx.init(); G.sfx.music('calm'); }
+  G.game = { start, spawn, fireMsl, boom, kill, damage, cam, get P() { return P; }, get E() { return E; }, get S() { return S; }, sel: t => sel = t }; // 검증·디버그용
 
   G.register('game', {
     init() {
-      G.css(`#hud{position:absolute;inset:0;width:100%;height:100%}.pn{position:absolute;padding:8px 12px;background:#06121cb8;border:1px solid #2c5c7a88;border-radius:6px;font:13px/1.55 ui-monospace,Consolas,'Malgun Gothic',monospace;color:#bfe6ff;text-shadow:0 1px 2px #000}
+      G.canvas.className = 'bl'; // 메뉴 뒤로 실제 장면을 흐리게 보여 줌
+      G.css(`#c{transition:filter .9s,transform .9s}#c.bl{filter:blur(7px) brightness(.62) saturate(1.1);transform:scale(1.04)}#hud{position:absolute;inset:0;width:100%;height:100%}.pn{position:absolute;padding:8px 12px;background:#06121cb8;border:1px solid #2c5c7a88;border-radius:6px;font:13px/1.55 ui-monospace,Consolas,'Malgun Gothic',monospace;color:#bfe6ff;text-shadow:0 1px 2px #000}
 .pn b{color:#ffd66b}#obj{left:12px;top:12px;max-width:440px}#obj .r{margin-top:4px;color:#d7ecf7}#obj i{color:#7fd6ff;font-style:normal}#obj i:after{content:' ▸'}
 #st{left:50%;bottom:12px;transform:translateX(-50%);text-align:center;white-space:nowrap}#warn{left:50%;top:16%;transform:translateX(-50%);color:#ff5340;border-color:#ff5340;font-weight:700;font-size:20px;animation:bl .5s steps(2) infinite}@keyframes bl{50%{opacity:.3}}
-#hit{position:absolute;inset:0;box-shadow:inset 0 0 160px 40px #ff2a00aa;opacity:0}#keys{right:12px;top:112px;font-size:11px;opacity:.7}
-#ov{position:absolute;inset:0;display:grid;place-items:center;background:radial-gradient(#06121c99,#02060acc);pointer-events:auto;text-align:center}#ov h1{margin:0;font-size:44px;letter-spacing:5px;color:#eaf7ff;text-shadow:0 0 24px #3fa9ff88}
+#hit{position:absolute;inset:0;box-shadow:inset 0 0 160px 40px #ff2a00aa;opacity:0}#keys{right:12px;top:112px;font-size:11px;opacity:.7;transition:opacity 1.5s}
+#ov{position:absolute;inset:0;display:grid;place-items:center;background:radial-gradient(#06121c33 30%,#02060acc);pointer-events:auto;text-align:center}#ov h1{margin:0;font:900 clamp(30px,5vw,64px)/1.05 system-ui,sans-serif;letter-spacing:.09em;color:#0000;background:linear-gradient(#fff 30%,#9fdcff 62%,#2f8fd0);-webkit-background-clip:text;background-clip:text;filter:drop-shadow(0 4px 14px #000b)}
 #ov h2{margin:6px 0 18px;font-size:17px;font-weight:400;color:#8fc7e6;letter-spacing:2px}#ov p{margin:6px 0;color:#a9cfe2;font-size:13px}#ov kbd{padding:1px 6px;border:1px solid #3c6a84;border-radius:4px;background:#0c2030;color:#e6f6ff;font:12px ui-monospace,monospace}
 #ov button{margin-top:20px;padding:11px 46px;font:700 18px inherit;letter-spacing:8px;color:#04121c;background:#7fd6ff;border:0;border-radius:6px;cursor:pointer}#ov button:hover{background:#b6e8ff}`);
       ui.cv = G.el('canvas', { id: 'hud' }); ui.x = ui.cv.getContext('2d'); ui.hit = G.el('div', { id: 'hit' });
       ui.obj = G.el('div', { id: 'obj', className: 'pn' }); ui.st = G.el('div', { id: 'st', className: 'pn' }); ui.warn = G.el('div', { id: 'warn', className: 'pn' }); ui.warn.style.display = 'none';
-      ui.keys = G.el('div', { id: 'keys', className: 'pn', innerHTML: 'W/S 추력 · A/D 조타 · 드래그 시점 · 휠 줌<br>Tab 다음 표적 · Q 최대 위협 · Space 미사일 · F 함포<br>P 일시정지 · M 음소거 · F2 그래픽' });
+      ui.keys = G.el('div', { id: 'keys', className: 'pn', innerHTML: 'W/S 추력 · A/D 조타 · 드래그 시점 · 휠 줌<br>Tab 다음 표적 · Q 최대 위협 · Space 미사일 · F 함포<br>P 일시정지 · M 음소거 · F2 그래픽 · H 도움말' });
       const g = G.gpuInfo; ui.ov = G.el('div', { id: 'ov' });
       ui.ov.innerHTML = `<div><h1>SECOND KOREAN WARS</h1><h2>해상 반격 — ${G.SCENARIO.title}</h2><p>GPU <b style="color:#fff">${g.name}</b> → 그래픽 등급 <b style="color:#8dff9a">${G.Q.name}</b> (우측 상단에서 변경)</p>
 <p><kbd>W</kbd><kbd>S</kbd> 추력 <kbd>A</kbd><kbd>D</kbd> 조타 · <kbd>드래그</kbd> 시점 <kbd>휠</kbd> 줌</p><p><kbd>Tab</kbd> 표적 <kbd>Q</kbd> 최대 위협 · <kbd>Space</kbd> 미사일(공중 SAM / 수상 SSM) · <kbd>F</kbd> 함포 · CIWS 자동</p><button>출 격</button></div>`;
@@ -299,7 +303,7 @@
       addEventListener('keydown', e => {
         if (state !== 'play') { if (e.code === 'Enter') start(); return; }
         if (e.code === 'Tab' || e.code === 'KeyE') pick(1); if (e.code === 'KeyQ') pick(0);
-        if (e.code === 'KeyP' || e.code === 'Escape') paused ^= 1; if (e.code === 'KeyM') G.sfx.volume((muted ^= 1) ? 0 : 1);
+        if (e.code === 'KeyP' || e.code === 'Escape') paused ^= 1; if (e.code === 'KeyM') G.sfx.volume((muted ^= 1) ? 0 : 1); if (e.code === 'KeyH') ui.help ^= 1;
       });
       let drag = 0, mv = 0;
       addEventListener('pointerdown', e => { if (e.target.tagName === 'CANVAS') { drag = 1; mv = 0; } });
@@ -308,6 +312,7 @@
         if (drag && mv < 6 && state === 'play') { let b = null, bd = 40; for (const t of E) if (t.side && live(t)) { const d = Math.hypot(t.sx - e.clientX, t.sy - e.clientY); if (d < bd) { bd = d; b = t; } } if (b) { sel = b; G.sfx.play('lock'); } }
         drag = 0; });
       addEventListener('wheel', e => { cam.d *= Math.exp(e.deltaY * .0012); }, { passive: true });
+      if (G.params.has('nohud')) G.ui.style.display = 'none'; // 검증용: HUD 없이 장면만
       reset(); if (G.params.has('autostart')) start();
     },
     update

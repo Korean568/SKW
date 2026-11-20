@@ -79,9 +79,9 @@ G.fatal = (title, html) => {
 /* ───────── 품질 프리셋 ───────── */
 G.HDR = 'rgba16float'; G.DEPTH = 'depth32float';
 G.PRESETS = {
-  LOW: { name: 'LOW', level: 0, scale: .75, dprCap: 1, maxPx: 1.4e6, particles: 500, ocean: 0, clouds: 0, shadows: 0, bloom: 0, refract: 0, shadowRes: 0 },
-  MEDIUM: { name: 'MEDIUM', level: 1, scale: 1, dprCap: 1.5, maxPx: 2.4e6, particles: 3000, ocean: 1, clouds: 1, shadows: 0, bloom: 1, refract: 0, shadowRes: 0 },
-  HIGH: { name: 'HIGH', level: 2, scale: 1, dprCap: 2, maxPx: 4.2e6, particles: 12000, ocean: 2, clouds: 2, shadows: 1, bloom: 1, refract: 1, shadowRes: 2048 },
+  LOW: { name: 'LOW', level: 0, scale: .75, dprCap: 1, maxPx: 1.4e6, particles: 500, ocean: 0, clouds: 0, shadows: 0, bloom: 0, refract: 0, shadowRes: 0, msaa: 1 },
+  MEDIUM: { name: 'MEDIUM', level: 1, scale: 1, dprCap: 1.5, maxPx: 2.4e6, particles: 3000, ocean: 1, clouds: 1, shadows: 0, bloom: 1, refract: 0, shadowRes: 0, msaa: 4 },
+  HIGH: { name: 'HIGH', level: 2, scale: 1, dprCap: 2, maxPx: 4.2e6, particles: 12000, ocean: 2, clouds: 2, shadows: 1, bloom: 1, refract: 1, shadowRes: 4096, msaa: 4 },
 };
 /* ───────── 환경(태양·바람·파도) ───────── */
 G.env = { sunAz: 40, sunEl: 26, cloud: .45, haze: .35, sea: .55, windDir: .6, windSpd: 9, fogDen: 1 / 9000, exposure: 1 };
@@ -109,6 +109,9 @@ G.waveAt = (x, z, t = G.time) => { // 월드 (x,z) 의 수면 높이 (셰이더 
   }
   return h;
 };
+// 구름 그림자 맵 등록 (sky 모듈): view = 텍스처 뷰(없애려면 null), (x,z) = 맵 중심, size = 한 변 길이(m). 뷰가 바뀔 때만 호출, 중심 이동은 G.cloudMap.x/z 를 직접 갱신
+G.cloudMap = { view: null, x: 0, z: 0, size: 16000 };
+G.setCloudMap = (view, size = 16000) => { G.cloudMap.view = view; G.cloudMap.size = size; G.bindGlobals && G.bindGlobals(); };
 G.addLight = (pos, rgb, intensity = 30, radius = 400, life = .4) => { G.lights.push({ pos: [...pos], rgb, intensity, radius, life, max: life }); };
 
 /* ───────── 공용 WGSL (모든 씬 셰이더 앞에 붙음) ───────── */
@@ -126,12 +129,14 @@ struct Globals {
   misc: vec4f,           // x near, y dt, z 프레임, w 노출
   waves: array<vec4f, 12>, // 파 i: [2i]=(dirx,dirz,진폭,k) [2i+1]=(ω,Q,위상,0)
   lights: array<vec4f, 8>, // 점광 i: [2i]=(pos,반경) [2i+1]=(rgb*세기,0)
+  cmap: vec4f,           // 구름 그림자 맵: xy 중심(월드 xz), z 1/한 변 길이(m), w 사용 0/1
 };
 @group(0) @binding(0) var<uniform> g: Globals;
 @group(0) @binding(1) var shadowTex: texture_depth_2d;
 @group(0) @binding(2) var shadowSamp: sampler_comparison;
 @group(0) @binding(3) var noiseTex: texture_2d<f32>;   // 256² RGBA 백색 잡음 (반복)
 @group(0) @binding(4) var linSamp: sampler;            // linear · repeat
+@group(0) @binding(5) var cloudTex: texture_2d<f32>;   // 구름 그림자 맵 (r = 지표에 닿는 햇빛 비율). sky 모듈이 G.setCloudMap 으로 등록
 const PI = 3.14159265;
 struct FSOut { @builtin(position) pos: vec4f, @location(0) uv: vec2f };
 @vertex fn vsFull(@builtin(vertex_index) i: u32) -> FSOut { // 전체 화면 삼각형 (z=0 → 원평면)
@@ -167,21 +172,28 @@ fn skyBase(rd: vec3f) -> vec3f { // 구름·태양 원반 없는 대기 색 (HDR
   c += warm * (pow(mu, 6.0) * .22 + pow(mu, 48.0) * .5 + pow(mu, 400.0) * 1.5) * (.25 + .75 * day);
   return mix(c, hor * 1.04, g.fog.z * exp(-h * 7.0));
 }
-fn fogAt(col: vec3f, P: vec3f) -> vec3f { // 대기 원근 (모든 불투명·수면 셰이더 마지막에 적용)
+fn fogAt(col: vec3f, P: vec3f) -> vec3f { // 대기 원근: 채널별 소광(파랑이 먼저 사라짐) + 높이 감쇠. 모든 불투명·수면 셰이더의 마지막 단계
   let v = P - g.cam.xyz; let d = length(v); let rd = v / max(d, 1e-3);
-  let f = 1.0 - exp(-d * g.fog.x * (1.0 + 2.0 * g.fog.z));
-  return mix(col, skyBase(normalize(vec3f(rd.x, abs(rd.y) * .25 + .015, rd.z))), f);
+  let dy = rd.y * d / 1200.0; // 대기 규모 높이 1200m
+  let hf = exp(-max(g.cam.y, 0.0) / 1200.0) * select((1.0 - exp(-dy)) / dy, 1.0 - dy * .5, abs(dy) < 1e-3);
+  let T = exp(-g.fog.x * (1.0 + 2.0 * g.fog.z) * d * hf * vec3f(.8, 1.0, 1.3));
+  return min(col * T + skyBase(normalize(vec3f(rd.x, abs(rd.y) * .25 + .015, rd.z))) * (1.0 - T), vec3f(40.0));
 }
-fn shadowAt(P: vec3f, N: vec3f) -> f32 { // 1 = 햇빛, 0 = 그림자 (3x3 PCF)
+fn shadowAt(P: vec3f, N: vec3f) -> f32 { // 1 = 햇빛, 0 = 그림자 (3x3 PCF, 깊이 범위 900m)
   if (g.sunCol.w < .5) { return 1.0; }
-  let q = g.shadowVP * vec4f(P + N * .35, 1.0);
+  let q = g.shadowVP * vec4f(P + N * .3, 1.0);
   let uv = q.xy * vec2f(.5, -.5) + .5;
-  if (any(uv < vec2f(0.0)) || any(uv > vec2f(1.0)) || q.z > 1.0) { return 1.0; }
-  let ts = 1.0 / f32(textureDimensions(shadowTex).x); var s = 0.0;
+  let e = min(min(uv.x, uv.y), min(1.0 - uv.x, 1.0 - uv.y));
+  if (e <= 0.0 || q.z > 1.0) { return 1.0; }
+  let ts = 1.4 / f32(textureDimensions(shadowTex).x); var s = 0.0;
   for (var y = -1; y <= 1; y++) { for (var x = -1; x <= 1; x++) {
-    s += textureSampleCompareLevel(shadowTex, shadowSamp, uv + vec2f(f32(x), f32(y)) * ts, q.z - .0012);
+    s += textureSampleCompareLevel(shadowTex, shadowSamp, uv + vec2f(f32(x), f32(y)) * ts, q.z - .0005);
   } }
-  return s / 9.0;
+  return mix(1.0, s / 9.0, smoothstep(0.0, .06, e)); // 맵 가장자리에서 서서히 사라짐
+}
+fn cloudVis(P: vec3f) -> f32 { // 구름 그림자: 1 = 햇빛, 0 = 완전 그늘 (맵이 없으면 1)
+  if (g.cmap.w < .5) { return 1.0; }
+  return textureSampleLevel(cloudTex, linSamp, (P.xz - g.cmap.xy) * g.cmap.z + .5, 0.0).r;
 }
 fn gerstner(p: vec2f, t: f32) -> vec3f { // 기준 수면 변위 (JS G.waveAt 과 동일한 6파)
   var d = vec3f(0.0);
@@ -213,21 +225,29 @@ G.layout = (...bgls) => G.dev.createPipelineLayout({ bindGroupLayouts: [G.bgl0, 
 /* ───────── 렌더 타깃 / 품질 전환 ───────── */
 G.targets = {};
 const hook = (h, ...a) => { for (const m of G.order) if (m[h]) m[h](...a); };
+G.dyn = 1; // 동적 해상도 배율 (gpu 모듈이 GPU 시간에 맞춰 0.5~1 로 조절)
 G.resize = quiet => {
   const dev = G.dev, Q = G.Q, T = G.targets, cv = G.canvas, dpr = Math.min(devicePixelRatio || 1, Q.dprCap);
   const cw = Math.max(16, Math.round(innerWidth * dpr)), ch = Math.max(16, Math.round(innerHeight * dpr));
-  cv.width = cw; cv.height = ch;
-  const s = Math.min(Q.scale, Math.sqrt(Q.maxPx / (cw * ch)));
+  if (cv.width !== cw || cv.height !== ch) { cv.width = cw; cv.height = ch; }
+  const s = Math.min(Q.scale, Math.sqrt(Q.maxPx / (cw * ch))) * G.dyn;
   const w = Math.max(16, Math.round(cw * s) & ~1), h = Math.max(16, Math.round(ch * s) & ~1);
-  for (const k of ['hdr', 'depth', 'hdrCopy', 'depthCopy']) T[k] && T[k].destroy();
-  const U = GPUTextureUsage, mk = (format, usage) => dev.createTexture({ size: [w, h], format, usage });
+  for (const k of ['hdr', 'depth', 'hdrCopy', 'depthCopy', 'ms', 'msDepth']) { T[k] && T[k].destroy(); T[k] = null; }
+  const U = GPUTextureUsage, RT = U.RENDER_ATTACHMENT | U.TEXTURE_BINDING, mk = (format, usage, sampleCount = 1) => dev.createTexture({ size: [w, h], format, usage, sampleCount });
   T.w = w; T.h = h; T.cw = cw; T.ch = ch;
-  T.hdr = mk(G.HDR, U.RENDER_ATTACHMENT | U.TEXTURE_BINDING | U.COPY_SRC); T.hdrView = T.hdr.createView();
-  T.depth = mk(G.DEPTH, U.RENDER_ATTACHMENT | U.TEXTURE_BINDING | U.COPY_SRC); T.depthView = T.depth.createView();
-  T.hdrCopy = T.depthCopy = null; T.hdrCopyView = G.dummyView; T.depthCopyView = G.dummyDepthView;
+  // hdr/depth: 단일 샘플 최종 장면(색·깊이) — 후처리가 읽음. MSAA 프리셋에서는 ms/msDepth 에 그린 뒤 여기로 리졸브.
+  T.hdr = mk(G.HDR, RT | U.COPY_SRC); T.hdrView = T.hdr.createView();
+  T.depth = mk(G.DEPTH, RT | U.COPY_SRC); T.depthView = T.depth.createView();
+  T.sceneView = T.hdrView; T.sceneDepthView = T.depthView;
+  if (Q.msaa > 1) {
+    T.ms = mk(G.HDR, U.RENDER_ATTACHMENT, Q.msaa); T.sceneView = T.ms.createView();
+    T.msDepth = mk(G.DEPTH, RT, Q.msaa); T.sceneDepthView = T.msDepth.createView();
+    G.bgDR = dev.createBindGroup({ layout: G.pipeDR.getBindGroupLayout(0), entries: [{ binding: 0, resource: T.sceneDepthView }] });
+  }
+  T.hdrCopyView = G.dummyView; T.depthCopyView = G.dummyDepthView;
   if (Q.refract) { // HIGH: 불투명 패스 결과 사본 (수면 굴절·깊이 기반 효과용)
-    T.hdrCopy = mk(G.HDR, U.TEXTURE_BINDING | U.COPY_DST | U.RENDER_ATTACHMENT); T.hdrCopyView = T.hdrCopy.createView();
-    T.depthCopy = mk(G.DEPTH, U.TEXTURE_BINDING | U.COPY_DST | U.RENDER_ATTACHMENT); T.depthCopyView = T.depthCopy.createView();
+    T.hdrCopy = mk(G.HDR, RT | U.COPY_DST); T.hdrCopyView = T.hdrCopy.createView();
+    T.depthCopy = mk(G.DEPTH, RT | U.COPY_DST); T.depthCopyView = T.depthCopy.createView();
   }
   if (G.params.has('step')) { G.test.tex && G.test.tex.destroy(); G.test.tex = dev.createTexture({ size: [cw, ch], format: G.fmt, usage: U.RENDER_ATTACHMENT | U.COPY_SRC }); }
   if (G.ready && !quiet) hook('onResize');
@@ -237,9 +257,11 @@ G.setQuality = (name, manual) => {
   G.shadowTex && G.shadowTex.destroy(); G.shadowTex = null;
   if (Q.shadows) G.shadowTex = dev.createTexture({ size: [Q.shadowRes, Q.shadowRes], format: G.DEPTH, usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING });
   G.shadowView = G.shadowTex ? G.shadowTex.createView() : null;
-  const bg = sv => dev.createBindGroup({ layout: G.bgl0, entries: [{ binding: 0, resource: { buffer: G.globalsBuf } }, { binding: 1, resource: sv }, { binding: 2, resource: G.shadowSamp }, { binding: 3, resource: G.noiseView }, { binding: 4, resource: G.linSamp }] });
+  G.bindGlobals = () => {
+  const bg = sv => dev.createBindGroup({ layout: G.bgl0, entries: [{ binding: 0, resource: { buffer: G.globalsBuf } }, { binding: 1, resource: sv }, { binding: 2, resource: G.shadowSamp }, { binding: 3, resource: G.noiseView }, { binding: 4, resource: G.linSamp }, { binding: 5, resource: G.cloudMap.view || G.dummyView }] });
   G.bg0 = bg(G.shadowView || G.dummyDepthView); // 일반 패스용
   G.bg0s = bg(G.dummyDepthView);                // 그림자 패스용 (그림자 맵 미바인딩)
+  }; G.bindGlobals();
   G.resize(1);
   if (G.ready) { hook('onQuality', Q); hook('onResize'); }
 };
@@ -247,7 +269,7 @@ G.setQuality = (name, manual) => {
 /* ───────── 카메라 / 전역 유니폼 ───────── */
 G.cam = { pos: [0, 40, -200], target: [0, 10, 0], up: [0, 1, 0], fov: 50 * Math.PI / 180, near: 1 };
 G.shadowFocus = [0, 0, 0]; G.shadowRange = 240;
-const GF = new Float32Array(156);
+const GF = new Float32Array(160);
 function writeGlobals() {
   const c = G.cam, T = G.targets, Q = G.Q, e = G.env;
   c.view = M4.lookAt(c.pos, c.target, c.up); c.proj = M4.persp(c.fov, T.w / T.h, c.near);
@@ -259,7 +281,7 @@ function writeGlobals() {
     const lz = V3.norm(sd), lx = V3.norm(V3.cross(up, lz)), ly = V3.cross(lz, lx), tx = 2 * R / Q.shadowRes;
     const fx = Math.round(V3.dot(G.shadowFocus, lx) / tx) * tx, fy = Math.round(V3.dot(G.shadowFocus, ly) / tx) * tx, fz = V3.dot(G.shadowFocus, lz);
     const f = V3.add(V3.add(V3.mul(lx, fx), V3.mul(ly, fy)), V3.mul(lz, fz));
-    G.shadowVP = M4.mul(M4.ortho(-R, R, -R, R, 1, 1400), M4.lookAt(V3.add(f, V3.mul(lz, 700)), f, up));
+    G.shadowVP = M4.mul(M4.ortho(-R, R, -R, R, 1, 900), M4.lookAt(V3.add(f, V3.mul(lz, 450)), f, up));
     GF.set(G.shadowVP, 32);
   }
   GF.set([c.pos[0], c.pos[1], c.pos[2], G.time, ...G.sun.dir, Q.level, ...G.sun.col, Q.shadows, T.w, T.h, 1 / T.w, 1 / T.h,
@@ -273,6 +295,7 @@ function writeGlobals() {
     const k = l.intensity * (l.life / l.max) ** 2;
     GF.set([l.pos[0], l.pos[1], l.pos[2], l.radius, l.rgb[0] * k, l.rgb[1] * k, l.rgb[2] * k, 0], o);
   }
+  const cm = G.cloudMap; GF[156] = cm.x; GF[157] = cm.z; GF[158] = 1 / cm.size; GF[159] = cm.view ? 1 : 0;
   G.dev.queue.writeBuffer(G.globalsBuf, 0, GF);
 }
 G.project = p => { // 월드 → 화면(CSS px). 반환 [x, y, w]; w<=0 이면 카메라 뒤
@@ -282,33 +305,52 @@ G.project = p => { // 월드 → 화면(CSS px). 반환 [x, y, w]; w<=0 이면 �
 };
 
 /* ───────── 프레임 ───────── */
+const depthResolve = (enc, view) => { // MSAA 깊이 → 단일 샘플 깊이 (샘플 0)
+  const p = enc.beginRenderPass({ colorAttachments: [], depthStencilAttachment: { view, depthClearValue: 0, depthLoadOp: 'clear', depthStoreOp: 'store' } });
+  p.setPipeline(G.pipeDR); p.setBindGroup(0, G.bgDR); p.draw(3); p.end();
+};
+let tsBusy = 0;
+G.gpuMs = 0; // GPU 프레임 시간(ms, 평활) — timestamp-query 지원 시에만 갱신
 G.tick = dt => {
   if (G.dead) return;
-  const dev = G.dev, T = G.targets, Q = G.Q;
+  const dev = G.dev, T = G.targets, Q = G.Q, ms = Q.msaa > 1, ts = G.ts;
   G.dt = dt; G.time += dt; G.frame++;
   hook('update', dt); writeGlobals(); hook('prepare');
   const enc = dev.createCommandEncoder();
+  if (ts) enc.beginComputePass({ timestampWrites: { querySet: ts.qs, beginningOfPassWriteIndex: 0 } }).end();
   hook('compute', enc);
   if (Q.shadows) {
     const p = enc.beginRenderPass({ colorAttachments: [], depthStencilAttachment: { view: G.shadowView, depthClearValue: 1, depthLoadOp: 'clear', depthStoreOp: 'store' } });
     p.setBindGroup(0, G.bg0s); hook('shadow', p); p.end();
   }
   let p = enc.beginRenderPass({ // A: 불투명 + 하늘
-    colorAttachments: [{ view: T.hdrView, clearValue: [0, 0, 0, 1], loadOp: 'clear', storeOp: 'store' }],
-    depthStencilAttachment: { view: T.depthView, depthClearValue: 0, depthLoadOp: 'clear', depthStoreOp: 'store' }
+    colorAttachments: [{ view: T.sceneView, resolveTarget: ms && Q.refract ? T.hdrCopyView : undefined, clearValue: [0, 0, 0, 1], loadOp: 'clear', storeOp: 'store' }],
+    depthStencilAttachment: { view: T.sceneDepthView, depthClearValue: 0, depthLoadOp: 'clear', depthStoreOp: 'store' }
   });
   p.setBindGroup(0, G.bg0); hook('opaque', p); hook('sky', p); p.end();
   if (Q.refract) {
-    enc.copyTextureToTexture({ texture: T.hdr }, { texture: T.hdrCopy }, [T.w, T.h]);
-    enc.copyTextureToTexture({ texture: T.depth }, { texture: T.depthCopy }, [T.w, T.h]);
+    if (ms) depthResolve(enc, T.depthCopyView);
+    else { enc.copyTextureToTexture({ texture: T.hdr }, { texture: T.hdrCopy }, [T.w, T.h]); enc.copyTextureToTexture({ texture: T.depth }, { texture: T.depthCopy }, [T.w, T.h]); }
   }
   p = enc.beginRenderPass({ // B: 수면 + 반투명(파티클)
-    colorAttachments: [{ view: T.hdrView, loadOp: 'load', storeOp: 'store' }],
-    depthStencilAttachment: { view: T.depthView, depthLoadOp: 'load', depthStoreOp: 'store' }
+    colorAttachments: [{ view: T.sceneView, resolveTarget: ms ? T.hdrView : undefined, loadOp: 'load', storeOp: 'store' }],
+    depthStencilAttachment: { view: T.sceneDepthView, depthLoadOp: 'load', depthStoreOp: 'store' }
   });
   p.setBindGroup(0, G.bg0); hook('water', p); hook('transparent', p); p.end();
+  if (ms) depthResolve(enc, T.depthView);
   G.mods.post.run(enc, G.test.tex ? G.test.tex.createView() : G.ctx.getCurrentTexture().createView());
+  if (ts) {
+    enc.beginComputePass({ timestampWrites: { querySet: ts.qs, endOfPassWriteIndex: 1 } }).end();
+    if (!tsBusy) { enc.resolveQuerySet(ts.qs, 0, 2, ts.buf, 0); enc.copyBufferToBuffer(ts.buf, 0, ts.rb, 0, 16); }
+  }
   dev.queue.submit([enc.finish()]);
+  if (ts && !tsBusy) {
+    tsBusy = 1;
+    ts.rb.mapAsync(GPUMapMode.READ).then(() => {
+      const a = new BigInt64Array(ts.rb.getMappedRange()), m = Number(a[1] - a[0]) / 1e6; ts.rb.unmap(); tsBusy = 0;
+      if (m > 0 && m < 500) G.gpuMs += (m - G.gpuMs) * (G.gpuMs ? .1 : 1);
+    }, () => { tsBusy = 0; });
+  }
 };
 /* 검증용(?step): 루프 대신 G.test.run(n, dt) 로 결정적 스텝 → 오프스크린 결과를 읽어 2D 캔버스에 표시(헤드리스 캡처 가능) */
 G.test = {
@@ -337,7 +379,8 @@ G.boot = async () => {
       return G.fatal('WebGPU 를 사용할 수 없습니다', (isSecureContext ? '' : '<p><b>보안 연결(https 또는 localhost)</b>에서만 WebGPU 가 켜집니다.</p>') + tip);
     const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' }) || await navigator.gpu.requestAdapter();
     if (!adapter) return G.fatal('사용 가능한 GPU 어댑터가 없습니다', tip);
-    const dev = G.dev = await adapter.requestDevice(); G.adapter = adapter;
+    const hasTS = adapter.features.has('timestamp-query');
+    const dev = G.dev = await adapter.requestDevice({ requiredFeatures: hasTS ? ['timestamp-query'] : [] }); G.adapter = adapter;
     dev.addEventListener('uncapturederror', e => G.err('[GPU] ' + e.error.message));
     dev.lost.then(i => { if (i.reason !== 'destroyed') G.fatal('GPU 장치 연결이 끊어졌습니다', `<p>${i.message || ''}</p><p>페이지를 새로고침(F5) 해 주세요.</p>`); });
     const cv = G.canvas = document.getElementById('c'); G.ctx = cv.getContext('webgpu'); G.fmt = navigator.gpu.getPreferredCanvasFormat();
@@ -345,7 +388,7 @@ G.boot = async () => {
     const U = GPUTextureUsage, S = GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT | GPUShaderStage.COMPUTE;
     G.globalsBuf = dev.createBuffer({ size: GF.byteLength, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     G.bgl0 = dev.createBindGroupLayout({ entries: [{ binding: 0, visibility: S, buffer: {} }, { binding: 1, visibility: S, texture: { sampleType: 'depth' } },
-      { binding: 2, visibility: S, sampler: { type: 'comparison' } }, { binding: 3, visibility: S, texture: {} }, { binding: 4, visibility: S, sampler: {} }] });
+      { binding: 2, visibility: S, sampler: { type: 'comparison' } }, { binding: 3, visibility: S, texture: {} }, { binding: 4, visibility: S, sampler: {} }, { binding: 5, visibility: S, texture: {} }] });
     G.shadowSamp = dev.createSampler({ compare: 'less', magFilter: 'linear', minFilter: 'linear' });
     G.linSamp = dev.createSampler({ magFilter: 'linear', minFilter: 'linear', addressModeU: 'repeat', addressModeV: 'repeat' });
     G.clampSamp = dev.createSampler({ magFilter: 'linear', minFilter: 'linear' });
@@ -358,6 +401,11 @@ G.boot = async () => {
     addEventListener('keyup', e => { G.keys[e.code] = 0; });
     addEventListener('blur', () => { G.keys = {}; });
     G.setEnv();
+    const mDR = dev.createShaderModule({ code: `@group(0) @binding(0) var d: texture_depth_multisampled_2d;
+      @vertex fn vs(@builtin(vertex_index) i: u32) -> @builtin(position) vec4f { return vec4f(f32((i << 1u) & 2u) * 2.0 - 1.0, f32(i & 2u) * 2.0 - 1.0, 0.0, 1.0); }
+      @fragment fn fs(@builtin(position) p: vec4f) -> @builtin(frag_depth) f32 { return textureLoad(d, vec2i(p.xy), 0); }` });
+    G.pipeDR = dev.createRenderPipeline({ layout: 'auto', vertex: { module: mDR, entryPoint: 'vs' }, fragment: { module: mDR, entryPoint: 'fs', targets: [] }, depthStencil: { format: G.DEPTH, depthWriteEnabled: true, depthCompare: 'always' } });
+    if (hasTS && !G.params.has('step')) G.ts = { qs: dev.createQuerySet({ type: 'timestamp', count: 2 }), buf: dev.createBuffer({ size: 16, usage: GPUBufferUsage.QUERY_RESOLVE | GPUBufferUsage.COPY_SRC }), rb: dev.createBuffer({ size: 16, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ }) };
     G.gpuInfo = await G.mods.gpu.detect(adapter, dev); // {name, vendor, tier, ...}
     const q = (G.params.get('q') || '').toUpperCase();
     G.setQuality(G.PRESETS[q] ? q : G.gpuInfo.tier, !!G.PRESETS[q]);

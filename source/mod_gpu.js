@@ -73,7 +73,7 @@
     return { ms, frames, scale, floor, tier: ms < .9 ? 2 : ms < 4 ? 1 : 0 };      // 단위당 ms → 등급
   }
   const store = v => { try { v === undefined || (v ? localStorage.setItem('skw_q', v) : localStorage.removeItem('skw_q')); return localStorage.getItem('skw_q'); } catch (e) { return null; } };
-  let el, low = 0, acc = 0;
+  let el, low = 0, acc = 0, win = 0, cool = 0, probe = 0;
   G.gpu = { classify, TIERS };
   G.register('gpu', {
     async detect(adapter, dev) {
@@ -103,16 +103,28 @@
       addEventListener('keydown', e => { if (e.code === 'F2') { e.preventDefault(); this.pick(G.qManual ? TIERS[G.Q.level + 1] || '' : 'LOW'); } });
       const s = store(); if (!G.params.get('q') && G.PRESETS[s]) G.setQuality(s, true); // 지난번 수동 선택 유지
     },
-    pick(q) { store(q || ''); low = 0; G.setQuality(q || G.gpuInfo.tier, !!q); },
+    pick(q) { store(q || ''); low = 0; G.dyn = 1; G.setQuality(q || G.gpuInfo.tier, !!q); },
     onQuality() { for (const b of el.querySelectorAll('button')) b.className = (G.qManual ? b.dataset.q === G.Q.name : !b.dataset.q) ? 'on' : ''; low = 0; },
     update(dt) {
       // 자동 모드에서 4초 넘게 28fps 미만이면 한 단계 낮춤 (탭이 보일 때만)
-      low = !G.qManual && G.Q.level > 0 && G.fps < 28 && document.visibilityState === 'visible' ? low + dt : 0;
-      if (low > 4) { low = 0; G.gpuInfo.tier = TIERS[G.Q.level - 1]; G.gpuInfo.auto = '↓'; G.setQuality(G.gpuInfo.tier, false); }
+      const vis = document.visibilityState === 'visible';
+      // 동적 해상도: 1초마다 GPU 프레임 시간(타임스탬프 쿼리)이 9.8~13.6ms 를 벗어나면 렌더 배율(0.5~1)을 조절.
+      // 타임스탬프를 못 쓰는 브라우저에서는 FPS 가 떨어질 때 줄이고 20초마다 한 번 올려 봄. (?dyn=0 으로 끔)
+      if ((win += dt) >= 1 && vis && !G.params.has('step') && G.params.get('dyn') !== '0') {
+        win = 0; let k = 1; const g = G.gpuMs;
+        if (cool > 0) cool--;
+        else if (g > 0) { if (g > 13.6 || g < 9.8) k = G.clamp(Math.sqrt(11.7 / g), .75, 1.15); }
+        else if (G.fps < 52) k = .9;
+        else if (++probe > 20) { probe = 0; k = 1.08; }
+        const d = G.clamp(G.dyn * k, .5, 1);
+        if (Math.abs(d - G.dyn) > .03) { G.dyn = d; G.resize(); cool = 2; }
+      }
+      low = !G.qManual && G.Q.level > 0 && G.dyn < .56 && G.fps < 28 && vis ? low + dt : 0;
+      if (low > 4) { low = 0; G.dyn = 1; G.gpuInfo.tier = TIERS[G.Q.level - 1]; G.gpuInfo.auto = '↓'; G.setQuality(G.gpuInfo.tier, false); }
       if ((acc += dt) < .25) return; acc = 0;
       const Q = G.Q, T = G.targets, f = G.fps;
       el.children[1].innerHTML = `등급 <b class="t${Q.level}">${Q.name}</b> ${G.qManual ? '수동' : '자동' + (G.gpuInfo.auto || '')} · <b style="color:${f < 30 ? '#ff6b5c' : f < 50 ? '#ffd66b' : '#8dff9a'}">${f.toFixed(0)}</b> FPS ${(1000 / Math.max(f, 1)).toFixed(1)}ms`;
-      el.children[2].textContent = `${T.w}×${T.h} · 파티클 ${G.fx && G.fx.alive | 0}/${Q.particles}`;
+      el.children[2].textContent = `${T.w}×${T.h}${G.dyn < .99 ? ' (' + (G.dyn * 100 | 0) + '%)' : ''}${Q.msaa > 1 ? ' · MSAA' + Q.msaa : ''}${G.gpuMs ? ' · GPU ' + G.gpuMs.toFixed(1) + 'ms' : ''} · 파티클 ${G.fx && G.fx.alive | 0}`;
     }
   });
 }

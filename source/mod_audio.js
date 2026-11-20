@@ -1,13 +1,13 @@
 'use strict';
-/* ═══ AUDIO — Web Audio 실시간 합성 (효과음 · 루프 · 음악) ═══ */
+/* ═══ AUDIO — Web Audio 실시간 합성 ═══ */
 {
   const LPF = 'lowpass', BPF = 'bandpass', HPF = 'highpass', SAW = 'sawtooth', SIN = 'sine';
-  let c, vol, mix, echo, NB, MB, V, LP, src, end, rt, mode, mt, mi, Lp = [0, 0, 0], Lf = [0, 0, 1];
+  let c, vol, mix, echo, NB, MB, V, LP, src, end, rt, mode, mt, mi, Lp = [0, 0, 0], Lf = Lp;
   const to = (n, dst) => (n.connect(dst), n);
   const gn = (gain, dst) => to(new GainNode(c, { gain }), dst);
   const bq = (type, frequency, Q, dst) => to(new BiquadFilterNode(c, { type, frequency, Q }), dst);
   const ws = (k, dst) => to(new WaveShaperNode(c, { curve: Float32Array.from({ length: 257 }, (_, i) => Math.tanh(k * (i / 128 - 1))) }), dst); // tanh 포화
-  // 소스 (d = 0: 무한 재생)
+  // 소스 (d = 0: 무한)
   const go = (s, dst, t, d, off) => { to(s, dst).start(t, off); if (d) { s.stop(t + d); end = Math.max(end, t + d); } src.push(s); return s; };
   const osc = (type, frequency, dst, t = 0, d = 0) => go(new OscillatorNode(c, { type, frequency }), dst, t, d);
   const nz = (dst, playbackRate = 1, t = 0, d = 0) => go(new AudioBufferSourceNode(c, { buffer: NB, loop: true, playbackRate }), dst, t, d, Math.random());
@@ -33,7 +33,7 @@
     gun: [[SIN, 150, .002, .3, 1.1, 1, 45], [BPF, 2200, .001, .14, 2.5, .7, 700], [LPF, 900, .01, .8, 1, .7, 150]],
     hit: [[HPF, 3500, .001, .04, .6, .7], ...[523, 811, 1287, 1962, 3140].map((f, i) => [SIN, f, .001, .45 - i * .07, .3])],
   };
-  const LOOP = { // 지속음: 출력 노드 → rate 설정 함수
+  const LOOP = { // 지속음: 출력 노드 → rate 함수
     ciws(d) { // 70Hz 톱니 + 임펄스열 게이트 잡음 → 왜곡
       const sat = ws(5, gn(.7, d)), o = osc(SAW, 70, bq(BPF, 500, .5, sat)), ng = gn(0, bq(BPF, 1800, .6, sat));
       nz(ng); o.connect(bq(HPF, 300, 1, gn(3, ng.gain)));
@@ -53,9 +53,9 @@
       nz(m); nz(gn(.5, m.gain), .004);
       return r => tgt(b.frequency, 500 * r);
     },
-    sea(d) { // 파도 + 바람
-      const w = gn(.5, bq(LPF, 700, .3, d)), wd = bq(BPF, 700, 2.5, gn(.2, d));
-      nz(w); nz(wd); osc(SIN, .13, gn(.25, w.gain)); osc(SIN, .07, gn(250, wd.frequency));
+    sea(d) { // 파도 + 바람 (느린 잡음 변조)
+      const w = gn(.7, bq(LPF, 700, .3, d)), wd = bq(BPF, 700, 2.5, gn(.2, d));
+      nz(w); nz(wd); nz(gn(.4, w.gain), 1e-5); nz(gn(250, wd.frequency), 1e-5);
       return r => tgt(wd.frequency, 700 * r);
     },
   };
@@ -79,8 +79,8 @@
         if (V.length > 33 || q.g >= g) return;
         tgt(q.o.gain, 0, .01); kill(q, now + .06);
       }
-      const v = out = gn(g, mix); src = []; end = 0; rt = o.rate ?? 1;
-      if (p) out = bq(LPF, 16000 / (1 + d / 500), .5, to(new StereoPannerNode(c, { pan: G.clamp((dz * Lf[0] - dx * Lf[2]) / (d + 30), -1, 1) * .85 }), v)); // 거리 저역통과 · 팬
+      const v = out = gn(g, mix); src = []; end = 0; rt = (o.rate ?? 1) * (p ? .92 + Math.random() * .16 : 1); // 음높이 변주
+      if (p) out = bq(LPF, 16000 / (1 + d / 500), .5, to(new StereoPannerNode(c, { pan: G.clamp((dz * Lf[0] - dx * Lf[2]) / (d + 30), -1, 1) * .85 }), v));
       name == 'ping' && v.connect(echo);
       for (const q of f) part(q, now + .01 + Math.min(d / 340, 2.5), out); // 음속 지연
       V.push({ o: v, g, e: end + .05, s: src });
@@ -90,9 +90,9 @@
       if (on && f) {
         if (!l) { src = []; l = gn(0, mix); l = LP[name] = { o: l, r: f(l), s: src }; }
         l.r((o = o || {}).rate ?? 1); tgt(l.o.gain, o.gain ?? 1, .01);
-      } else if (l) { delete LP[name]; l.r(.3); tgt(l.o.gain, 0); kill(l, c.currentTime + .6); V.push(l); } // 끌 때 스핀다운
+      } else if (l) { delete LP[name]; l.r(0); tgt(l.o.gain, 0, .15); kill(l, c.currentTime + .9); V.push(l); } // 끌 때 스핀다운
     },
-    music(m) { mode = m; for (const k in MB) tgt(MB[k].gain, k == m ? .4 : 0, .5); }, // ≈1.5초 크로스페이드
+    music(m) { if (m != mode) { mode = m; mt = mi = 0; for (const k in MB) tgt(MB[k].gain, k == m ? .4 : 0, .5); } }, // 크로스페이드
     listener(p, f) { Lp = p; Lf = f; },
     volume(v) { tgt(vol.gain, G.clamp(v, 0, 1), .02); },
     tick(dt, ahead = .3) { // 끝난 보이스 해제 + 음악 시퀀서(8분음표 · 110BPM)
@@ -103,15 +103,15 @@
         const d = gn(1, b), P = (...a) => part(a, mt, d); src = []; end = 0; rt = 1;
         if (mode == 'combat') {
           P(SAW, 110 * 2 ** ([0, 0, 12, 0, 0, 10, 0, 3][i % 8] / 12), .01, .24, .7); // 오스티나토
-          if (i % 4 == 0 || i == 14) P(SIN, 110, .003, .2, 1.2, 1, 38); // 킥
+          if (i % 2 == 0 || i == 15) P(SIN, 110, .003, .2, .9, 1, 38); // 킥
           if (!i) P(SAW, 155.6, 2, 2.3, .2); // 긴장 패드
-        } else if (!i) for (const f of [55, 82.4, 110.3]) P(SAW, f, 2.5, 6, .3); // 드론
+        } else if (!i) for (const f of [55, 82.5, 110.23]) P(SAW, f, 4.36, 8, .22); // 드론
         else if (i % 4 == 2 && Math.random() < .4) { d.connect(echo); P(SIN, [220, 261.6, 329.6, 392, 440][Math.random() * 5 | 0], .03, 2.5, .2); } // 드문 음
         V.push({ o: d, g: 9, e: end + .1, s: src });
       }
     },
   };
-  G.sfx = { use }; // init 전에는 no-op, 예외는 G.err 로만
+  G.sfx = { use }; // init 전 no-op, 예외 → G.err
   for (const k in api) G.sfx[k] = (...a) => { try { return (c || k == 'init') && api[k](...a); } catch (e) { G.err('[audio] ' + e); } };
   G.register('audio', { update: G.sfx.tick });
 }
