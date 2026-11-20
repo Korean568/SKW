@@ -143,7 +143,7 @@ ${R ? `  let zw = g.misc.x / i.pos.z; let pu = i.pos.xy * g.res.zw; // 굴절 + 
   col = mix(col, fc * (.6 + .4 * mix(nb.w, na.z, nf)) * (1.0 - .35 * nf * nc.z), fo);
   for (var k = 0; k < 4; k++) { // 점광 반사 줄기
     let l = g.lights[k * 2]; let lv = l.xyz - i.w; let ld = length(lv);
-    col += g.lights[k * 2 + 1].rgb * pow(max(1.0 - ld / (l.w * 2.0 + 1.0), 0.0), 2.0) * (pow(max(dot(r, lv / ld), 0.0), 40.0) * .3 + .02 + fo * .1);
+    col += g.lights[k * 2 + 1].rgb * pow(max(1.0 - ld / (l.w * 1.3 + 1.0), 0.0), 2.0) * (pow(max(dot(r, lv / ld), 0.0), 40.0) * .3 + .004 + fo * .05);
   }
   // 수평선: 안개 점근색(= 수평선 하늘)으로 수렴
   return vec4f(mix(fogAt(col, g.cam.xyz - v * (1.0 + d / 2000.0)), skyBase(normalize(vec3f(-vd.x, .015, -vd.z))), exp(-vd.y / .034) * saturate(d / 300.0 - .2)), 1.0);
