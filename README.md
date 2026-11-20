@@ -26,8 +26,26 @@ CIWS(근접 방어)는 자동으로 작동합니다.
 화면 우측 상단에 GPU 이름 · 등급 · FPS 가 표시되고, 버튼(또는 F2)으로 직접 바꿀 수 있습니다.
 자동 모드에서 FPS 가 계속 낮으면 한 단계씩 스스로 낮춥니다.
 
-## 시나리오 고치기
-`index.html` 안의 `G.SCENARIO` 표만 고치면 됩니다 (위에서 아래로 순서대로 실행, 형식은 바로 위 주석 참고).
+## 소스와 빌드
+`index.html` 은 `source/` 폴더의 읽기 쉬운 소스를 압축해 만든 결과물입니다 (직접 고치지 마세요).
+
+| 파일 | 내용 |
+|---|---|
+| `source/core.js` | 엔진 코어: WebGPU 초기화, 품질 프리셋, 프레임 구성, 공용 셰이더 |
+| `source/mod_gpu.js` | GPU 등급 감지(이름 판별 + 10프레임 벤치마크), 성능 표시 |
+| `source/mod_sky.js` · `mod_post.js` | 하늘·구름 / 블룸·톤매핑 |
+| `source/mod_ocean.js` | 바다 (파도·반사·거품·굴절·항적) |
+| `source/mod_mesh.js` · `mod_models.js` | 메시 렌더러·그림자·섬 지형 / 함정·전투기·미사일 모델 |
+| `source/mod_fx.js` | GPU 파티클 (화염·연기·물기둥·섬광·예광탄) |
+| `source/mod_audio.js` | Web Audio 합성 사운드 |
+| `source/mod_game.js` | 게임 진행·무장·적 AI·HUD — **시나리오는 맨 위 `G.SCENARIO` 표** |
+
+고친 뒤 다시 빌드 (Node.js 18 이상):
+```
+cd source
+npm install
+npm run build
+```
 
 ## 내 컴퓨터에서 실행하기
 ```
