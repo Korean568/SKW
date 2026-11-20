@@ -25,7 +25,7 @@
     if (/nvidia|geforce|quadro|radeon|amd/.test(s)) return 1;
     return -1;
   };
-  // WebGL UNMASKED_RENDERER 로 실제 제품명 확보 (WebGPU 는 이름을 비워 둘 때가 많음)
+  // WebGL 로 실제 제품명 확보
   const glName = () => {
     try {
       const gl = document.createElement('canvas').getContext('webgl'), x = gl.getExtension('WEBGL_debug_renderer_info');
@@ -34,7 +34,7 @@
       return r.replace(/^ANGLE Metal Renderer: /, '').replace(/\s*\(0x[0-9a-f]+\)/i, '').replace(/\s*(Direct3D|OpenGL|vs_\d|ps_\d).*$/i, '').replace(/, or similar$/, '').trim();
     } catch (e) { return ''; }
   };
-  // 벤치마크: 1024² 프래그먼트 + 26만 원소 컴퓨트 = 1단위, 부하를 보정한 뒤 10프레임의 GPU 시간 측정
+  // 벤치마크: 1024² 프래그먼트 + 26만 원소 컴퓨트 = 1단위, 부하 보정 뒤 10프레임 측정
   async function bench(dev) {
     const m = dev.createShaderModule({ code: `
       @group(0) @binding(0) var<storage, read_write> d: array<vec4f>;
@@ -60,17 +60,17 @@
       }
       e.copyBufferToBuffer(sb, 0, rb, 0, 16);
       const t = performance.now(); dev.queue.submit([e.finish()]);
-      await rb.mapAsync(GPUMapMode.READ); rb.unmap(); return performance.now() - t; // 읽기 매핑 완료 = GPU 작업 종료
+      await rb.mapAsync(GPUMapMode.READ); rb.unmap(); return performance.now() - t; // 매핑 완료 = GPU 작업 끝
     };
     const med = a => a.sort((x, y) => x - y)[a.length >> 1];
-    await run(1 / 16); // 워밍업
+    await run(1 / 16);
     const floor = med([await run(0), await run(0), await run(0)]); // 제출·매핑 자체 지연
-    const unit0 = Math.max(await run(1 / 16) - floor, .05) * 16; // 1단위 예상 시간
-    const scale = G.clamp(20 / unit0, 1 / 16, 12), frames = []; // 프레임당 ≈20ms 가 되게 보정
-    for (let i = 0; i < 10; i++) frames.push(await run(scale)); // ── 10프레임 측정 ──
+    const unit0 = Math.max(await run(1 / 16) - floor, .05) * 16;
+    const scale = G.clamp(20 / unit0, 1 / 16, 12), frames = []; // 프레임당 ≈20ms 로 보정
+    for (let i = 0; i < 10; i++) frames.push(await run(scale));
     const ms = Math.max(med([...frames]) - floor, .02) / (scale < 1 ? scale : Math.round(scale));
     sb.destroy(); rb.destroy(); tex.destroy();
-    return { ms, frames, scale, floor, tier: ms < .9 ? 2 : ms < 4 ? 1 : 0 }; // 단위당 ms → 등급
+    return { ms, frames, scale, floor, tier: ms < .9 ? 2 : ms < 4 ? 1 : 0 };
   }
   const store = v => { try { v === undefined || (v ? localStorage.setItem('skw_q', v) : localStorage.removeItem('skw_q')); return localStorage.getItem('skw_q'); } catch (e) { return null; } };
   let el, low = 0, acc = 0, win = 0, cool = 0, probe = 0;
@@ -92,11 +92,12 @@
       return info;
     },
     init() {
-      // 알약(등급 · FPS) → 올리거나 누르면 상세 + 프리셋
-      G.css(`#perf{position:absolute;right:12px;top:12px;max-width:270px;text-align:right;font:11px/1.6 ui-monospace,monospace;color:#9fc6dc;pointer-events:auto}
-#perf>*{display:inline-block;padding:2px 11px;background:#06121cb0;border:1px solid #2c5c7a77;border-radius:12px}#perf .d{display:none;margin-top:5px;padding:8px 10px;border-radius:8px;text-align:left;overflow-wrap:anywhere}#perf:hover .d,#perf.op .d{display:block}
-#perf b{color:#fff}#perf .t0{color:#ffb35c}#perf .t1{color:#7fd6ff}#perf .t2{color:#8dff9a}
-#perf button{font:inherit;margin:5px 4px 0 0;padding:1px 8px;color:#9fc6dc;background:#0d2231;border:1px solid #2c5c7a;border-radius:4px;cursor:pointer}#perf button.on{color:#04121c;background:#7fd6ff;border-color:#7fd6ff}`);
+      // 알약(GPU 이름 · 등급 · FPS) → 누르면 상세 + 프리셋
+      G.css(`#perf{position:absolute;right:12px;top:12px;max-width:300px;text-align:right;font:11px/1.6 ui-monospace,monospace;color:#9cd;pointer-events:auto}
+#perf>*{display:inline-block;padding:2px 11px;background:#012b;border:1px solid #3577;border-radius:12px}#perf .d{display:none;margin-top:5px;padding:8px 10px;border-radius:8px;text-align:left;overflow-wrap:anywhere}#perf:hover .d,#perf.op .d{display:block}
+#perf>div:first-child{white-space:nowrap}#perf i{display:inline-block;max-width:13em;margin-right:.7em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom;font-style:normal;opacity:.75}@media(max-width:1100px){#perf i{display:none}}
+#perf b{color:#fff}#perf .t0{color:#fb5}#perf .t1{color:#8df}#perf .t2{color:#8f9}
+#perf button{font:inherit;margin:5px 4px 0 0;padding:1px 8px;color:#9cd;background:#123;border:1px solid #357;border-radius:4px;cursor:pointer}#perf button.on{color:#012;background:#8df;border-color:#8df}`);
       el = G.el('div', { id: 'perf' });
       const g = G.gpuInfo;
       el.innerHTML = `<div title="그래픽 설정 · F2 순환"></div><div class="d"><b>${g.name}</b><div>이름 판별 ${g.nameTier} · 벤치마크 ${g.benchTier} (${g.benchMs}ms)</div><div></div>`
@@ -108,9 +109,8 @@
     pick(q) { store(q || ''); low = 0; G.dyn = 1; G.setQuality(q || G.gpuInfo.tier, !!q); },
     onQuality() { for (const b of el.querySelectorAll('button')) b.className = (G.qManual ? b.dataset.q === G.Q.name : !b.dataset.q) ? 'on' : ''; low = 0; },
     update(dt) {
-      // 자동 모드: 4초 넘게 28fps 미만이면 한 단계 낮춤
       const vis = document.visibilityState === 'visible';
-      // 동적 해상도: 1초마다 GPU 시간이 9.8~13.6ms 를 벗어나면 배율(0.5~1) 조절. 타임스탬프가 없으면 FPS 로 줄이고 20초마다 올려 봄 (?dyn=0 끔)
+      // 동적 해상도: 1초마다 GPU 시간(없으면 FPS)으로 배율 0.5~1 조절 (?dyn=0 끔) · 자동 모드: 그래도 4초 넘게 28fps 미만이면 한 단계 낮춤
       if ((win += dt) >= 1 && vis && !G.params.has('step') && G.params.get('dyn') !== '0') {
         win = 0; let k = 1; const g = G.gpuMs;
         if (cool > 0) cool--;
@@ -124,8 +124,8 @@
       if (low > 4) { low = 0; G.dyn = 1; G.gpuInfo.tier = TIERS[G.Q.level - 1]; G.gpuInfo.auto = '↓'; G.setQuality(G.gpuInfo.tier, false); }
       if ((acc += dt) < .25) return; acc = 0;
       const Q = G.Q, T = G.targets, f = G.fps;
-      el.firstChild.innerHTML = `<b class="t${Q.level}">${Q.name}</b> · ${f.toFixed(0)} FPS`;
-      el.lastChild.children[2].textContent = `${G.qManual ? '수동' : '자동' + (G.gpuInfo.auto || '')} · ${T.w}×${T.h}${G.dyn < .99 ? ' (' + (G.dyn * 100 | 0) + '%)' : ''}${Q.msaa > 1 ? ' · MSAA' + Q.msaa : ''}${G.gpuMs ? ' · GPU ' + G.gpuMs.toFixed(1) + 'ms' : ''} · 파티클 ${G.fx && G.fx.alive | 0}`;
+      el.firstChild.innerHTML = `<i>${G.gpuInfo.name}</i><b class="t${Q.level}">${Q.name}</b> · ${f.toFixed(0)} FPS`; // GPU 이름 · 등급 · 실시간 FPS (좁은 화면에서는 이름 숨김)
+      el.lastChild.children[2].textContent = `${G.qManual ? '수동' : '자동' + (G.gpuInfo.auto || '')} · ${T.w}×${T.h}${G.dyn < .99 ? ' (' + (G.dyn * 100 | 0) + '%)' : ''}${Q.msaa > 1 ? ' · MSAA' + Q.msaa : ''}${G.gpuMs ? ' · GPU ' + G.gpuMs.toFixed(1) + 'ms' : ''}`;
     }
   });
 }

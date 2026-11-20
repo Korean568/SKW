@@ -1,5 +1,5 @@
 'use strict';
-/* ═════════ OCEAN — 방사형 수면 메시 · 거스트너 + 스펙트럼 타일 · 항적 · 거품 · 굴절 ═════════ */
+/* ═══ OCEAN — 방사형 수면 메시 · 거스트너 + 스펙트럼 타일 · 항적 밀도장 · 윤슬 · 굴절 ═══ */
 {
   const u = new Float32Array(96), rp = new Float32Array(32), O = { pc: {}, nw: 0, ri: 0 };
   G.ocean = {
@@ -41,95 +41,112 @@ struct V { @builtin(position) pos: vec4f, @location(0) w: vec3f, @location(1) b:
   ${q > 1 ? `w.y += textureSampleLevel(tile, smp, b / 48.44 + .37, log2(r + 1.0) * .5 + .5).z * 48.44 * saturate(1.4 - r / 160.0);` : ''}
   return V(g.viewProj * vec4f(w, 1.0), w, b);
 }
-fn sn(p: vec2f) -> vec4f { let f = fract(p); return textureSampleLevel(noiseTex, linSamp, (floor(p) + f * f * (3.0 - 2.0 * f) + .5) / 256.0, 0.0); } // 매끈한 값 잡음
+fn sn(p: vec2f) -> vec4f { let f = fract(p); return textureSampleLevel(noiseTex, linSamp, (floor(p) + f * f * (3.0 - 2.0 * f) + .5) / 256.0, 0.0); }
+fn bx(o: vec2f, r: vec3f, b: vec3f) -> f32 { // 선체 상자 × 광선 0..1 (중앙부는 높게)
+  let d = r.xz + 1e-4; let a = (-sign(d) * b.xz - o) / d; let c = (sign(d) * b.xz - o) / d; let t = max(max(a.x, a.y), 0.0);
+  return saturate((min(c.x, c.y) - t) * .2) * (1.0 - smoothstep(.6, 1.0, r.y * t / (b.y * (1.0 + 1.5 * smoothstep(.55, .3, abs(o.y + d.y * t) / b.z)))));
+}
+fn gl(p: vec2f, s: f32, a: f32) -> f32 { // 윤슬 셀: 무작위 점이 로브 세기 a 만큼 반짝임
+  let q = p / s; let h = hash33(vec3f(floor(q), s)); let o = fract(q) - .15 - h.xy * .7;
+  return smoothstep(0.0, .15, a - abs(fract(h.z + g.cam.w * (.6 + h.x * 1.2)) * 2.0 - 1.0)) * exp(-dot(o, o) * ${q ? 28 : 12}.0) * (.3 + 1.4 * h.y * h.y);
+}
 @fragment fn fs(i: V) -> @location(0) vec4f {
   let t = g.cam.w; let L = g.sun.xyz; let wd = g.wind.xy; let sea = g.fog.w; let v = g.cam.xyz - i.w; let d = length(v); let vd = v / d;
-  let fp = d * d * g.res.w / max(abs(v.y), 1.0); // 픽셀 발자국(m) → 디테일 LOD
-  let lf = fbm(i.b / 1100.0 + wd * (t * .006), 2) * 1.33; // 저주파 얼룩 0..1: 돌풍 무늬 · 큰 색 변화
-  let gq = sn(i.b / 50.0 + wd * (t * .02)); // 파군: 짧은 파의 진폭·위상을 덩어리지게 흔듦 → 격자 무늬 없음
-  var sl = vec2f(0.0); var ts = sl; var cr = 0.0; var ct = 0.0; var cd = 0.0; var ht = 0.0; var ro = .005; var fo = 0.0; var ae = 0.0; var oc = 0.0; var ol = 0.0; var pr = 0.0; var ao = 0.0;
-  for (var k = 0; k < 6; k++) { // 기본 6파 해석 법선 (함정이 타는 파와 동일). 발자국보다 짧은 파는 거칠기로 넘김
+  let fx = d * g.res.w; let fp = fx * d / max(abs(v.y), 1.0); let up = smoothstep(.3, .8, vd.y); // 픽셀 발자국(m) 가로·세로, 내려다보는 정도
+  let lf = fbm(i.b / 1100.0 + wd * (t * .006), 2) * 1.33;
+  let gq = sn(i.b / 50.0 + wd * (t * .02)); let gw = sn(i.b / 230.0 - wd * (t * .013)); // 파군 · 타일 반복 깨기
+  var sl = vec2f(0.0); var ts = sl; var cr = 0.0; var ct = 0.0; var cd = 0.0; var ht = 0.0; var ro = .005; var fo = 0.0; var ae = 0.0; var oc = 0.0; var ol = 0.0; var sh = 1.0;
+  for (var k = 0; k < 6; k++) { // 기본 6파 법선. 짧은 파는 거칠기로, 거품용 마루(e)는 더 멀리까지
     let a = g.waves[k * 2]; let c = g.waves[k * 2 + 1]; let w = select(0.0, gq[k - 2] - .5, k > 1); let th = a.w * dot(a.xy, i.b) - c.x * t + c.z + w * f32(k) * 3.0;
-    let f = saturate(2.0 - a.w * fp); let m = a.w * a.z * f * (1.0 + 1.4 * w);
-    sl += a.xy * (m * cos(th)); cr += c.y * m * sin(th); ct += c.y * m * sin(th + .9); ht += a.z * f * sin(th); ro += .002 - f * .002;
+    let f = saturate(2.0 - a.w * fp); let m = a.w * a.z * (1.0 + 1.4 * w); let e = c.y * m * saturate(3.0 - a.w * fp * .5);
+    sl += a.xy * (m * f * cos(th)); cr += e * sin(th); ct += e * sin(th + .9); ht += a.z * f * sin(th); ro += .002 - f * .002;
   }
-  for (var k = 0; k < 3; k++) { // 스펙트럼 타일 3스케일 (스케일마다 회전). 밉으로 걸러진 기울기 분산은 거칠기로
+  let s0 = sl;
+  for (var k = 0; k < 3; k++) { // 스펙트럼 타일 3스케일 (회전·워프·진폭 변조)
     let e = f32(k); let sz = 173.0 * pow(.28, e); let M = mat2x2f(cos(e * .7), sin(e * .7), -sin(e * .7), cos(e * .7));
-    let lod = log2(max(fp / ${q ? 2 << q : 4}.0, d * g.res.w) * 512.0 / sz); let f = saturate(5.0 - lod) * (.7 + .6 * lf);
-    let s = textureSample(tile, smp, M * (i.b - wd * (t * sqrt(sz) * ${q > 1 ? 0 : .5})) / sz + e * .37);
+    let lod = log2(max(fp / ${q ? 2 << q : 4}.0, fx) * 512.0 / sz); let f = saturate(5.0 - lod) * (.3 + 1.4 * gw[k]);
+    let s = textureSample(tile, smp, M * (i.b - wd * (t * sqrt(sz) * ${q > 1 ? 0 : .5})) / sz + e * .37 + gw.zw * .3);
     ts += s.xy * M * f; cd += (.5 - s.w * .5) * f; ro += .005 * clamp(lod, 0.0, 4.0);
   }
-  // 거품 침식 잡음: na 5m · nc 1.2m 셀, nb 바람 방향 줄무늬
-  let nf = saturate(2.0 - fp * .6);
-  let na = sn(i.b / 5.0 + ts * 2.0); let nc = ${q ? 'sn(i.b.yx / 1.2 - ts * 4.0)' : 'na.wzyx'};
-  let nb = mix(vec4f(.5), sn(vec2f(dot(i.b, wd) / 18.0 - t * .77, (i.b.x * wd.y - i.b.y * wd.x) / 4.7) + ts * 1.5), saturate(2.0 - fp * .15));
+  // 거품 잡음: na 6m · nc 1.4m · nb 바람 줄무늬 → ch 휘젓기. lg 랭뮤어 줄무늬
+  let nf = saturate(2.0 - fp * .25); let ac = dot(i.b, wd); let ax = i.b.x * wd.y - i.b.y * wd.x;
+  let na = sn(i.b / 6.0 + ts * 2.0); let nc = ${q ? 'sn(i.b.yx / 1.4 - ts * 4.0)' : 'na.wzyx'};
+  let nb = mix(vec4f(.5), sn(vec2f(ac / 18.0 - t * .77, ax / 4.7) + ts * 1.5), saturate(2.0 - fp * .15));
+  let ch = mix(nb.z, na.y * .6 + nc.y * .4, nf);
+  let lg = pow(1.0 - abs(2.0 * sn(vec2f(ac / 170.0, ax / 26.0) + gq.xy * .5).x - 1.0), 3.0) * saturate(1.5 - fp * .08) * (.03 + .05 * sea);
+  var r0 = reflect(-vd, normalize(vec3f(-sl.x - ts.x, 1.0, -sl.y - ts.y))); r0.y = abs(r0.y) + .02;
   for (var k = 0; k < 8; k++) {
     let R = u.rp[k]; let rv = i.b - R.xy; let x = length(rv) / max(R.z, .1);
-    if (x < 2.0) { // 착탄 파문: 퍼지는 고리(법선 + 거품)와 안쪽 거품
+    if (x < 2.0) { // 착탄 파문
       let e = exp(-pow((x - 1.0) * 4.0, 2.0)) * R.w;
       sl += rv * (e * sin((x - 1.0) * 9.0) * .9 / max(x * R.z, 1.0)); fo += e + .6 * R.w * max(1.0 - x, 0.0);
     }
-    // 항적 (선체 좌표에서 해석적으로): s 선수로부터 뒤쪽 거리, l 중심선에서 옆 거리. 폭·수명은 함 크기(P.y)에 비례
-    let W = u.wk[k * 2]; let P = u.wk[k * 2 + 1]; let p = i.b - W.xy; let hl = P.y * 1.3; let hb = P.y * .18;
-    let s = hl - dot(p, W.zw); let lt = p.x * W.w - p.y * W.z; let l = abs(lt);
-    if (P.y < 1.0) { continue; }
-    pr = max(pr, 1.5 - length(p) / (P.y * 2.5)); // 선체 근접도 → 수면 그림자 세기
-    if (s < 0.0 || l > hb * 4.0 + s * .5) { continue; }
-    let am = min(P.x * .13, 1.0); let e = max(s - hl * 2.0, 0.0);
-    let hw = hb * min(sqrt(s / hl), 1.0); let wh = hw + e * hb * .006; // 선체 반폭 (선수는 뾰족) · 뒤로 갈수록 넓어지는 난류 띠 반폭
-    // 켈빈 V: 19.5° 팔을 따라 이어지는 부드러운 줄기 (톱니 없음). 법선은 발산파
-    let q = (l - hb * .4 - s * .34) / (hb * .5 + s * .12); let ar = exp(-q * q) * am; let kk = 6.283 / (8.0 + P.x * 1.4);
-    sl += (W.zw * .82 + vec2f(W.w, -W.z) * (sign(lt) * .57)) * (ar * exp(-s / (P.x * 35.0 + 1.0)) * saturate(2.0 - kk * fp) * .5 * cos(kk * (l * .57 - s * .82) + nb.z * 5.0));
-    // 선미 난류 띠: 나이 들수록 넓고 옅게 조각남
-    let tb = (1.0 - smoothstep(.2, 1.2, l / wh + nb.y - .5)) * step(hl * 1.5, s) * am;
-    fo += ar * (.7 + .4 * cos(q * 4.0 + gq.x * 9.0)) * (.5 + gq.y) * (1.2 * exp(-s / hl) + .3 * exp(-s / (hl * 4.0))) // 선수에서 밀려나는 거품
-      + (1.0 - smoothstep(hw, hw + 1.5 + s * .04, l)) * saturate(1.0 - e / hb) * am // 현측 세류
-      + tb * (.5 + nb.w) * (1.6 * exp(-e / (hl * .5)) + .45 * exp(-e / (hl * 3.0)));
-    ae = max(ae, tb * (.3 + nb.x) * exp(-e / (hl * 3.0)));
-    // 선체 반사 (거울 반사선이 현측에 닿는 높이로 판정) · ol 햇빛 받는 현측 · ao 흘수선 그늘
-    let ta = (l - hw) / max((vd.x * W.w - vd.z * W.z) * sign(lt), .03); let sh = s + dot(vd.xz, W.zw) * ta; let g0 = exp(-max(l - hw, 0.0) / hb);
-    let o = (1.0 - smoothstep(P.y * .08, P.y * .3, (vd.y - 2.0 * dot(ts, vd.xz)) * ta)) * smoothstep(0.0, hb, sh) * smoothstep(hl * 2.0, hl * 2.0 - hb, sh) * sqrt(g0);
-    oc = max(oc, o); ol += o * max((L.x * W.w - L.z * W.z) * sign(lt), 0.0); ao = max(ao, g0 * g0 * saturate(s / hb) * saturate((hl * 2.0 - s) / hb));
+    // 항적 (선체 좌표 o = 옆·앞): s 선수에서 뒤로, l 옆으로. 폭 최소 3px
+    let W = u.wk[k * 2]; let P = u.wk[k * 2 + 1]; if (P.y < 1.0) { continue; }
+    let p = i.b - W.xy; let hl = P.y * 1.3; let hb = max(P.y * .18, fp * 1.5); let o = vec2f(p.x * W.w - p.y * W.z, dot(p, W.zw)); let l = abs(o.x); let s = hl - o.y;
+    // 반사선이 선체에 닿으면 oc, 태양 광선이 닿으면 그림자 sh
+    let B = vec3f(P.y * .11, P.y * .13, hl * .95);
+    let lx = L.x * W.w - L.z * W.z; let ob = bx(o, vec3f(r0.x * W.w - r0.z * W.z, r0.y, dot(r0.xz, W.zw)), B); sh = min(sh, 1.0 - bx(o, vec3f(lx, L.y, dot(L.xz, W.zw)), B));
+    if (ob > oc) { oc = ob; ol = saturate(lx * sign(o.x) * 3.0); }
+    if (s < 0.0 || l > hb * 4.0 + s * .6) { continue; }
+    let am = min(P.x * .13, 1.0); let e = max(s - hl * 2.0, 0.0); let hw = hb * min(sqrt(s / hl), 1.0);
+    // 켈빈 V 팔: 발산파 법선 + 깃털 거품
+    let q = (l - 1.0 - s * .34) / (hb * .3 + s * .07); let kk = 6.283 / (8.0 + P.x * 1.4); let ph = kk * (l * .57 - s * .82) + nb.z * 5.0;
+    let ar = exp(-q * q - s / (hl * 5.0)) * am; let kf = saturate(2.0 - kk * fp);
+    sl += (W.zw * .82 + vec2f(W.w, -W.z) * (sign(o.x) * .57)) * (ar * kf * .8 * cos(ph));
+    // 거품 밀도: 팔 + 선수 물마루 + 끊기는 현측 거품 + 선미 난류 띠(나이 e 로 감쇠·확산). ae 오래 남는 기포수
+    let wh = hb * (.9 + .3 * sqrt(e / hb)); let x2 = l * l / (wh * wh); let st = step(hl * 1.7, s) * am;
+    fo += exp(-q * q * 9.0 - s / (hl * 1.5)) * (.4 + gq.y) * am
+      + exp(-s / (hl * .3) - pow((l - hw) / (2.5 + s * .2), 2.0)) * (.5 + gq.y) * am
+      + exp(-max(l - hw * .8, 0.0) / (1.0 + hb * (.25 * exp(-s / (hl * .4)) + .2 * smoothstep(hl * 1.3, hl * 2.0, s)))) * smoothstep(.5, .75, gq.z) * (.4 + gq.y) * saturate(1.0 - e / hb) * am
+      + exp(-x2 * 1.5 - e / (hl * 5.0)) * st * (.4 + .6 * gq.x + .5 * exp(-e / hl));
+    ae = max(ae, exp(-x2 * .6 - e / (hl * 14.0)) * st);
   }
-  sl += ts * (1.0 - .75 * ae); cd *= 1.0 - .75 * ae; // 항적 안쪽은 잔물결이 눌려 매끈
+  sl += ts * (1.0 - .75 * ae); cd *= 1.0 - .75 * ae;
   let n = normalize(vec3f(-sl.x, max(1.0 - cr - cd, .3), -sl.y)); let nv = max(dot(n, vd), .03); let sg = sqrt(ro);
-  let hz = smoothstep(30.0, 1200.0, d); // 먼 바다: 스치는 각에서 프레넬 → 1, 밝은 수평선 하늘을 반사
-  let fr = .02 + .98 * pow(saturate(1.0 - nv), 5.0 * exp(-2.69 * sg)) / (1.0 + 22.7 * sg * sqrt(sg) * (1.0 - .85 * hz)); // 거친 수면 프레넬
+  let hz = smoothstep(30.0, 1200.0, d); // 먼 바다 프레넬 → 1
+  let fr = max(.02 + .98 * pow(saturate(1.0 - nv), 5.0 * exp(-2.69 * sg)) / (1.0 + 22.7 * sg * sqrt(sg) * (1.0 - .85 * hz)), oc * pow(1.0 - vd.y, 5.0) * .8);
   var r = reflect(-vd, n); r = normalize(vec3f(r.x, abs(r.y) + sg * .3 * (1.0 - hz), r.z));
-  let cs = 1.0 - (.2 + .4 * g.fog.y) * smoothstep(.6, .35, lf); // 돌풍 무늬의 큰 명암
-  // 구름 그림자 (4탭 블러) × 함정 그림자 (태양이 낮거나 선체에서 멀면 옅게)
-  let sw = (cloudVis(i.w + vec3f(22, 0, 9)) + cloudVis(i.w - vec3f(22, 0, 9)) + cloudVis(i.w + vec3f(-9, 0, 22)) + cloudVis(i.w - vec3f(-9, 0, 22))) * .25
-    ${q > 1 ? '* mix(1.0, shadowAt(i.w, n), saturate(L.y * 4.0) * saturate(.4 + pr))' : ''};
-  let amb = skyBase(vec3f(-L.x, .7, -L.z)); let sun = g.sunCol.rgb * (cs * sw); let nl = max(dot(n, L), 0.0);
-  // 수체색: 짙은 청록, 마루는 옥빛. 태양 쪽 사면(sf)은 밝게 + 마루의 전방 산란
+  sh = mix(1.0, sh${q > 1 ? ' * shadowAt(i.w, n)' : ''}, saturate(L.y * 5.0));
+  let sw = (cloudVis(i.w + vec3f(22, 0, 9)) + cloudVis(i.w - vec3f(22, 0, 9)) + cloudVis(i.w + vec3f(-9, 0, 22)) + cloudVis(i.w - vec3f(-9, 0, 22))) * .25;
+  let amb = skyBase(vec3f(-L.x, .7, -L.z)); let sun = g.sunCol.rgb * (sw * sh); let nl = max(dot(n, L), 0.0);
+  // 수체색: 짙은 청색, 마루는 옥빛. 내려다볼 땐 밝게 + 너울 사면 명암 띠
   let sf = saturate(.3 - 1.5 * dot(sl, L.xz)); let hh = saturate(cr * 1.6 + cd + ht * .25 + .25);
-  var body = mix(vec3f(.007, .044, .078), vec3f(.01, .085, .09), max((1.0 - nv) * saturate(L.y * 2.5), hh * .6)) * (amb * 1.4 + sun * (.1 + .8 * nl * nl) * (.4 + 2.0 * sf)) * (.6 + .5 * lf + .4 * hh)
-    + vec3f(.0, .2, .15) * sun * (pow(max(dot(vd, -L), 0.0), 3.0) + .1 + sf * .4) * hh * (.08 + min(L.y, .25));
-${R ? `  let zw = g.misc.x / i.pos.z; let pu = i.pos.xy * g.res.zw; // 굴절: 불투명 장면을 법선으로 왜곡, 물 두께로 흡수
+  var body = mix(vec3f(.008, .05, .095), vec3f(.01, .09, .1), max((1.0 - nv) * saturate(L.y * 2.5), hh * .4) * (1.0 - .7 * up)) * (amb * 1.4 + sun * (.1 + .8 * nl * nl) * (.4 + 2.0 * sf))
+    * (.75 + .2 * lf + .4 * hh * (1.0 - up)) * (1.0 + up * (clamp(1.0 - 2.5 * dot(s0, L.xz), .6, 1.5) * 1.3 - .6))
+    + vec3f(.0, .2, .15) * sun * (pow(max(dot(vd, -L), 0.0), 3.0) + .1 + sf * .4) * hh * (.08 + min(L.y, .25)) * (1.0 - .7 * up);
+${R ? `  let zw = g.misc.x / i.pos.z; let pu = i.pos.xy * g.res.zw; // 굴절 + 흡수
   let t0 = g.misc.x / max(textureLoad(dpt, vec2i(i.pos.xy), 0), 1e-9) - zw;
   var uv = clamp(pu + n.xz * saturate(t0 * .3) * 2.0 / (zw + 20.0), vec2f(.001), vec2f(.999));
   var th = g.misc.x / max(textureLoad(dpt, vec2i(uv * g.res.xy), 0), 1e-9) - zw;
   if (th < 0.0) { uv = pu; th = t0; }
-  th = max(th, 0.0); let bp = i.w - vd * th; // 물속에 보이는 점 → 태양 방향으로 수면에 투영해 커스틱(타일 야코비안) 조회
-  let ca = pow(saturate(1.3 - textureSampleLevel(tile, smp, (bp.xz - L.xz * (bp.y / max(L.y, .2))).yx / 11.3, clamp(log2(d * g.res.w * 90.0), 0.0, 4.0)).w), 2.0);
+  th = max(th, 0.0); let bp = i.w - vd * th; // 커스틱
+  let ca = pow(saturate(1.3 - textureSampleLevel(tile, smp, (bp.xz - L.xz * (bp.y / max(L.y, .2))).yx / 11.3, clamp(log2(fx * 90.0), 0.0, 4.0)).w), 2.0);
   body = mix(body, textureSampleLevel(scn, linSamp, uv, 0.0).rgb * (1.0 + ca * 4.0 * exp(bp.y * .12)), exp(-th * vec3f(.6, .25, .2)));
-  fo += 1.0 - smoothstep(0.0, 2.5, th);
+  fo += (1.0 - smoothstep(0.0, 2.5, th)) * smoothstep(.3, .7, gq.z);
 ` : ''}
-  let hv = normalize(vd + L); let vh = dot(vd, hv); let n2 = pow(max(dot(n, hv), .01), 2.0);
-  let sp = exp((n2 - 1.0) / (n2 * ro)) / (ro * n2 * n2) * (.02 + .98 * pow(1.0 - vh, 5.0)) * .015 / max(vh * vh, .1) * (1.0 - oc);
-  // 반사: 하늘 + 저주파 구름 + 선체. 따뜻한 태양 윤슬은 3배에서 부드럽게 포화
+  // 윤슬: 매끈한 기본 로브 + 발자국에 맞춘 두 스케일 셀의 HDR 반짝임
+  let hv = normalize(vd + L); let vh = dot(vd, hv); let n2 = pow(max(dot(normalize(n + vec3f(0, 2, 0)), hv), .01), 2.0); let rb = ro * 2.0 + .03;
+  let lb = exp((n2 - 1.0) / (n2 * rb)) * (1.0 - oc); let sb = lb * min((.02 + .98 * pow(1.0 - vh, 5.0)) * .5 / max(vh * vh, .1), 1.3) * min(1.0, sqrt(.08 / rb));
+  let gs = log2(${q ? 2.8 : 4} * sqrt(fp * fx) * pow(fp / fx, .15)); let g0 = exp2(floor(gs));
+  let sk = mix(gl(i.b, g0, lb * .45), gl(i.b, g0 * 2.0, lb * .45), fract(gs)) * ${q ? 22 : 5}.0 * saturate(2.0 - fp / (fx * 14.0));
   let cl = g.fog.y * smoothstep(.4, .8, sn((i.b - vd.xz * (1500.0 / (vd.y + .2))) / 600.0 + wd * (t * .01)).x);
-  var col = mix(body * (1.0 - .4 * oc), mix(mix(skyBase(r) * (.95 + .3 * lf), g.sunCol.rgb * .2 + amb * .5, cl), amb * .3, oc) * (.6 + .4 * sw) + sun * (ol * .3), fr) + sun * vec3f(1.2, 1.0, .75) * sp / (1.0 + sp * .3);
-  // 거품: 중성 흰색 × (태양 + 채도를 뺀 하늘빛)
-  let fc = (sun * (.25 + .5 * nl) + mix(amb, vec3f(dot(amb, vec3f(.4))), .7) * .9 + g.sunCol.rgb * .04) * .85;
-  col = mix(col, fc * mix(vec3f(.17), vec3f(.1, .3, .28), saturate(L.y * 4.0 - .2)), min(fo * .3 + ae * .5, .6)); // 기포 섞인 옥빛 물 (낮은 태양에선 중성)
-  // 백파: 부서지는 마루 + 바람 줄무늬. 발자국이 커지면 문턱이 넓어져 부드럽게 사라짐
-  let wc = cd * .4 + sea * .45 - .17 + (lf - .5) * .5 + (nb.x - .5) * .5; let w = fp * .2;
-  fo += min(smoothstep(.32 - w, .82 + w, cr + wc) + smoothstep(.27 - w, .82 + w, ct + wc) * nb.y, .7) / (1.0 + fp * .2);
-  // 침식: 세 스케일 값 잡음 + 넓은 문턱 → 부드러운 덩어리와 구멍 (실선 없음)
-  fo = smoothstep(0.0, .6 + fp * .1, fo * 1.2 - (nb.y * .5 + .25 + (na.x - .5) * .7 * nf + (nc.x - .5) * .4 * saturate(1.5 - fp * 1.5)) / (1.0 + fp * .1)) * .92;
-  col = mix(col, fc * (1.0 - .3 * nf * nc.z), fo) * (1.0 - .3 * ao) + pointLights(i.w, r) * (.02 + fr * .06 + fo * .15);
-  return vec4f(fogAt(col, g.cam.xyz - v * (1.0 + d / 2000.0)), 1.0); // 먼 바다는 안개를 더 얹어 수평선에서 하늘과 이어지게
+  var col = mix(body * (.65 + .35 * sh) * (1.0 - .4 * oc), mix(mix(skyBase(r), g.sunCol.rgb * .2 + amb * .5, cl) * (.65 + .35 * sw), amb * .22 + sun * (ol * .1), oc), fr) + sun * (sb + sk);
+  // 거품색: 태양(낮엔 흰색) + 하늘빛
+  let fc = mix(sun, vec3f(dot(sun, vec3f(.33))), saturate(L.y * 3.0) * .6) * (.3 + .5 * nl) + mix(amb, vec3f(dot(amb, vec3f(.33))), .4) * 1.3;
+  col = mix(col, fc * mix(vec3f(.2), vec3f(.13, .36, .34), saturate(L.y * 4.0 - .2)), min(ae * .55 + lg, .6));
+  // 백파: 마루 모양의 부드러운 줄 + 꼬리
+  let wc = cd * .4 + sea * .45 - .22 + (lf - .5) * .5 + (nb.x - .5) * .3; let w = fp * .1;
+  let fw = min(smoothstep(.32 - w, .82 + w, cr + wc) + smoothstep(.27 - w, .82 + w, ct + wc) * nb.y * .6, .8) / (1.0 + fp * .15) * (.3 + .7 * ch) * (1.0 - .4 * up);
+  // 항적 밀도 → 넓은 문턱의 레이스
+  fo = max(smoothstep(0.0, 1.1, fo * 1.7 - 1.1 + ch * 1.1), fw);
+  col = mix(col, fc * (.6 + .4 * mix(nb.w, na.z, nf)) * (1.0 - .35 * nf * nc.z), fo);
+  for (var k = 0; k < 4; k++) { // 점광 반사 줄기
+    let l = g.lights[k * 2]; let lv = l.xyz - i.w; let ld = length(lv);
+    col += g.lights[k * 2 + 1].rgb * pow(max(1.0 - ld / (l.w * 2.0 + 1.0), 0.0), 2.0) * (pow(max(dot(r, lv / ld), 0.0), 40.0) * .3 + .02 + fo * .1);
+  }
+  // 수평선: 안개 점근색(= 수평선 하늘)으로 수렴
+  return vec4f(mix(fogAt(col, g.cam.xyz - v * (1.0 + d / 2000.0)), skyBase(normalize(vec3f(-vd.x, .015, -vd.z))), exp(-vd.y / .034) * saturate(d / 300.0 - .2)), 1.0);
 }`;
   G.register('ocean', Object.assign(O, {
     init() {

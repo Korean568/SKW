@@ -33,9 +33,8 @@ fn X(uv: vec2f) -> vec3f { return textureSampleLevel(shf, smp, uv, 0.0).rgb; }
   return vec4f(c * smoothstep(1.4, 5.0, mx(c)) * pow(max(dot(viewRay(i.uv), g.sun.xyz), 0.0), 4.0) * k, 1.0);
 }
 fn rad(i: FSOut, k: f32, n: i32, fall: f32) -> vec4f { // 태양 쪽 방사형 적분
-  let p = g.viewProj * vec4f(g.sun.xyz, 0.0); // 태양 지터 → 부드러운 가장자리
-  let s = p.xy / max(p.w, 1e-3) * vec2f(.5, -.5) + .5 + (vec2f(ign(i.pos.yx), ign(i.pos.xy + 31.0)) - .5) * .025 * fall;
-  let d = (s - i.uv) * k / f32(n); var uv = i.uv + d * (1.0 - fall) * ign(i.pos.xy); var c = vec3f(0.0);
+  let p = g.viewProj * vec4f(g.sun.xyz, 0.0); // 지터 없음: 2패스 = n×8 표본, 마스크는 블룸 ⅛ 단(미리 흐림)
+  let d = (p.xy / max(p.w, 1e-3) * vec2f(.5, -.5) + .5 - i.uv) * k / f32(n); var uv = i.uv; var c = vec3f(0.0);
   for (var j = 0; j < n; j++) {
     c += S(uv) * (1.0 - fall * f32(j) / f32(n)) * f32(all(abs(uv - .5) < vec2f(.5)));
     uv += d;
@@ -83,11 +82,11 @@ fn cr(uv: vec2f) -> vec3f { // Catmull-Rom 5탭 + 링잉 방지
     let b = textureSampleLevel(blm, smp, i.uv, 0.0).rgb; // 베일 + 광원
     c = mix(c, b, .04) + b * smoothstep(2.5, 9.0, mx(b)) * .2;
   }
-  c *= u.x * (1.0 - .5 * dot(q, q));
+  c *= u.x * (1.0 - .28 * dot(q, q));
   var l = dot(c, W); c = mix(c, vec3f(l), .4 * smoothstep(.6, 5.0, l)); // 고휘도 탈색
   c = clamp(c * (2.51 * c + .03) / (c * (2.43 * c + .59) + .14), vec3f(0.0), vec3f(1.0)); // ACES 근사
   l = dot(c, W);
-  c = mix(vec3f(l), c, 1.08) * mix(vec3f(.9, 1.0, 1.1), vec3f(1.04, 1.0, .96), smoothstep(0.0, .7, l));
+  c = mix(vec3f(l), c, 1.08) * mix(vec3f(.93, 1.0, 1.07), vec3f(1.07, 1.0, .92), smoothstep(0.0, .5, l)); // 찬 그림자 · 따뜻한 하이라이트
   c = max(mix(c, c * c * (3.0 - 2.0 * c), .22), vec3f(0.0));
   ${G.fmt.endsWith('srgb') ? '' : 'c = pow(c, vec3f(1.0 / 2.2));'}
   return vec4f(c + (ign(i.pos.xy) + ign(i.pos.yx + 47.0) - 1.0) / 255.0, 1.0); // TPDF 디더
@@ -115,11 +114,11 @@ fn cr(uv: vec2f) -> vec3f { // Catmull-Rom 5탭 + 링잉 방지
       const V = this.v, B = this.b, n = V.length - 1, T = G.targets, e = G.env, sv = this.sv, sb = this.sb, lo = 1 - G.clamp(e.sunEl / 22, 0, 1), v = G.cam.view, s = G.sun.dir;
       const f = Math.max(-v[2] * s[0] - v[6] * s[1] - v[10] * s[2], 0) ** 4; // 역광: 노출 ↓
       fl *= Math.exp(-G.dt * 12);
-      U[0] = e.exposure * .28 * (1 + 2 * fl) * (1 + 1.1 * lo * lo) * (1 - .2 * f);
+      U[0] = e.exposure * .345 * (1 + 2 * fl) * (1 + .6 * lo * lo) * (1 - .2 * f); // 낮 +0.3 EV, 해 질 녘 그대로
       U[1] = n && 1; U[2] = .6 + .9 * e.haze; U[3] = T.w < T.cw;
       G.dev.queue.writeBuffer(this.ub, 0, U);
-      if (n) { pass(enc, sv[0], this.pm, B[0]); pass(enc, sv[1], this.pr, sb[0]); pass(enc, sv[0], this.pq, sb[1]); }
       for (let i = 0; i < n; i++) pass(enc, V[i + 1], this.pd, B[i]);
+      if (n) { pass(enc, sv[0], this.pm, B[Math.min(3, n)]); pass(enc, sv[1], this.pr, sb[0]); pass(enc, sv[0], this.pq, sb[1]); }
       for (let i = n - 1; i > 0; i--) pass(enc, V[i], this.pu, B[i + 1], 'load');
       pass(enc, dst, this.pc, this.bc);
     }

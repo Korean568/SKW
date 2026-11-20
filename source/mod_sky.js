@@ -1,5 +1,5 @@
 'use strict';
-/* SKY — 대기·태양·별·권운·볼륨 적운(LOW ¼ 14스텝 / MEDIUM ⅓ 22 / HIGH ½ 48)·구름 그림자 맵 */
+/* SKY — 대기·태양·별·권운·볼륨 적운(LOW·MEDIUM ⅓ 14·22스텝 / HIGH ½ 48)·구름 그림자 맵 */
 {
   const COMMON = `
 @group(1) @binding(0) var cl: texture_2d<f32>;
@@ -36,7 +36,7 @@ fn C(uv: vec2f) -> vec4f { return textureSampleLevel(cl, linSamp, uv, 0.0); }
     c += vec3f(.7, .85, 1.0) * ni * step(.98, h.x) * h.y * (1.0 - smoothstep(0.0, sw, d)) * .06 / (sw * sw) * smoothstep(0.0, .25, v.y);
   }
   c += S * (pow(mu, 5000.0) * 4.0 + pow(mu, 700.0) * (1.0 + .6 * lo) + pow(mu, 70.0) * (.12 + .15 * lo)) * smoothstep(0.0, .05, v.y);
-  if (g.sun.w > .5 && v.y > 0.0) { // 권운 (9 km, 얇고 길게)
+  if (v.y > 0.0) { // 권운 (9 km, 얇고 길게)
     let t = 9000.0 / (v.y + .08); let p = (g.cam.xz + v.xz * t + drift() * 2.0) / 9000.0;
     let a = smoothstep(.5, .95, fb(p * vec2f(.6, 2.6) + fb(p * 1.3, 2) * 1.2, 3)) * (.2 + .4 * g.fog.y) * exp(-t * 2e-5) * smoothstep(.02, .22, v.y);
     c = mix(c, S * (.28 + 1.6 * pow(mu, 5.0)) + amb(), a);
@@ -56,9 +56,9 @@ fn dens(p: vec3f, fine: bool) -> f32 { // 밀도 (슬랩 1500–3500 m)
   let h = (p.y - 1500.0) / 2000.0; let q = p.xz + drift();
   if (h < 0.0 || h > 1.0) { return 0.0; }
   let w = n2(q / 7000.0); let hh = h / (.3 + .7 * w);
-  var d = V(vec3f(q / 8000.0, h * .26)) - cov() - (.5 - w) * .75 - .2 * hh * hh;
+  var d = V(vec3f(q / 8000.0, h * .26)) - cov() - (.5 - w) * 1.05 - .2 * hh * hh;
   if (fine && d > 0.0) { d += (V(vec3f(q / 1300.0, h * 1.5)) - .6) * .35 * min(d * 8.0, 1.0); } // 세부는 본체 안쪽만
-  d = clamp(d * 7.0, 0.0, 1.0);
+  d = clamp(d * 5.5, 0.0, 1.0); // 완만한 경사 → 작은 부스러기는 합성 침식에서 사라짐
   return d * d * smoothstep(0.0, .05, h) * (1.0 - smoothstep(.75, 1.0, hh));
 }
 fn hg(mu: f32, k: f32) -> f32 { return (1.0 - k * k) / pow(1.0 + k * k - 2.0 * k * mu, 1.5); }
@@ -71,22 +71,24 @@ fn hg(mu: f32, k: f32) -> f32 { return (1.0 - k * k) / pow(1.0 + k * k - 2.0 * k
   var t = max(1500.0 - g.cam.y, 0.0) / rd.y + dt * fract(dot(i.pos.xy, vec2f(.5, .75))); // 정적 2×2 지터
   var T = 1.0; var L = vec3f(0.0);
   for (var n = 0; n < N; n++) {
-    let p = g.cam.xyz + rd * t; let d = dens(p, g.sun.w > .5);
+    let p = g.cam.xyz + rd * t; let d = dens(p, true);
     if (d > 0.0) {
       var od = 0.0; // 태양 쪽 광학 두께
-      for (var j = 1; j < select(3, 5, hi); j++) { od += dens(p + s * f32(j * j) * select(80.0, 35.0, hi), false) * f32(2 * j - 1) * select(1.0, .45, hi); }
+      for (var j = 1; j < select(3, 5, hi); j++) { od += dens(p + s * f32(j * j) * select(90.0, 45.0, hi), false) * f32(2 * j - 1) * select(1.0, .4, hi); }
+      od *= 1.0 + 3.5 * lo; // 낮은 태양: 빛이 구름을 길게 통과 → 어두운 속
       let h = (p.y - 1500.0) / 2000.0;
-      let lt = (ph * exp(-od) + .22 * exp(-od * .2) + .05 * exp(-od * .04)) // 다중 산란
+      let lt = (ph * exp(-od) + (1.0 - .7 * lo) * (.22 * exp(-od * .2) + .05 * exp(-od * .04))) // 다중 산란 (해 질 녘엔 약하게)
         * (1.0 - .5 * exp(-d * 6.0 - od * 2.0) * (.5 - .5 * mu)); // 파우더
       let e = exp(-d * .009 * dt);
-      // 밝은 꼭대기 · 어두운 밑면 (낮은 태양: 주황)
-      L += (S * (lt * (.6 + .6 * h) + vec3f(.3, .13, .1) * lo * (1.0 - h)) + A * (.25 + 1.1 * h) * (1.0 - .5 * d)) * T * (1.0 - e);
+      // 밝은 꼭대기 · 어두운 밑면 (낮은 태양: 밑면에 옅은 적갈색)
+      L += (S * (lt * (.6 + .6 * h) + vec3f(.07, .03, .025) * lo * (1.0 - h)) + A * (.25 + 1.1 * h) * (1.0 - .5 * d)) * T * (1.0 - e);
       T *= e;
       if (T < .02) { break; }
     }
     t += dt;
   }
-  return vec4f(L, 1.0 - T);
+  // 은빛 테두리: 시선 방향으로 얇은 가장자리만 강한 전방 산란
+  return vec4f(L + S * hg(mu, .75) * (.5 + lo) * .35 * T * (1.0 - T), 1.0 - T);
 }
 @fragment fn fm(i: FSOut) -> @location(0) vec4f { // 그림자 맵: 지표점 → 태양 쪽 8탭
   let s = normalize(vec3f(g.sun.x, max(g.sun.y, .15), g.sun.z)); var od = 0.0;
@@ -135,7 +137,7 @@ fn hg(mu: f32, k: f32) -> f32 { return (1.0 - k * k) / pow(1.0 + k * k - 2.0 * k
       o && o.destroy();
     },
     onResize() {
-      const T = G.targets, d = 4 - G.Q.level;
+      const T = G.targets, d = G.Q.level > 1 ? 2 : 3;
       this.ct && this.ct.destroy();
       this.ct = tex(Math.ceil(T.w / d), Math.ceil(T.h / d));
       this.bs = bind(this.cv = this.ct.createView(), this.nv);

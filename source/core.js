@@ -90,7 +90,7 @@ G.waves = new Float32Array(48); // 6개 거스트너 파: [dirx,dirz,진폭,k, �
 G.setEnv = (o = {}) => {
   const e = Object.assign(G.env, o), az = e.sunAz * Math.PI / 180, el = e.sunEl * Math.PI / 180, k = G.clamp(e.sunEl / 35, 0, 1), up = G.clamp(e.sunEl / 4 + .5, 0, 1);
   G.sun.dir = [Math.sin(az) * Math.cos(el), Math.sin(el), Math.cos(az) * Math.cos(el)];
-  G.sun.col = [G.lerp(2.4, 3.3, k) * up, G.lerp(1.25, 3.1, k) * up, G.lerp(.55, 2.8, k) * up];
+  G.sun.col = [G.lerp(2.8, 3.8, k) * up, G.lerp(1.4, 3.45, k) * up, G.lerp(.58, 3.0, k) * up]; // 낮은 태양일수록 따뜻한 주광 (하늘빛 보조광과 대비)
   const L = [150, 97, 61, 37, 23, 13], sp = [0, .38, -.45, .8, -.95, 1.35];
   for (let i = 0; i < 6; i++) {
     const kk = 2 * Math.PI / L[i], amp = e.sea * L[i] * .011 * (i < 2 ? 1 : .8), d = e.windDir + sp[i];
