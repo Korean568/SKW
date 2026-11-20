@@ -1,10 +1,9 @@
 'use strict';
-{ /* ═════════ GAME — 플레이어 함 · 무장 · 적 AI · 시나리오 실행기 · HUD ═════════
-  시나리오 형식 (위→아래 순서로 실행 · 실제 시나리오가 정해지면 이 표만 교체):
-   ['msg', 화자, 대사]  ['obj', 목표]  ['wait', 초]  ['env', {G.setEnv 값}]  ['music', 'calm'|'combat'|'off']
-   ['island', 메시이름, x, z, yaw]                섬 배치
-   ['spawn', 종류, {n, brg, dist, spread, isl}]   종류: ssm·jet·boat·frigate·battery / brg = 함수 기준 시계방향(도) / isl = 섬 번호
-   ['clear', 'msl'|'jet'|'ship'|'site'|'all']     해당 적이 모두 사라질 때까지 대기        ['win', 문구] */
+{ /* ═══ GAME — 플레이어 함 · 무장 · 적 AI · 시나리오 실행기 · HUD ═══
+  시나리오 (위→아래 실행 · 실제 시나리오가 정해지면 이 표만 교체):
+   ['msg', 화자, 대사] ['obj', 목표] ['wait', 초] ['env', {G.setEnv 값}] ['music', 'calm'|'combat'|'off'] ['island', 메시, x, z, yaw] ['win', 문구]
+   ['spawn', 종류, {n, brg, dist, spread, isl}] 종류: ssm·jet·boat·frigate·battery / brg = 함수 기준 시계방향(도) / isl = 섬 번호
+   ['clear', 'msl'|'jet'|'ship'|'site'|'all'] 해당 적이 사라질 때까지 대기 */
   G.SCENARIO = { title: '훈련 교전 · 동해 차단선', steps: [
     ['island', 'island0', 2600, 7800, .5], ['island', 'island1', -3400, 4600, 2], ['music', 'calm'], ['obj', '전투 배치 — 대기'], ['wait', 3],
     ['msg', '전투정보실', '함장님, 북동쪽에서 대함미사일 3발 탐지. 본함으로 접근 중입니다.'],
@@ -21,14 +20,14 @@
   const rnd = (a, b) => a + Math.random() * (b - a), wrap = a => Math.atan2(Math.sin(a), Math.cos(a)), R2D = 180 / Math.PI;
   const dir = (yaw, pit = 0) => [Math.sin(yaw) * Math.cos(pit), Math.sin(pit), Math.cos(yaw) * Math.cos(pit)];
   const steer = (cur, want, max) => cur + G.clamp(wrap(want - cur), -max, max);
-  const HP = n => G.modelData[n].hp, live = e => e && e.alive && !e.dead;
+  const HP = n => G.modelData[n].hp, live = e => e && e.alive && !e.dead, isAir = e => e.k === 'msl' || e.k === 'jet';
   const TYPES = { // 적 제원
     boat: { k: 'ship', model: 'boat', name: '고속정', hp: 35, spd: 17, keep: 3200, range: 5200, rate: [14, 22], ammo: 4, r: 22, len: 18 },
     frigate: { k: 'ship', model: 'frigate', name: '호위함', hp: 110, spd: 11, keep: 4300, range: 6500, rate: [16, 24], salvo: 2, ammo: 8, gun: 1, r: 50, len: 40 },
     battery: { k: 'site', model: 'battery', name: '해안포대', hp: 45, range: 9000, rate: [12, 18], ammo: 8, r: 14 },
     jet: { k: 'jet', model: 'jet', name: '전투기', hp: 1, spd: 170, r: 14, ammo: 2 } };
   const cam = { az: 2.6, el: .2, d: 340 }, ui = {};
-  let P, E, S, T, state = 'title', sel, shake = 0, hudT = 0, paused = 0, muted = 0, log;
+  let P, E, S, T, X, state = 'title', sel, shake = 0, hudT = 0, paused = 0, muted = 0, log;
 
   function reset() {
     P = { k: 'ship', side: 0, model: 'aegis', name: '본함', p: [0, 0, 0], v: [0, 0, 0], yaw: 0, spd: 8, thr: .5, hp: 100, r: 70, len: 60, alive: 1,
@@ -37,7 +36,7 @@
     G.setEnv(Object.assign({ sunAz: 40, sunEl: 26, cloud: .45, haze: .35, sea: .55 }, G.SCENARIO.env));
   }
   function say(who, text) { log.push([who, text, T]); if (log.length > 4) log.shift(); G.sfx.play('click'); hudT = 1; }
-  function boom(p, kind, size = 1) { // 폭발 연출 묶음: 파티클 + 섬광 조명 + 소리 + 물결 + 화면 섬광
+  function boom(p, kind, size = 1) { // 폭발 묶음: 파티클 + 조명 + 소리 + 물결 + 화면 섬광
     G.fx.burst(kind, p, { size });
     const d = V3.dist(p, G.cam.pos), near = G.clamp(1 - d / 1500, 0, 1) * size;
     if (kind === 'splash') { G.ocean.ripple(p[0], p[2], 30 * size); G.sfx.play('splash', { pos: p, gain: size }); return; }
@@ -46,7 +45,7 @@
     if (p[1] < 25) G.ocean.ripple(p[0], p[2], 40 * size);
     if (near > .05) { G.post && G.post.flash(near * .6); shake = Math.max(shake, near * .8); }
   }
-  function shipMat(e) { // 파도 위에 얹기: 수면 높이 + 앞뒤/좌우 기울기 (+ 침몰 자세)
+  function shipMat(e) { // 파도 위에 얹기: 높이 + 기울기 (+ 침몰 자세)
     const x = e.p[0], z = e.p[2], f = dir(e.yaw), L = e.len, s = e.dead ? Math.min(e.dead / 14, 1) : 0;
     const pt = Math.atan2(G.waveAt(x + f[0] * L, z + f[2] * L) - G.waveAt(x - f[0] * L, z - f[2] * L), L * 2) * .5;
     const rl = Math.atan2(G.waveAt(x + f[2] * 9, z - f[0] * 9) - G.waveAt(x - f[2] * 9, z + f[0] * 9), 18) * .6;
@@ -77,19 +76,19 @@
     m.t += dt; const t = m.tgt, ok = live(t); let want = m.dir, d = 1e9;
     if (ok) {
       const aim = [t.p[0], t.p[1] + (t.k === 'ship' ? 6 : 0), t.p[2]]; d = V3.dist(aim, m.p);
-      const tt = Math.min(d / m.spd, 6) * .9; for (let i = 0; i < 3; i++) aim[i] += t.v[i] * tt;           // 예측 요격
+      const tt = Math.min(d / m.spd, 6) * .9; for (let i = 0; i < 3; i++) aim[i] += t.v[i] * tt; // 예측 요격
       want = V3.norm(V3.sub(aim, m.p));
       if (m.kind === 'ssm' && d > 550) want = V3.norm([want[0], G.clamp((10 - m.p[1]) * .02, -.4, .4), want[2]]); // 해면 밀착 비행
-      if (m.kind === 'sam' && m.t < .8) want = [0, 1, 0];                                                    // 수직 발사 구간
+      if (m.kind === 'sam' && m.t < .8) want = [0, 1, 0]; // 수직 발사 구간
     } else m.life = Math.min(m.life, m.t + 1.2);
     const ang = Math.acos(G.clamp(V3.dot(m.dir, want), -1, 1));
     if (ang > 1e-4) m.dir = V3.norm(V3.lerp(m.dir, want, Math.min(1, m.turn * dt / ang)));
     m.spd = Math.min(m.max, m.spd + 150 * dt); m.v = V3.mul(m.dir, m.spd); m.p = V3.add(m.p, V3.mul(m.v, dt));
     G.draw(m.kind, M4.fromDir(m.p, m.dir, 0, 1.5), m.side ? [1, .7, .6, 0] : [1, 1, 1, 0]);
     G.fx.trail(V3.sub(m.p, V3.mul(m.dir, 4)), m.v, 'missile', dt);
-    if (ok && d < (t.k === 'msl' || t.k === 'jet' ? 18 : t.r * .4) + m.spd * dt) {
+    if (ok && d < (isAir(t) ? 18 : t.r * .4) + m.spd * dt) {
       m.alive = 0;
-      if (t.k === 'msl' || t.k === 'jet') Math.random() < .88 ? kill(t) : boom(m.p, 'flash', .4); else damage(t, m.dmg, m.p);
+      if (isAir(t)) Math.random() < .88 ? kill(t) : boom(m.p, 'flash', .4); else damage(t, m.dmg, m.p);
     } else if (m.p[1] < G.waveAt(m.p[0], m.p[2]) - 1) { m.alive = 0; boom(m.p, 'splash', .7); }
     else if (m.t > m.life) { m.alive = 0; boom(m.p, 'flash', .4); }
   }
@@ -157,11 +156,11 @@
     S.i++;
   }
   function weapons(dt) {
-    const k = G.keys, hp = HP('aegis'), air = live(sel) && (sel.k === 'msl' || sel.k === 'jet');
+    const k = G.keys, hp = HP('aegis'), air = live(sel) && isAir(sel);
     for (let i = 0; i < 3; i++) P.cd[i] -= dt;
-    const inb = t => E.reduce((n, m) => n + (m.k === 'msl' && !m.side && m.tgt === t ? 1 : 0), 0); // 이 표적으로 날아가는 아군 미사일 수
-    if (k.Space && air && inb(sel)) { // 이미 교전 중이면 아직 교전하지 않은 다음 공중 위협으로 자동 전환 (Space 를 누르고 있으면 연속 교전)
-      let b = null, bd = 1e9; for (const e of E) if (e.side && live(e) && (e.k === 'msl' || e.k === 'jet') && !inb(e)) { const d = V3.dist(e.p, P.p) * (e.k === 'msl' ? .3 : 1); if (d < bd) { bd = d; b = e; } }
+    const inb = t => E.reduce((n, m) => n + (m.k === 'msl' && !m.side && m.tgt === t ? 1 : 0), 0); // 표적을 쫓는 아군 미사일 수
+    if (k.Space && air && inb(sel)) { // 교전 중이면 미교전 공중 위협으로 자동 전환 (Space 유지 = 연속 교전)
+      let b = null, bd = 1e9; for (const e of E) if (e.side && live(e) && isAir(e) && !inb(e)) { const d = V3.dist(e.p, P.p) * (e.k === 'msl' ? .3 : 1); if (d < bd) { bd = d; b = e; } }
       if (b) sel = b;
     }
     if (k.Space && live(sel) && (air ? !inb(sel) : inb(sel) * 55 < sel.hp)) {
@@ -181,7 +180,7 @@
     let firing = 0;
     P.ciws.forEach((c, i) => {
       const base = M4.point(P.m, hp.ciws[i]); let best = null, bd = 1500;
-      for (const e of E) if (e.side && live(e) && (e.k === 'msl' || e.k === 'jet')) { const d = V3.dist(e.p, base); if (d < bd) { bd = d; best = e; } }
+      for (const e of E) if (e.side && live(e) && isAir(e)) { const d = V3.dist(e.p, base); if (d < bd) { bd = d; best = e; } }
       let wy = i ? Math.PI : 0, wp = .15;
       if (best) { const v = V3.sub(V3.add(best.p, V3.mul(best.v, bd / 1100)), base); wy = Math.atan2(v[0], v[2]) - P.yaw; wp = Math.atan2(v[1], Math.hypot(v[0], v[2])); }
       c.yaw = steer(c.yaw, wy, 3.5 * dt); c.pit += G.clamp(wp - c.pit, -2.5 * dt, 2.5 * dt);
@@ -228,6 +227,7 @@
     // 카메라
     cam.el = G.clamp(cam.el, .02, 1.45); cam.d = G.clamp(cam.d, 90, 5000); shake = Math.max(0, shake - dt * 1.6);
     const c = [P.p[0] + rnd(-1, 1) * shake * 5, 14 + rnd(-1, 1) * shake * 5, P.p[2]], o = dir(cam.az, cam.el);
+    if (state === 'title') { c[0] -= o[2] * 150; c[2] += o[0] * 150; c[1] = 55; } // 타이틀: 함을 오른쪽 아래로
     G.cam.target = c; G.cam.pos = [c[0] + o[0] * cam.d, Math.max(c[1] + o[1] * cam.d, G.waveAt(c[0] + o[0] * cam.d, c[2] + o[2] * cam.d) + 3), c[2] + o[2] * cam.d];
     if (cam.free) { G.cam.pos = cam.free[0]; G.cam.target = cam.free[1]; } // 검증용 고정 시점
     G.shadowFocus = P.p;
@@ -236,74 +236,107 @@
     G.sfx.listener(G.cam.pos, V3.norm(V3.sub(c, G.cam.pos))); G.sfx.loop('siren', warn, { gain: .5 }); G.sfx.loop('missile', inc < 900, { gain: 1 - inc / 900 });
     G.sfx.loop('engine', state === 'play', { rate: Math.abs(P.thr), gain: .5 }); G.sfx.loop('sea', 1, { gain: .6 });
     if (state === 'play' && T % 2.86 < dt) G.sfx.play('ping', { gain: .35 });
-    hud(dt, warn, inc);
+    hud(dt, warn);
   }
-  function hud(dt, warn, inc) {
-    const x = ui.x, W = innerWidth, H = innerHeight, cv = ui.cv; if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
-    x.clearRect(0, 0, W, H); ui.hit.style.opacity *= .94;
-    ui.obj.style.display = ui.st.style.display = ui.keys.style.display = state === 'title' ? 'none' : '';
-    ui.keys.style.opacity = T < 25 || ui.help ? .7 : 0;
-    if (state !== 'play') return;
-    x.font = '12px ui-monospace,Consolas,monospace'; x.lineWidth = 1.5; x.textAlign = 'center';
-    for (const e of E) { // 표적 표시: 미사일 ◇ 빨강, 항공기 △ 주황, 수상·지상 □ 노랑
-      if (!e.side || !live(e)) continue;
-      const s = G.project([e.p[0], e.p[1] + (e.k === 'ship' ? 8 : 0), e.p[2]]), d = V3.dist(e.p, P.p); let sx = s[0], sy = s[1];
-      if (s[2] <= 0) { sx = W - sx; sy = H * 2; }
-      const off = sx < 24 || sx > W - 24 || sy < 24 || sy > H - 24; sx = G.clamp(sx, 24, W - 24); sy = G.clamp(sy, 24, H - 24); e.sx = sx; e.sy = sy;
-      const col = e.k === 'msl' ? '#ff5340' : e.k === 'jet' ? '#ffa23c' : '#ffd84a', r = off ? 6 : e === sel ? 15 : 10;
-      x.strokeStyle = x.fillStyle = col; x.beginPath();
-      if (e.k === 'msl') { x.moveTo(sx, sy - r); x.lineTo(sx + r, sy); x.lineTo(sx, sy + r); x.lineTo(sx - r, sy); x.closePath(); }
-      else if (e.k === 'jet') { x.moveTo(sx, sy - r); x.lineTo(sx + r, sy + r * .8); x.lineTo(sx - r, sy + r * .8); x.closePath(); }
-      else x.rect(sx - r, sy - r, r * 2, r * 2);
-      off ? x.fill() : x.stroke();
-      if (!off) x.fillText((d / 1000).toFixed(1) + 'km', sx, sy + r + 13);
-      if (e === sel) { x.strokeStyle = '#fff'; const q = r + 7 + Math.sin(T * 9) * 2; x.strokeRect(sx - q, sy - q, q * 2, q * 2); x.fillStyle = '#fff'; x.fillText(e.name, sx, sy - q - 6); }
+  /* ── HUD: 2D 캔버스(표식·레이더) + DOM 패널(0.2초마다) ── */
+  const COL = { msl: '#f54', jet: '#fa4', ship: '#fd5', site: '#fd5', own: '#6ef' }, lab = [];
+  // 표식: 미사일 ◇ · 항공기 △ · 함정 ⬟ · 지상 □ · 아군 ➤
+  const SH = { msl: [0, -1, 1, 0, 0, 1, -1, 0], jet: [0, -1, 1, .8, -1, .8], ship: [0, -1.1, 1, -.1, .7, .8, -.7, .8, -1, -.1], site: [-1, -1, 1, -1, 1, 1, -1, 1], own: [0, -1.3, .8, .9, 0, .4, -.8, .9] };
+  const ink = (col, fill) => { X.strokeStyle = '#000c'; X.lineWidth = fill ? 3 : 4.5; X.stroke(); X.strokeStyle = X.fillStyle = col; X.lineWidth = 2; fill ? X.fill() : X.stroke(); }; // 어두운 테두리 + 색
+  const mark = (k, sx, sy, r, fill) => { const s = SH[k]; X.beginPath(); for (let i = 0; i < s.length; i += 2) X.lineTo(sx + s[i] * r, sy + s[i + 1] * r); X.closePath(); ink(COL[k], fill); };
+  const txt = (s, sx, sy, col) => { X.strokeStyle = '#000d'; X.lineWidth = 3.5; X.strokeText(s, sx, sy); X.fillStyle = col; X.fillText(s, sx, sy); };
+  const put = (e, h) => { if (e.h !== h) e.innerHTML = e.h = h; };
+  const deg = a => ('00' + Math.round((a * R2D % 360 + 360) % 360) % 360).slice(-3);
+  function hud(dt, warn) {
+    const W = innerWidth, H = innerHeight, cv = X.canvas, on = state === 'play', o = ui.hit.style; if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
+    X.clearRect(0, 0, W, H); if (o.opacity > .01) o.opacity *= .94;
+    if (ui.on !== on) ui.box.hidden = !(ui.on = on);
+    if (!on) return;
+    const tick = (hudT += dt) >= .2, fs = G.clamp(H * .019, 11, 16), f = dir(P.yaw), fr = G.frame; if (tick) hudT = 0;
+    X.font = `600 ${fs}px system-ui`; X.textAlign = 'center'; X.lineJoin = 'round';
+    let nm = null, nd = 1e9, cnt = 0; lab.length = 0;
+    for (const m of E) if (m.k === 'msl') { // 최근접 적 미사일 · 교전 중인 표적
+      if (m.side) { cnt++; const d = V3.dist(m.p, P.p); if (d < nd) { nd = d; nm = m; } } else if (live(m.tgt)) m.tgt.ef = fr;
     }
-    // 레이더 (함수 방향이 위, 반경 8km)
-    const cx = 108, cy = H - 108, R = 88, sw = T * 2.2 % (Math.PI * 2), f = dir(P.yaw);
-    x.fillStyle = '#04141cc8'; x.strokeStyle = '#2f8f6a'; x.beginPath(); x.arc(cx, cy, R, 0, 7); x.fill(); x.stroke();
-    x.strokeStyle = '#2f8f6a55'; for (const q of [.33, .66]) { x.beginPath(); x.arc(cx, cy, R * q, 0, 7); x.stroke(); }
-    x.beginPath(); x.moveTo(cx - R, cy); x.lineTo(cx + R, cy); x.moveTo(cx, cy - R); x.lineTo(cx, cy + R); x.stroke();
-    x.strokeStyle = '#5dffb0'; x.beginPath(); x.moveTo(cx, cy); x.lineTo(cx + Math.sin(sw) * R, cy - Math.cos(sw) * R); x.stroke();
-    const blip = (p, col, sz) => { const dx = p[0] - P.p[0], dz = p[2] - P.p[2], u = (-dx * f[2] + dz * f[0]) / 8000, v = (dx * f[0] + dz * f[2]) / 8000, l = Math.hypot(u, v); if (l > 1) return;
-      x.globalAlpha = .35 + .65 * (1 - (((sw - Math.atan2(u, v)) % 6.283 + 6.283) % 6.283) / 6.283); x.fillStyle = col; x.fillRect(cx + u * R - sz / 2, cy - v * R - sz / 2, sz, sz); x.globalAlpha = 1; };
-    for (const I of S.isl) blip(I.p, '#3a7a55', 9);
-    for (const e of E) if (e.k !== 'shell') blip(e.p, !e.side ? '#6fd8ff' : e.k === 'msl' ? '#ff5340' : e.k === 'jet' ? '#ffa23c' : '#ffd84a', e === sel ? 6 : e.k === 'msl' ? 3 : 5);
-    x.fillStyle = '#6fd8ff'; x.fillRect(cx - 2, cy - 4, 4, 8);
-    // 글자 패널 (0.2초마다)
-    ui.warn.style.display = warn ? '' : 'none'; if (warn) ui.warn.textContent = `⚠ 대함미사일 접근 ${(inc / 1000).toFixed(1)}km`;
-    if ((hudT += dt) < .2) return; hudT = 0;
-    ui.obj.innerHTML = `<b>목표</b> ${S.obj}` + log.filter(l => T - l[2] < 14).map(l => `<div class="r"><i>${l[0]}</i> ${l[1]}</div>`).join('');
-    const bar = Math.max(0, Math.round(P.hp / 10)), hd = ((P.yaw * R2D % 360) + 360) % 360;
-    ui.st.innerHTML = `선체 <span style="color:${P.hp > 50 ? '#8dff9a' : P.hp > 25 ? '#ffd66b' : '#ff6b5c'}">${'█'.repeat(bar)}${'░'.repeat(10 - bar)}</span> ${Math.max(0, P.hp | 0)}% · ${(Math.abs(P.spd) * 1.94).toFixed(0)}kn (추력 ${(P.thr * 100).toFixed(0)}%) · 침로 ${hd.toFixed(0).padStart(3, '0')}°<br>`
-      + `대공 SAM <b>${P.sam}</b> · 대함 SSM <b>${P.ssm}</b> · 함포 <b>${P.gun}</b> · CIWS <b>자동</b> · 격파 <b>${S.kills}</b>`
-      + (live(sel) ? `<br>표적 <b style="color:#fff">${sel.name}</b> ${(V3.dist(sel.p, P.p) / 1000).toFixed(1)}km — ${sel.k === 'msl' || sel.k === 'jet' ? 'Space: SAM' : 'Space: SSM · F: 함포'}` : '');
+    for (const e of E) {
+      if (e.k === 'shell' || !live(e)) continue;
+      const s = G.project([e.p[0], e.p[1] + (e.k === 'ship' ? 8 : 0), e.p[2]]), d = V3.dist(e.p, P.p), eng = e.ef === fr, top = e === nm, col = eng ? COL.own : COL[e.k];
+      let sx = s[0], sy = s[1]; if (s[2] <= 0) { sx = W - sx; sy = H * 2; }
+      if (!e.side) { mark('own', sx, sy, 5, 1); continue; }
+      if (tick || !e.lb) e.lb = (d / 1000).toFixed(1) + 'km' + (top ? ' ' + Math.ceil(d / Math.max(e.spd, 150)) + '초' : '');
+      const a = Math.atan2(sy - H / 2, sx - W / 2), off = sx < 30 || sx > W - 30 || sy < 56 || sy > H * .79;
+      e.sx = sx = G.clamp(sx, 30, W - 30); e.sy = sy = G.clamp(sy, 56, H * .79);
+      if (off) { // 화면 밖: 화살표 + 거리
+        X.beginPath(); for (let i = -1; i < 2; i++) X.lineTo(sx + Math.cos(a + i * 2.5) * 11, sy + Math.sin(a + i * 2.5) * 11); X.closePath(); ink(COL[e.k], 1);
+        txt(e.lb, sx - Math.cos(a) * (fs * 2 + 14), sy - Math.sin(a) * 24 + fs * .35, col); continue;
+      }
+      const r = (e === sel ? 12 : 9) + (top ? 2 + Math.sin(T * 10) * 2 : 0), q = r + 8; let ly = sy + r + fs + 4;
+      mark(e.k, sx, sy, r);
+      if (eng) { X.setLineDash([5, 5]); X.lineDashOffset = -T * 40; X.beginPath(); X.arc(sx, sy, r + 5, 0, 7); ink(col); X.setLineDash([]); } // 교전 중 고리
+      if (e === sel) { // 선택: 모서리 괄호 + 이름
+        X.setLineDash([q, q]); X.lineDashOffset = q / 2; X.beginPath(); X.rect(sx - q, sy - q, q * 2, q * 2); ink('#fff'); X.setLineDash([]);
+        txt(e.name + (eng ? ' · 교전 중' : ''), sx, sy - q - 7, eng ? col : '#fff'); ly += 8;
+      }
+      for (let i = 0; i < lab.length; i += 2) if (Math.abs(lab[i] - sx) < fs * 4 && Math.abs(lab[i + 1] - ly) < fs + 1) { ly = lab[i + 1] + fs + 2; i = -2; } // 겹치면 아래로
+      lab.push(sx, ly); txt(e.lb, sx, ly, col);
+    }
+    // 레이더: 함수가 위 · 8km(그 밖은 테두리에) · 고리 2/4/8km · N
+    const R = G.clamp(H * .15, 84, 140), cx = R + 14, cy = H - R - 14;
+    let bx, by; const at = p => { const dx = p[0] - P.p[0], dz = p[2] - P.p[2], u = (dz * f[0] - dx * f[2]) / 8000, v = (dx * f[0] + dz * f[2]) / 8000, l = Math.max(1, Math.hypot(u, v)); bx = cx + u / l * R; by = cy - v / l * R; return l; };
+    X.beginPath(); X.arc(cx, cy, R, 0, 7); X.fillStyle = '#011a'; X.fill(); ink('#6fb');
+    X.lineWidth = 1; X.strokeStyle = '#6fb5'; X.beginPath(); X.arc(cx, cy, R / 2, 0, 7); X.moveTo(cx + R / 4, cy); X.arc(cx, cy, R / 4, 0, 7);
+    X.moveTo(cx - R, cy); X.lineTo(cx + R, cy); X.moveTo(cx, cy - R); X.lineTo(cx, cy + R); X.stroke();
+    for (const I of S.isl) if (at(I.p) === 1) { X.beginPath(); X.arc(bx, by, 6, 0, 7); ink('#475', 1); } // 섬
+    X.font = `600 ${fs * .8}px system-ui`; for (const k of [2, 4, 8]) txt(k + (k > 4 ? 'km' : ''), cx + R * k / 11.3 - 8, cy + R * k / 11.3 - 2, '#9ec');
+    txt('N', cx + Math.sin(P.yaw) * (R - 9), cy - Math.cos(P.yaw) * (R - 9) + 4, '#fff');
+    for (const e of E) if (e.k !== 'shell' && live(e)) { at(e.p); mark(e.side ? e.k : 'own', bx, by, e === sel ? 6.5 : 4.5, 1); }
+    mark('own', cx, cy, 6, 1);
+    if (!tick) return;
+    put(ui.warn, warn && nm ? `⚠ 대함미사일 <b>${cnt}</b>발 접근 · 최근접 <b>${nm.lb.replace(' ', '</b> · 충돌 <b>')}</b>` : '');
+    put(ui.obj, `<label>임무 · 격파 ${S.kills} · 잔여 위협 ${E.filter(e => e.side && live(e)).length} · H 도움말</label><div class="br"><i style="width:${S.i / G.SCENARIO.steps.length * 100}%"></i></div>${S.obj}`
+      + log.filter(l => T - l[2] < 14).map(l => `<div style="opacity:${Math.min(1, (14 - T + l[2]) / 3).toFixed(1)}"><i>${l[0]}</i> ${l[1]}</div>`).join(''));
+    const hp = Math.max(0, P.hp | 0), sa = live(sel) && isAir(sel);
+    put(ui.st.firstChild, `<label>선체</label> <b>${hp}</b>%<div class="br"><i style="width:${hp}%;color:${hp > 50 ? '#8f9' : hp > 25 ? '#fd6' : '#f65'}"></i></div><b>${(Math.abs(P.spd) * 1.94).toFixed(0)}</b>kn · <b>${deg(-P.yaw)}</b>° · 추력 <b>${(P.thr * 100).toFixed(0)}</b>%`);
+    [P.sam, P.ssm, P.gun].forEach((a, i) => { // 무장: 잔탄 · 재장전 · 권장 강조
+      const w = ui.st.children[i + 1]; put(w.children[1], a); w.lastChild.firstChild.style.width = G.clamp(1 - P.cd[i] / [.9, 3.5, 1.1][i], 0, 1) * 100 + '%'; w.className = !a ? 'w no' : live(sel) && !i == sa ? 'w on' : 'w'; });
+    put(ui.tg, live(sel) ? `<label>표적 <kbd>Tab</kbd></label><br><b style="color:${COL[sel.k]}">${sel.name}</b><br>거리 <b>${sel.lb}</b> · 방위 <b>${deg(Math.atan2(P.p[0] - sel.p[0], sel.p[2] - P.p[2]))}</b>°<br>`
+      + (sel.ef === fr ? `<i>◎ 교전 중 — ${sa ? 'SAM' : 'SSM'} 추적</i>` : '<kbd>Space</kbd> ' + (sa ? 'SAM 발사' : 'SSM · <kbd>F</kbd> 함포')) : '<label>표적</label> 없음');
   }
-  function over(text, col) { G.canvas.className = 'bl'; ui.ov.style.display = ''; ui.ov.innerHTML = `<div><h1 style="color:${col}">${text}</h1><h2>격파 ${S.kills} · 선체 ${Math.max(0, P.hp | 0)}%</h2><button>다시 출격</button></div>`; G.sfx.loop('siren', 0); }
+  function over(text, col) { G.canvas.className = 'bl'; ui.ov.className = ''; ui.ov.style.display = ''; ui.ov.innerHTML = `<div><h1 style="color:${col}">${text}</h1><h2>격파 ${S.kills} · 선체 ${Math.max(0, P.hp | 0)}%</h2><button>다시 출격 <kbd>Enter</kbd></button></div>`; G.sfx.loop('siren', 0); }
   function start() { reset(); state = 'play'; paused = 0; ui.ov.style.display = 'none'; G.canvas.className = ''; G.sfx.init(); G.sfx.music('calm'); }
   G.game = { start, spawn, fireMsl, boom, kill, damage, cam, get P() { return P; }, get E() { return E; }, get S() { return S; }, sel: t => sel = t }; // 검증·디버그용
 
   G.register('game', {
     init() {
       G.canvas.className = 'bl'; // 메뉴 뒤로 실제 장면을 흐리게 보여 줌
-      G.css(`#c{transition:filter .9s,transform .9s}#c.bl{filter:blur(7px) brightness(.62) saturate(1.1);transform:scale(1.04)}#hud{position:absolute;inset:0;width:100%;height:100%}.pn{position:absolute;padding:8px 12px;background:#06121cb8;border:1px solid #2c5c7a88;border-radius:6px;font:13px/1.55 ui-monospace,Consolas,'Malgun Gothic',monospace;color:#bfe6ff;text-shadow:0 1px 2px #000}
-.pn b{color:#ffd66b}#obj{left:12px;top:12px;max-width:440px}#obj .r{margin-top:4px;color:#d7ecf7}#obj i{color:#7fd6ff;font-style:normal}#obj i:after{content:' ▸'}
-#st{left:50%;bottom:12px;transform:translateX(-50%);text-align:center;white-space:nowrap}#warn{left:50%;top:16%;transform:translateX(-50%);color:#ff5340;border-color:#ff5340;font-weight:700;font-size:20px;animation:bl .5s steps(2) infinite}@keyframes bl{50%{opacity:.3}}
-#hit{position:absolute;inset:0;box-shadow:inset 0 0 160px 40px #ff2a00aa;opacity:0}#keys{right:12px;top:112px;font-size:11px;opacity:.7;transition:opacity 1.5s}
-#ov{position:absolute;inset:0;display:grid;place-items:center;background:radial-gradient(#06121c33 30%,#02060acc);pointer-events:auto;text-align:center}#ov h1{margin:0;font:900 clamp(30px,5vw,64px)/1.05 system-ui,sans-serif;letter-spacing:.09em;color:#0000;background:linear-gradient(#fff 30%,#9fdcff 62%,#2f8fd0);-webkit-background-clip:text;background-clip:text;filter:drop-shadow(0 4px 14px #000b)}
-#ov h2{margin:6px 0 18px;font-size:17px;font-weight:400;color:#8fc7e6;letter-spacing:2px}#ov p{margin:6px 0;color:#a9cfe2;font-size:13px}#ov kbd{padding:1px 6px;border:1px solid #3c6a84;border-radius:4px;background:#0c2030;color:#e6f6ff;font:12px ui-monospace,monospace}
-#ov button{margin-top:20px;padding:11px 46px;font:700 18px inherit;letter-spacing:8px;color:#04121c;background:#7fd6ff;border:0;border-radius:6px;cursor:pointer}#ov button:hover{background:#b6e8ff}`);
-      ui.cv = G.el('canvas', { id: 'hud' }); ui.x = ui.cv.getContext('2d'); ui.hit = G.el('div', { id: 'hit' });
-      ui.obj = G.el('div', { id: 'obj', className: 'pn' }); ui.st = G.el('div', { id: 'st', className: 'pn' }); ui.warn = G.el('div', { id: 'warn', className: 'pn' }); ui.warn.style.display = 'none';
-      ui.keys = G.el('div', { id: 'keys', className: 'pn', innerHTML: 'W/S 추력 · A/D 조타 · 드래그 시점 · 휠 줌<br>Tab 다음 표적 · Q 최대 위협 · Space 미사일 · F 함포<br>P 일시정지 · M 음소거 · F2 그래픽 · H 도움말' });
-      const g = G.gpuInfo; ui.ov = G.el('div', { id: 'ov' });
-      ui.ov.innerHTML = `<div><h1>SECOND KOREAN WARS</h1><h2>해상 반격 — ${G.SCENARIO.title}</h2><p>GPU <b style="color:#fff">${g.name}</b> → 그래픽 등급 <b style="color:#8dff9a">${G.Q.name}</b> (우측 상단에서 변경)</p>
-<p><kbd>W</kbd><kbd>S</kbd> 추력 <kbd>A</kbd><kbd>D</kbd> 조타 · <kbd>드래그</kbd> 시점 <kbd>휠</kbd> 줌</p><p><kbd>Tab</kbd> 표적 <kbd>Q</kbd> 최대 위협 · <kbd>Space</kbd> 미사일(공중 SAM / 수상 SSM) · <kbd>F</kbd> 함포 · CIWS 자동</p><button>출 격</button></div>`;
+      G.css(`#c{transition:filter .9s,transform .9s}#c.bl{filter:blur(7px) brightness(.62);transform:scale(1.04)}#hud,#hit,#ov{position:absolute;inset:0}#hud{width:100%;height:100%}#hit{box-shadow:inset 0 0 160px 40px #f20a;opacity:0}
+.pn{position:absolute;padding:.6em .85em;background:#012e;border:1px solid #48b5;border-radius:8px;font-size:clamp(12px,1.7vh,17px);color:#cef}
+.pn b{color:#fff;font:700 1.2em ui-monospace,monospace}.pn label,.kg h3{margin:0;font-size:.76em;letter-spacing:.1em;color:#7bd}.pn i{font-style:normal;color:#6ef}
+kbd{margin:0 .15em;padding:0 .45em;border:1px solid #48a;border-radius:4px;background:#123;color:#eff;font:600 .8em ui-monospace,monospace;letter-spacing:0}
+#obj{left:12px;top:12px;width:min(29vw,27em);border-left:3px solid #8df}#obj div{margin-top:.3em;font-size:.88em;transition:opacity .4s}
+#st,#warn,#help{left:50%;transform:translateX(-50%);white-space:nowrap}#st{bottom:12px;display:flex;gap:.55em}
+.br{height:.4em;margin:.3em 0;border-radius:3px;background:#fff2}.br i{display:block;height:100%;background:currentColor;transition:width .2s linear}
+.w{padding:.15em .5em 0;border:1px solid #48b4;border-radius:6px;color:#7bd;text-align:center}.w b{display:block}.on.w{border-color:#8df;background:#146;color:#8f9}.no{opacity:.4}
+#tg{right:12px;bottom:12px}#warn{top:10px;padding:.2em 1.1em;border-color:#f54;border-radius:2em;background:#411e}#warn:empty{display:none}
+#help{top:24%}.kg{display:grid;grid-template-columns:auto auto;gap:.45em 2.2em}.kg i{display:inline-block;min-width:5em}
+#ov{display:grid;place-items:center;text-align:center;background:radial-gradient(#0123 30%,#001c);pointer-events:auto;font-size:clamp(14px,1.45vw,21px)}#ov.t{place-items:center start;padding-left:7vw;text-align:left;background:linear-gradient(90deg,#001e,#0000 75%)}
+#ov h1{margin:0;font:900 3.9em/1.04 system-ui;letter-spacing:.06em;color:#0000;background:linear-gradient(#fff 30%,#9df 62%,#39d);-webkit-background-clip:text;background-clip:text;filter:drop-shadow(0 4px 14px #000b)}
+#ov h2{margin:.5em 0 .9em;font-size:1em;font-weight:400;letter-spacing:.14em;color:#9ce}#ov p{margin:0 0 1.5em;max-width:32em;color:#fff;word-break:keep-all}
+#ov button{padding:.65em 1.6em .65em 2em;border:0;border-radius:8px;background:linear-gradient(#cef,#5cf);box-shadow:0 6px 26px #4bf8;font:800 1.2em system-ui;letter-spacing:.35em;cursor:pointer}#ov button:hover{filter:brightness(1.15)}
+#ov .pn{position:static;display:table;margin-top:1.8em;font-size:.8em}#ov small{position:absolute;left:7vw;bottom:14px;font-size:11px;opacity:.45}`);
+      X = G.el('canvas', { id: 'hud' }).getContext('2d'); ui.hit = G.el('div', { id: 'hit' });
+      ui.box = G.el('div'); for (const k of ['obj', 'st', 'tg', 'warn', 'help']) ui[k] = G.el('div', { id: k, className: 'pn' }, ui.box);
+      ui.st.innerHTML = '<div style="min-width:10em"></div>' + ['대공 SAM', '대함 SSM', '함포', 'CIWS'].map((n, i) => `<div class="w"><label>${n}</label><b>자동</b>${i > 2 ? '1.5km' : `<kbd>${i > 1 ? 'F' : 'Space'}</kbd>`}<div class="br"><i></i></div></div>`).join('');
+      const KEYS = '<div class="kg"><h3>기동</h3><h3>교전</h3>' + [['W S', '추력'], ['Tab', '다음 표적'], ['A D', '조타'], ['Q', '최대 위협'], ['드래그', '시점'], ['Space', '미사일 — 공중 SAM · 수상 SSM'], ['휠', '줌'], ['F', '함포 · CIWS 는 자동']]
+        .map(k => `<span><i>${k[0].replace(/\S+/g, '<kbd>$&</kbd>')}</i>${k[1]}</span>`).join('') + '</div>';
+      ui.help.hidden = 1; ui.help.innerHTML = KEYS + '<br>' + 'P 일시정지 M 음소거 F2 그래픽 H 닫기'.replace(/\w+/g, '<kbd>$&</kbd>');
+      ui.ov = G.el('div', { id: 'ov', className: 't' });
+      ui.ov.innerHTML = `<div><h1>SECOND<br>KOREAN WARS</h1><h2>해상 반격 — ${G.SCENARIO.title}</h2><p>날아오는 대함미사일을 요격하고 적 함대와 해안포대를 격파하라.</p><button>출 격 <kbd>Enter</kbd></button><div class="pn">${KEYS}</div><small>GPU ${G.gpuInfo.name} · 그래픽 ${G.Q.name}</small></div>`;
       ui.ov.onclick = e => { if (e.target.tagName === 'BUTTON') start(); };
       addEventListener('keydown', e => {
         if (state !== 'play') { if (e.code === 'Enter') start(); return; }
         if (e.code === 'Tab' || e.code === 'KeyE') pick(1); if (e.code === 'KeyQ') pick(0);
-        if (e.code === 'KeyP' || e.code === 'Escape') paused ^= 1; if (e.code === 'KeyM') G.sfx.volume((muted ^= 1) ? 0 : 1); if (e.code === 'KeyH') ui.help ^= 1;
+        if (e.code === 'KeyP' || e.code === 'Escape') paused ^= 1; if (e.code === 'KeyM') G.sfx.volume((muted ^= 1) ? 0 : 1); if (e.code === 'KeyH') ui.help.hidden ^= 1;
       });
       let drag = 0, mv = 0;
       addEventListener('pointerdown', e => { if (e.target.tagName === 'CANVAS') { drag = 1; mv = 0; } });

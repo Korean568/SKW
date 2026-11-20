@@ -1,8 +1,8 @@
 'use strict';
-/* POST — 빛줄기·블룸·톤맵·그레이드·디더 (LOW 1패스 / MEDIUM·HIGH: ¼ 빛줄기 + 5·6단 블룸 + 샤픈) */
+/* POST — 빛줄기·블룸·톤맵·그레이드·디더 (LOW 1패스 / 그 외 ¼ 빛줄기 + 5·6단 블룸 + 샤픈) */
 {
   const U = new Float32Array(4); let fl = 0;
-  G.post = { flash(v) { fl = Math.max(fl, v); } }; // 노출 킥 (~0.25초 감쇠)
+  G.post = { flash(v) { fl = Math.max(fl, v); } }; // 노출 킥
   const pass = (enc, view, pipe, bg, loadOp = 'clear') => {
     const p = enc.beginRenderPass({ colorAttachments: [{ view, loadOp, storeOp: 'store' }] });
     p.setPipeline(pipe); p.setBindGroup(0, G.bg0); p.setBindGroup(1, bg); p.draw(3); p.end();
@@ -20,14 +20,14 @@ fn S(uv: vec2f) -> vec3f { return min(textureSampleLevel(src, smp, uv, 0.0).rgb,
 fn box(uv: vec2f, t: vec2f) -> vec3f { let e = vec2f(t.x, -t.y); return (S(uv + t) + S(uv - t) + S(uv + e) + S(uv - e)) * .25; }
 fn ign(p: vec2f) -> f32 { return fract(52.9829189 * fract(dot(p, vec2f(.06711056, .00583715)))); }
 fn mx(c: vec3f) -> f32 { return max(c.r, max(c.g, c.b)); }
-@fragment fn fm(i: FSOut) -> @location(0) vec4f { // 빛줄기 마스크: 태양 근처 밝은 하늘만, 지오메트리는 차폐
+@fragment fn fm(i: FSOut) -> @location(0) vec4f { // 빛줄기 마스크: 태양 근처 밝은 하늘만
   let R = vec2f(textureDimensions(dep)); var c = vec3f(0.0);
   for (var n = 0; n < 4; n++) {
     let uv = i.uv + (vec2f(f32(n & 1), f32(n >> 1u)) - .5) * 2.0 / R;
-    c += min(S(uv), vec3f(12.0)) * step(textureLoad(dep, vec2i(uv * R), 0), 0.0);
+    c += min(S(uv), vec3f(8.0)) * step(textureLoad(dep, vec2i(uv * R), 0), 0.0);
   }
   c *= .25;
-  let p = g.viewProj * vec4f(g.sun.xyz, 0.0); let e = abs(p.xy) / max(p.w, 1e-3); // 화면 밖·뒤쪽 태양: 소멸
+  let p = g.viewProj * vec4f(g.sun.xyz, 0.0); let e = abs(p.xy) / max(p.w, 1e-3); // 화면 밖 태양: 소멸
   let k = smoothstep(0.0, .3, p.w) * (1.0 - smoothstep(1.0, 2.4, max(e.x, e.y)));
   return vec4f(c * smoothstep(1.4, 5.0, mx(c)) * pow(max(dot(viewRay(i.uv), g.sun.xyz), 0.0), 4.0) * k, 1.0);
 }
@@ -40,7 +40,7 @@ fn rad(i: FSOut, k: f32, n: i32, fall: f32) -> vec4f { // 태양 쪽 방사형 �
   }
   return vec4f(c / f32(n), 1.0);
 }
-// 2패스: 긴 보폭(16·28탭) → 한 보폭을 8탭으로 메움 = 유효 128~224탭, 밴딩·잡음 없음
+// 2패스: 긴 보폭(16·28탭) → 8탭으로 메움
 @fragment fn fr(i: FSOut) -> @location(0) vec4f { return rad(i, .92, i32(4.0 + 12.0 * g.sun.w), 1.0); }
 @fragment fn fq(i: FSOut) -> @location(0) vec4f { return rad(i, .92 / (4.0 + 12.0 * g.sun.w), 8, 0.0); }
 @fragment fn fd(i: FSOut) -> @location(0) vec4f { // 13탭 다운샘플 (첫 단계 Karis)
@@ -53,7 +53,7 @@ fn rad(i: FSOut, k: f32, n: i32, fall: f32) -> vec4f { // 태양 쪽 방사형 �
   }
   return vec4f(s / ws, 1.0);
 }
-@fragment fn fu(i: FSOut) -> @location(0) vec4f { // 텐트 업샘플 · 알파 혼합(에너지 보존)
+@fragment fn fu(i: FSOut) -> @location(0) vec4f { // 텐트 업샘플 · 알파 혼합
   return vec4f(box(i.uv, .75 / vec2f(textureDimensions(src))), .62 + .04 * g.sun.w);
 }
 fn cr(uv: vec2f) -> vec3f { // Catmull-Rom 5탭 + 링잉 방지
@@ -68,13 +68,14 @@ fn cr(uv: vec2f) -> vec3f { // Catmull-Rom 5탭 + 링잉 방지
   let t = 1.0 / vec2f(textureDimensions(src)); let q = i.uv - .5; let W = vec3f(.2126, .7152, .0722);
   var c = S(i.uv);
   if (u.w > 0.0) { c = cr(i.uv); }
-  else if (g.sun.w > .5) { // 샤픈 (이웃 범위 제한 → 헤일로 없음)
+  else if (g.sun.w > .5) { // 샤픈 (이웃 범위 제한)
     let a = S(i.uv + vec2f(t.x, 0.0)); let b = S(i.uv - vec2f(t.x, 0.0)); let d = S(i.uv + vec2f(0.0, t.y)); let e = S(i.uv - vec2f(0.0, t.y));
-    c = clamp(c + (c * 4.0 - a - b - d - e) * .16, min(c, min(min(a, b), min(d, e))), max(c, max(max(a, b), max(d, e))));
+    c = clamp(c + (c * 4.0 - a - b - d - e) * .22, min(c, min(min(a, b), min(d, e))), max(c, max(max(a, b), max(d, e))));
   }
   if (u.y > 0.0) {
     c += textureSampleLevel(shf, smp, i.uv, 0.0).rgb * u.z;
-    c = mix(c, textureSampleLevel(blm, smp, i.uv, 0.0).rgb, u.y);
+    let b = textureSampleLevel(blm, smp, i.uv, 0.0).rgb; // 옅은 베일 + 광원만 가산
+    c = mix(c, b, .04) + b * smoothstep(2.0, 8.0, mx(b)) * .25;
   }
   c *= u.x * (1.0 - .5 * dot(q, q));
   var l = dot(c, W); c = mix(c, vec3f(l), .4 * smoothstep(.6, 5.0, l)); // 고휘도 탈색
@@ -83,7 +84,7 @@ fn cr(uv: vec2f) -> vec3f { // Catmull-Rom 5탭 + 링잉 방지
   c = mix(vec3f(l), c, 1.08) * mix(vec3f(.9, 1.0, 1.1), vec3f(1.05, 1.0, .94), smoothstep(0.0, .7, l)); // 암부 청록 · 명부 따뜻
   c = max(mix(c, c * c * (3.0 - 2.0 * c), .22), vec3f(0.0)); // 완만한 S 커브
   ${G.fmt.endsWith('srgb') ? '' : 'c = pow(c, vec3f(1.0 / 2.2));'}
-  return vec4f(c + (ign(i.pos.xy) + ign(i.pos.yx + 47.0) - 1.0) / 255.0, 1.0); // 정적 TPDF 디더 ±1 LSB
+  return vec4f(c + (ign(i.pos.xy) + ign(i.pos.yx + 47.0) - 1.0) / 255.0, 1.0); // TPDF 디더
 }`, 'post'), tx = (binding, sampleType) => ({ binding, visibility: 2, texture: { sampleType } });
       this.bgl = dev.createBindGroupLayout({ entries: [tx(0), tx(1), { binding: 2, visibility: 2, sampler: {} }, { binding: 3, visibility: 2, buffer: {} }, tx(4, 'depth'), tx(5)] });
       const pipe = (entryPoint, format = G.HDR, blend) => dev.createRenderPipeline({ layout: G.layout(this.bgl), vertex: { module: m, entryPoint: 'vsFull' }, fragment: { module: m, entryPoint, targets: [{ format, blend }] } });
@@ -92,7 +93,7 @@ fn cr(uv: vec2f) -> vec3f { // Catmull-Rom 5탭 + 링잉 방지
       this.pm = pipe('fm'); this.pr = pipe('fr'); this.pq = pipe('fq');
       this.ub = dev.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }); this.tx = [];
     },
-    onResize() { // 크기 의존 자원만 교체
+    onResize() {
       const dev = G.dev, T = G.targets, n = G.Q.bloom && Math.min(4 + G.Q.level, Math.log2(T.h) | 0), V = this.v = [T.hdrView];
       const bg = (a, b = a, c = a) => dev.createBindGroup({ layout: this.bgl, entries: [{ binding: 0, resource: a }, { binding: 1, resource: b }, { binding: 2, resource: G.clampSamp }, { binding: 3, resource: { buffer: this.ub } }, { binding: 4, resource: T.depthView }, { binding: 5, resource: c }] });
       const tex = (s, mipLevelCount = 1) => this.tx[this.tx.push(dev.createTexture({ size: [T.w >> s, T.h >> s], mipLevelCount, format: G.HDR, usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING })) - 1];
@@ -100,14 +101,15 @@ fn cr(uv: vec2f) -> vec3f { // Catmull-Rom 5탭 + 링잉 방지
       this.tx = [];
       if (n) {
         const t = tex(1, n); for (let i = 0; i < n; i++) V.push(t.createView({ baseMipLevel: i, mipLevelCount: 1 }));
-        this.sv = [tex(2).createView(), tex(2).createView()]; this.sb = this.sv.map(v => bg(v)); // 빛줄기 (¼)
+        this.sv = [tex(2).createView(), tex(2).createView()]; this.sb = this.sv.map(v => bg(v));
       }
       this.b = V.map(v => bg(v)); this.bc = bg(V[0], V[n && 1], n ? this.sv[0] : V[0]);
     },
     run(enc, dst) {
       const V = this.v, B = this.b, n = V.length - 1, T = G.targets, e = G.env, sv = this.sv, sb = this.sb, lo = 1 - G.clamp(e.sunEl / 22, 0, 1);
       fl *= Math.exp(-G.dt * 12);
-      U[0] = e.exposure * .28 * (1 + 2 * fl) * (1 + 1.1 * lo * lo); // 낮은 태양·밤: 노출 보정 U[1] = n && .16; U[2] = 2 + 6 * e.haze; U[3] = T.w < T.cw;
+      U[0] = e.exposure * .28 * (1 + 2 * fl) * (1 + 1.1 * lo * lo); // 낮은 태양·밤: 노출 보정
+      U[1] = n && 1; U[2] = (.5 + 1.5 * e.haze) * (1 + .4 * lo); U[3] = T.w < T.cw; // 연무·낮은 태양: 빛줄기 ↑
       G.dev.queue.writeBuffer(this.ub, 0, U);
       if (n) { pass(enc, sv[0], this.pm, B[0]); pass(enc, sv[1], this.pr, sb[0]); pass(enc, sv[0], this.pq, sb[1]); }
       for (let i = 0; i < n; i++) pass(enc, V[i + 1], this.pd, B[i]);

@@ -217,7 +217,7 @@ fn pointLights(P: vec3f, N: vec3f) -> vec3f { // 폭발 섬광 등 동적 점광
 G.WGSL_LINES = G.WGSL.split('\n').length - 1;
 G.shader = (code, label = 'shader', common = true) => {
   const m = G.dev.createShaderModule({ label, code: (common ? G.WGSL : '') + code });
-  m.getCompilationInfo().then(i => { for (const x of i.messages) if (x.type === 'error') G.err(`[WGSL ${label}] L${x.lineNum - (common ? G.WGSL_LINES : 0)}: ${x.message}`); });
+  m.getCompilationInfo().then(i => { for (const x of i.messages) if (x.type === 'error') G.err(`[WGSL ${label}] L${x.lineNum - (common ? G.WGSL_LINES : 0)}: ${x.message}`); }, () => { });
   return m;
 };
 G.layout = (...bgls) => G.dev.createPipelineLayout({ bindGroupLayouts: [G.bgl0, ...bgls] });

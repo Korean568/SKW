@@ -24,10 +24,11 @@ struct V { @builtin(position) p: vec4f, @location(0) w: vec3f, @location(1) n: v
 @location(4) a: vec3f, @location(5) o: vec4f };
 @vertex fn vs(i: I) -> V {
 let M = mat4x4f(i.a, i.b, i.d, i.e); let w = M * vec4f(i.p, 1.0); let N = normalize((M * vec4f(i.n, 0.0)).xyz);
-// 환경광: 하늘 반구 + 바다 반사광
-let u = N.y * .5 + .5; var k = min(skyBase(normalize(vec3f(N.x, abs(N.y) + .45, N.z))), vec3f(1.2));
-k = mix(k, vec3f(dot(k, vec3f(.33))), .35);
-let a = k * (.3 + .7 * u * u) + (g.sunCol.rgb * max(g.sun.y, 0.0) + k) * vec3f(.03, .07, .09) * (1.0 - u) + g.sunCol.rgb * .03;
+// 환경광: 하늘 반구(해 쪽 따뜻 · 그늘 차갑게) + 바다 반사광 + 바닥값
+let u = N.y * .5 + .5; let L = g.sun.xyz;
+var k = min(skyBase(normalize(vec3f(N.x - L.x * .3, .4, N.z - L.z * .3))), vec3f(1.2));
+k = mix(k, dot(k, vec3f(.33)) * vec3f(.85, 1.0, 1.2), .5);
+let a = k * (.7 + 1.3 * u * u) * (.7 + .3 * smoothstep(.05, .3, L.y)) + (g.sunCol.rgb * max(L.y, 0.0) * .6 + k) * vec3f(.07, .11, .13) * (1.0 - u) + dot(g.sunCol.rgb, vec3f(.012)) * vec3f(.8, .9, 1.1);
 return V(g.viewProj * w, w.xyz, N, i.c * i.t.rgb, vec2f(i.m, i.t.a), a, vec4f(i.p, i.n.y));
 }
 @vertex fn vsS(i: I) -> @builtin(position) vec4f { // 접지 그림자용 바이어스 보정
@@ -41,8 +42,8 @@ let px = length(fwidth(i.w)) * .7 + 1e-4;
 var N = normalize(i.n);
 var c = i.c * (mt - 1.0) * (3.0 - 2.0 * smoothstep(.05, .4, L.y)); // 발광
 if (mt < 2.0) {
-var al = i.c; var gl = clamp(mt, 0.0, 1.0); var fw = .4;
-var y = i.w.y; if (hq && y < 9.0) { y -= gerstner(i.w.xz, g.cam.w).y; }
+var al = i.c; var gl = clamp(mt, 0.0, 1.0); var ao = 1.0; var ww = 1.2; var st = .5;
+var y = i.w.y; if (y < 6.0) { y -= gerstner(i.w.xz, g.cam.w).y; }
 if (mt >= 0.0) { if (hq) { // 강판: 얼룩 · 녹물 · 소금기
 let sd = 1.0 - abs(i.o.w); let u = vec2f(P.z + P.x * .37, P.y + P.x * .71);
 let a = nz(u * .001); let d = nz(u * .0065 + a.xy * .004); let b = nz(vec2f(u.x * .0065, u.y * .0004) + a.zw * .004);
@@ -51,26 +52,31 @@ al *= 1.0 + (a.x - .5) * .16 * fa + (d.x - .5) * .14 * fe;
 al = mix(al, al * vec3f(.62, .5, .4), smoothstep(.45, .85, b.x) * sd * fe * (.3 + .7 * a.z) * .65);
 al = mix(al, vec3f(dot(al, vec3f(.4)) + .04), (1.0 - smoothstep(1.0, 4.0 + 4.0 * a.y, y)) * sd * d.y * .4);
 gl *= .55 + .9 * mix(.5, a.w, fa);
-} } else if (mt > -1.5) { // 지형 (색 r = 상대 고도)
-let a = nz(P.xz * .00013); let b = nz(P.xz * .0012 + a.xy * .03); let fb = fd(3.3, px);
-let s = nz(vec2f((P.x + P.z) * .00008, P.y * .0007 + a.z * .006)).x;
-N = normalize(N + (a.xyz - .5) * .9 + (b.xyz - .5) * 1.4 * fb);
-let fl = i.o.w + (b.w - .5) * .25 * fb;
-al = mix(vec3f(.05, .046, .042), vec3f(.23, .19, .15), s) * (.7 + .6 * mix(.5, b.y, fb)) * (.55 + .45 * smoothstep(.3, .7, fl));
-al = mix(al, mix(vec3f(.03, .065, .018), vec3f(.1, .1, .04), a.y) * (.7 + .6 * mix(.5, b.x, fb)),
-smoothstep(.62, .8, fl) * (1.0 - smoothstep(.45, .8, i.c.r + (a.w - .5) * .3)));
-al = mix(al, vec3f(.3, .26, .19), (1.0 - smoothstep(2.5, 7.0, P.y)) * smoothstep(.5, .8, fl));
-fw = 1.6; gl = .03;
+} } else if (mt > -1.5) { // 지형 (색 r = 상대 고도 · g = 베이크한 골짜기 차폐)
+let a = nz(P.xz * .00007); let b = nz(P.xz * .0005 + a.xy * .02); let d = nz(P.xz * .0041 + b.zw * .01);
+let fb = fd(9.0, px); let fc = fd(1.6, px);
+// 절벽 골: 세로로 늘인 잡음을 경사 방향의 두 투영으로 섞음 (등고선 줄무늬 대신)
+let v = P.y * .00009 + a.z * .01; let gu = mix(nz(vec2f(P.x * .0004, v)), nz(vec2f(P.z * .0004, v)), N.x * N.x / (1.001 - N.y * N.y));
+N = normalize(N + (a.xyz - .5) * .5 + ((b.xyz - .5) * 1.2 + vec3f(gu.y - .5, 0.0, gu.z - .5)) * fb + (d.xyz - .5) * .8 * fc);
+let fl = i.o.w + ((b.w - .5) * .3 + (gu.x - .5) * .2) * fb; let hh = i.c.r + (a.w - .5) * .25;
+al = mix(vec3f(.07, .065, .06), vec3f(.36, .31, .25), smoothstep(.25, .75, mix(.5, gu.x * .6 + b.y * .4, fb))) * (.75 + .5 * mix(.5, d.x, fc)); // 암석
+let vg = mix(mix(vec3f(.018, .04, .012), vec3f(.07, .1, .03), smoothstep(.35, .65, b.x)), vec3f(.17, .15, .07), smoothstep(.55, .8, a.y) * b.z); // 숲 · 풀 · 마른 풀
+al = mix(al, vg * (.7 + .6 * mix(.5, d.y, fc)), smoothstep(.6, .78, fl) * (1.0 - smoothstep(.5, .8, hh)));
+al = mix(al, vec3f(.42, .37, .28) * (.8 + .4 * b.y), (1.0 - smoothstep(1.5 + 5.0 * a.z, 4.0 + 9.0 * a.z, P.y)) * smoothstep(.4, .75, fl)); // 해변
+ao = i.c.g; gl = .03; ww = 1.0 + 3.0 * b.x; st = 0.0;
 }
-let wt = 1.0 - smoothstep(.1, 1.2 + px * 2.0, y); al *= 1.0 - .6 * wt; gl = max(gl, wt * .7);
-if (hq) { al = mix(al, vec3f(.8), (1.0 - smoothstep(0.0, fw + px * 1.5, abs(y - .1 - fw * .5))) * (.35 + .65 * nz(i.w.xz * .004 + g.cam.w * .01).x) * (.5 + fw * .3)); }
+// 흘수선: 젖어 어두운 띠 + 얇고 옅은 소금 줄 (채도 없음)
+let wt = 1.0 - smoothstep(.1, ww + px * 2.0, y); al *= 1.0 - .6 * wt; gl = max(gl, wt * .5);
+al = mix(al, vec3f(.42), (1.0 - smoothstep(0.0, .3 + px, abs(y - 1.6))) * st * nz(i.w.xz * .01).x);
 let sh = shadowAt(i.w, N) * cloudVis(i.w); let nl = max(dot(N, L), 0.0); let nv = max(dot(N, E), 0.0);
-let Hv = normalize(L + E); let R = reflect(-E, N); let sp = 6.0 + 420.0 * gl * gl;
-c = al * (g.sunCol.rgb * nl * sh + i.a * (.7 + .3 * sh) + pointLights(i.w, N));
-c += g.sunCol.rgb * sh * nl * (.04 + .96 * pow(1.0 - max(dot(Hv, E), 0.0), 5.0)) * (sp + 2.0) * .125 * pow(max(dot(N, Hv), 0.0), sp) * (.4 + 2.0 * gl);
+let Hv = normalize(L + E); let nh = max(dot(N, Hv), 0.0); let R = reflect(-E, N); let sp = 6.0 + 420.0 * gl * gl; let S = g.sunCol.rgb * sh;
+c = al * (S * nl * (.6 + .4 * nl) + i.a * (.8 + .2 * sh) * ao + pointLights(i.w, N));
+// 정반사 + 도장면의 넓은 광택
+c += S * nl * ((.04 + .96 * pow(1.0 - max(dot(Hv, E), 0.0), 5.0)) * (sp + 2.0) * .125 * pow(nh, sp) * (.4 + 2.0 * gl) + pow(nh, 8.0) * gl * .4);
 c += pointLights(i.w, R) * gl * .6;
-c += g.sunCol.rgb * (al + .03) * pow(1.0 - nv, 3.0) * pow(max(-dot(E, L), 0.0), 2.0) * (1.0 - L.y) * (.3 + .7 * sh) * .8;
-if (hq) { c = mix(c, skyBase(vec3f(R.x, abs(R.y), R.z)) * mix(.25, 1.0, smoothstep(-.3, .1, R.y)), gl * (.08 + .92 * pow(1.0 - nv, 5.0))); }
+c += g.sunCol.rgb * (al + .03) * pow(1.0 - nv, 3.0) * pow(max(-dot(E, L), 0.0), 2.0) * (1.0 - L.y) * (.3 + .7 * sh) * .8; // 역광
+if (hq) { let k = skyBase(vec3f(R.x, abs(R.y), R.z)); // 하늘 반사 (수평선 아래는 어두운 무채색 바다)
+c = mix(c, mix(vec3f(dot(k, vec3f(.09))), k, smoothstep(-.3, .1, R.y)), gl * (.08 + .92 * pow(1.0 - nv, 5.0))); }
 }
 var h = i.m.y; if (h > 0.0) { h *= .5 + nz(P.zy * .003 + vec2f(P.x * .002, g.cam.w * .015)).x; }
 c += h * (vec3f(5.0, 1.2, .2) + h * h * vec3f(6.0, 6.0, 4.0));
@@ -91,9 +97,11 @@ return vec4f(fogAt(c, i.w), 1.0);
       return s;
     };
     let k = 1, t = 1;
-    const hgt = (x, z) => { // 해안 마스크 × 능선
+    const hgt = (x, z) => { // 해안 마스크 × 휘어진 능선 + 절벽 단. 일부 해안은 완만(해변)
       const f = 2 / R, m = Math.min(1, (.9 - H3(x, z * 1.25) / R) * 3 + (fb(x * f, z * f) - .47) * 2.4);
-      return m <= 0 ? Math.max(-15, m * 90) : k * m ** .4 * (.05 + .3 * m + fb(x * f * 1.2 + 5, z * f * 1.2, 1) ** 2 * (.6 + m));
+      if (m <= 0) return Math.max(-15, m * 90);
+      const q = fb(z * f * 2, x * f * 2) * .8, e = fb(x * f * 1.2 + 5 + q, z * f * 1.2 + fb(x * f * 2 + 9, z * f * 2) * .8, 1) ** 2;
+      return k * m ** (.4 + sm(.42, .55, q / .8)) * (.05 + .3 * m + (e + .2 * sm(.22, .34, e)) * (.6 + m));
     };
     for (let i = 0; i < 4096; i++) t = Math.max(t, hgt((i % 64 - 32) * R / 30, ((i >> 6) - 32) * R / 30));
     k = H / t;
@@ -102,7 +110,8 @@ return vec4f(fogAt(c, i.w), 1.0);
     const Y = (x, z) => L(hgt(x, z), hs, sm(45, 18, H3(x - sx, z - sz)));
     for (let j = 0; j <= N; j++) for (let i = 0; i <= N; i++) { // mat -1 = 지형
       const x = (i - N / 2 + r() * .4 - .2) * S, z = (j - N / 2 + r() * .4 - .2) * S, y = Y(x, z);
-      P.push([x, y, z, ...V3.norm([Y(x - S, z) - Y(x + S, z), 2 * S, Y(x, z - S) - Y(x, z + S)]), y / H, 1, 1, -1]);
+      const a = Y(x - S, z), b = Y(x + S, z), c = Y(x, z - S), d = Y(x, z + S), e = 3 * S; // g = 골짜기 차폐 (주변이 높을수록 어둡게)
+      P.push([x, y, z, ...V3.norm([a - b, 2 * S, c - d]), y / H, G.clamp(1.05 - ((Y(x - e, z) + Y(x + e, z) + Y(x, z - e) + Y(x, z + e)) / 4 - y) / e, .4, 1.2), 1, -1]);
     }
     for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
       const q = j * (N + 1) + i, a = P[q], b = P[q + 1], c = P[q + N + 1], d = P[q + N + 2];
@@ -146,7 +155,7 @@ return vec4f(fogAt(c, i.w), 1.0);
     init() {
       M.sm = G.shader(WGSL, 'mesh');
       M.spipe = M.mk('vsS', 'none', { depthCompare: 'less', depthBiasSlopeScale: 2.5, depthBiasClamp: .004 });
-      isle('island0', 600, 185, 100, 11); isle('island1', 250, 70, 72, 5, 1);
+      isle('island0', 600, 185, 120, 11); isle('island1', 250, 70, 72, 5, 1);
     },
     onQuality({ msaa: n }) { // MSAA 샘플 수별 캐시
       M.pipe = M.P[n] || (M.P[n] = M.mk('vs', 'back', { depthCompare: 'greater' }, { module: M.sm, entryPoint: 'fs', targets: [{ format: G.HDR }] }, n));
