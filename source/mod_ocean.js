@@ -52,19 +52,18 @@ fn gl(p: vec2f, s: f32, a: f32) -> f32 { // 윤슬 셀: 무작위 점이 로브 
 }
 @fragment fn fs(i: V) -> @location(0) vec4f {
   let t = g.cam.w; let L = g.sun.xyz; let wd = g.wind.xy; let sea = g.fog.w; let v = g.cam.xyz - i.w; let d = length(v); let vd = v / d;
-  let fx = d * g.res.w; let fp = fx * d / max(abs(v.y), 1.0); let up = smoothstep(.3, .8, vd.y); // 픽셀 발자국(m) 가로·세로, 내려다보는 정도
-  let lf = fbm(i.b / 1100.0 + wd * (t * .006), 2) * 1.33;
+  let fx = d * g.res.w; let fp = fx * d / max(abs(v.y), 1.0); let up = smoothstep(.3, .8, vd.y); let ud = up * saturate(d / 400.0 - .3); // 픽셀 발자국(m) 가로·세로, 내려다보는 정도, 고공 하향
   let gq = sn(i.b / 50.0 + wd * (t * .02)); let gw = sn(i.b / 230.0 - wd * (t * .013)); // 파군 · 타일 반복 깨기
-  var sl = vec2f(0.0); var ts = sl; var cr = 0.0; var ct = 0.0; var cd = 0.0; var ht = 0.0; var ro = .005; var fo = 0.0; var ae = 0.0; var oc = 0.0; var ol = 0.0; var sh = 1.0;
-  for (var k = 0; k < 6; k++) { // 기본 6파 법선. 짧은 파는 거칠기로, 거품용 마루(e)는 더 멀리까지
-    let a = g.waves[k * 2]; let c = g.waves[k * 2 + 1]; let w = select(0.0, gq[k - 2] - .5, k > 1); let th = a.w * dot(a.xy, i.b) - c.x * t + c.z + w * f32(k) * 3.0;
-    let f = saturate(2.0 - a.w * fp); let m = a.w * a.z * (1.0 + 1.4 * w); let e = c.y * m * saturate(3.0 - a.w * fp * .5);
+  var sl = vec2f(0.0); var ts = sl; var s0 = sl; var cr = 0.0; var ct = 0.0; var cd = 0.0; var ht = 0.0; var ro = .005; var fo = 0.0; var ae = 0.0; var oc = 0.0; var ol = 0.0; var sh = 1.0;
+  for (var k = 0; k < 6; k++) { // 기본 6파 법선: 앞 3파 = 너울 s0(평행 띠), 짧은 파는 거칠기로·고공에선 약하게
+    let a = g.waves[k * 2]; let c = g.waves[k * 2 + 1]; let w = select(0.0, gq[k - 3] - .5, k > 2); let th = a.w * dot(a.xy, i.b) - c.x * t + c.z + (gw.y - .5) * f32(k) * 1.2;
+    let f = saturate(2.0 - a.w * fp) * select(1.0, 1.0 - .8 * ud, k > 2); let m = a.w * a.z * (1.0 + 1.4 * w); let e = c.y * m * saturate(3.0 - a.w * fp * .5);
     sl += a.xy * (m * f * cos(th)); cr += e * sin(th); ct += e * sin(th + .9); ht += a.z * f * sin(th); ro += .002 - f * .002;
+    if (k == 2) { s0 = sl; }
   }
-  let s0 = sl;
   for (var k = 0; k < 3; k++) { // 스펙트럼 타일 3스케일 (회전·워프·진폭 변조)
     let e = f32(k); let sz = 173.0 * pow(.28, e); let M = mat2x2f(cos(e * .7), sin(e * .7), -sin(e * .7), cos(e * .7));
-    let lod = log2(max(fp / ${q ? 2 << q : 4}.0, fx) * 512.0 / sz); let f = saturate(5.0 - lod) * (.3 + 1.4 * gw[k]);
+    let lod = log2(max(fp / ${q ? 2 << q : 4}.0, fx) * 512.0 / sz); let f = saturate(5.0 - lod) * (.3 + 1.4 * gw[k]) * (1.0 - .7 * ud);
     let s = textureSample(tile, smp, M * (i.b - wd * (t * sqrt(sz) * ${q > 1 ? 0 : .5})) / sz + e * .37 + gw.zw * .3);
     ts += s.xy * M * f; cd += (.5 - s.w * .5) * f; ro += .005 * clamp(lod, 0.0, 4.0);
   }
@@ -74,7 +73,7 @@ fn gl(p: vec2f, s: f32, a: f32) -> f32 { // 윤슬 셀: 무작위 점이 로브 
   let nb = mix(vec4f(.5), sn(vec2f(ac / 18.0 - t * .77, ax / 4.7) + ts * 1.5), saturate(2.0 - fp * .15));
   let ch = mix(nb.z, na.y * .6 + nc.y * .4, nf);
   let lg = pow(1.0 - abs(2.0 * sn(vec2f(ac / 170.0, ax / 26.0) + gq.xy * .5).x - 1.0), 3.0) * saturate(1.5 - fp * .08) * (.03 + .05 * sea);
-  var r0 = reflect(-vd, normalize(vec3f(-sl.x - ts.x, 1.0, -sl.y - ts.y))); r0.y = abs(r0.y) + .02;
+  var r0 = reflect(-vd, normalize(vec3f(-sl.x - ts.x, 3.0, -sl.y - ts.y))); r0.y = abs(r0.y) + .02;
   for (var k = 0; k < 8; k++) {
     let R = u.rp[k]; let rv = i.b - R.xy; let x = length(rv) / max(R.z, .1);
     if (x < 2.0) { // 착탄 파문
@@ -89,32 +88,33 @@ fn gl(p: vec2f, s: f32, a: f32) -> f32 { // 윤슬 셀: 무작위 점이 로브 
     let lx = L.x * W.w - L.z * W.z; let ob = bx(o, vec3f(r0.x * W.w - r0.z * W.z, r0.y, dot(r0.xz, W.zw)), B); sh = min(sh, 1.0 - bx(o, vec3f(lx, L.y, dot(L.xz, W.zw)), B));
     if (ob > oc) { oc = ob; ol = saturate(lx * sign(o.x) * 3.0); }
     if (s < 0.0 || l > hb * 4.0 + s * .6) { continue; }
-    let am = min(P.x * .13, 1.0); let e = max(s - hl * 2.0, 0.0); let hw = hb * min(sqrt(s / hl), 1.0);
+    let am = min(P.x * .13, 1.0); let e = max(s - hl * 2.0, 0.0); let hw = hb * min(sqrt(s / hl), 1.0); let wl = hl * (hl * .05 + 1.0);
+      let hs = .3 * exp(-s / (hl * .4)) + .25 * smoothstep(hl * 1.3, hl * 2.0, s); // 선수 어깨·선미에서 두꺼움
     // 켈빈 V 팔: 발산파 법선 + 깃털 거품
-    let q = (l - 1.0 - s * .34) / (hb * .3 + s * .07); let kk = 6.283 / (8.0 + P.x * 1.4); let ph = kk * (l * .57 - s * .82) + nb.z * 5.0;
+    let q = (l - 1.0 - s * .34) / (hb * .3 + s * .07); let kk = 6.283 / (8.0 + P.x * 1.4); let ph = kk * (l * .57 - s * .82) + nb.z * 3.0;
     let ar = exp(-q * q - s / (hl * 5.0)) * am; let kf = saturate(2.0 - kk * fp);
-    sl += (W.zw * .82 + vec2f(W.w, -W.z) * (sign(o.x) * .57)) * (ar * kf * .8 * cos(ph));
-    // 거품 밀도: 팔 + 선수 물마루 + 끊기는 현측 거품 + 선미 난류 띠(나이 e 로 감쇠·확산). ae 오래 남는 기포수
+    sl += (W.zw * .82 + vec2f(W.w, -W.z) * (sign(o.x) * .57)) * (ar * kf * (.5 - .3 * ud) * cos(ph));
+    // 거품 밀도: 팔 + 선수 물마루 + 흘러가며 끊기는 현측 거품 + 선미 난류 띠(나이 e 로 감쇠·확산). ae 기포수(멀수록 조각남)
     let wh = hb * (.9 + .3 * sqrt(e / hb)); let x2 = l * l / (wh * wh); let st = step(hl * 1.7, s) * am;
-    fo += exp(-q * q * 9.0 - s / (hl * 1.5)) * (.4 + gq.y) * am
+    fo += exp(-q * q * 4.0 - s / (hl * 1.5)) * (.4 + gq.y) * am
       + exp(-s / (hl * .3) - pow((l - hw) / (2.5 + s * .2), 2.0)) * (.5 + gq.y) * am
-      + exp(-max(l - hw * .8, 0.0) / (1.0 + hb * (.25 * exp(-s / (hl * .4)) + .2 * smoothstep(hl * 1.3, hl * 2.0, s)))) * smoothstep(.5, .75, gq.z) * (.4 + gq.y) * saturate(1.0 - e / hb) * am
-      + exp(-x2 * 1.5 - e / (hl * 5.0)) * st * (.4 + .6 * gq.x + .5 * exp(-e / hl));
-    ae = max(ae, exp(-x2 * .6 - e / (hl * 14.0)) * st);
+      + exp(-max(l - hw * .8, 0.0) / (.4 + hb * hs)) * smoothstep(.45, .7, sn(vec2f((s - P.x * t) * .08, o.x * .3)).x + hs) * (.4 + gq.y) * saturate(1.0 - e / hb) * am
+      + exp(-x2 * 1.5 - e / wl) * st * (.4 + .6 * gq.x + .5 * exp(-e / hl));
+    ae = max(ae, exp(-x2 * .9 - e / (wl * 2.5)) * st * mix(1.0, gq.x * 1.7, saturate(e / wl)));
   }
   sl += ts * (1.0 - .75 * ae); cd *= 1.0 - .75 * ae;
   let n = normalize(vec3f(-sl.x, max(1.0 - cr - cd, .3), -sl.y)); let nv = max(dot(n, vd), .03); let sg = sqrt(ro);
   let hz = smoothstep(30.0, 1200.0, d); // 먼 바다 프레넬 → 1
   let fr = max(.02 + .98 * pow(saturate(1.0 - nv), 5.0 * exp(-2.69 * sg)) / (1.0 + 22.7 * sg * sqrt(sg) * (1.0 - .85 * hz)), oc * pow(1.0 - vd.y, 5.0) * .8);
   var r = reflect(-vd, n); r = normalize(vec3f(r.x, abs(r.y) + sg * .3 * (1.0 - hz), r.z));
-  sh = mix(1.0, sh${q > 1 ? ' * shadowAt(i.w, n)' : ''}, saturate(L.y * 5.0));
+  sh = mix(1.0, sh${q > 1 ? ' * shadowAt(i.w + n * vec3f(9, 0, 9), n)' : ''}, saturate(L.y * 5.0) * .6);
   let sw = (cloudVis(i.w + vec3f(22, 0, 9)) + cloudVis(i.w - vec3f(22, 0, 9)) + cloudVis(i.w + vec3f(-9, 0, 22)) + cloudVis(i.w - vec3f(-9, 0, 22))) * .25;
   let amb = skyBase(vec3f(-L.x, .7, -L.z)); let sun = g.sunCol.rgb * (sw * sh); let nl = max(dot(n, L), 0.0);
-  // 수체색: 짙은 청색, 마루는 옥빛. 내려다볼 땐 밝게 + 너울 사면 명암 띠
-  let sf = saturate(.3 - 1.5 * dot(sl, L.xz)); let hh = saturate(cr * 1.6 + cd + ht * .25 + .25);
-  var body = mix(vec3f(.008, .05, .095), vec3f(.01, .09, .1), max((1.0 - nv) * saturate(L.y * 2.5), hh * .4) * (1.0 - .7 * up)) * (amb * 1.4 + sun * (.1 + .8 * nl * nl) * (.4 + 2.0 * sf))
-    * (.75 + .2 * lf + .4 * hh * (1.0 - up)) * (1.0 + up * (clamp(1.0 - 2.5 * dot(s0, L.xz), .6, 1.5) * 1.3 - .6))
-    + vec3f(.0, .2, .15) * sun * (pow(max(dot(vd, -L), 0.0), 3.0) + .1 + sf * .4) * hh * (.08 + min(L.y, .25)) * (1.0 - .7 * up);
+  // 수체색: 짙은 청색, 옥빛 산란은 마루(hh)에만. 내려다볼 땐 너울 사면 명암 띠
+  let sf = saturate(.3 - 1.5 * dot(sl, L.xz)); let hh = saturate(cr * 1.6 + cd * .6 + ht * .25);
+  var body = (mix(vec3f(.008, .05, .095), vec3f(.01, .09, .1), hh * hh * (.6 - .4 * up)) + up * .02) * (amb * (1.4 + 1.2 * saturate(1.0 - L.y * 5.0)) + sun * (.1 + .8 * nl * nl) * (.4 + 2.0 * sf))
+    * (1.05 + hh * (.5 - .3 * up)) * (1.0 + up * (clamp(1.0 - 6.0 * dot(s0, L.xz), .5, 1.6) * 1.3 - .6))
+    + vec3f(.0, .2, .15) * sun * (pow(max(dot(vd, -L), 0.0), 3.0) + .1 + sf * .4) * hh * hh * (.08 + min(L.y, .25)) * (1.0 - .7 * up);
 ${R ? `  let zw = g.misc.x / i.pos.z; let pu = i.pos.xy * g.res.zw; // 굴절 + 흡수
   let t0 = g.misc.x / max(textureLoad(dpt, vec2i(i.pos.xy), 0), 1e-9) - zw;
   var uv = clamp(pu + n.xz * saturate(t0 * .3) * 2.0 / (zw + 20.0), vec2f(.001), vec2f(.999));
@@ -123,21 +123,21 @@ ${R ? `  let zw = g.misc.x / i.pos.z; let pu = i.pos.xy * g.res.zw; // 굴절 + 
   th = max(th, 0.0); let bp = i.w - vd * th; // 커스틱
   let ca = pow(saturate(1.3 - textureSampleLevel(tile, smp, (bp.xz - L.xz * (bp.y / max(L.y, .2))).yx / 11.3, clamp(log2(fx * 90.0), 0.0, 4.0)).w), 2.0);
   body = mix(body, textureSampleLevel(scn, linSamp, uv, 0.0).rgb * (1.0 + ca * 4.0 * exp(bp.y * .12)), exp(-th * vec3f(.6, .25, .2)));
-  fo += (1.0 - smoothstep(0.0, 2.5, th)) * smoothstep(.3, .7, gq.z);
 ` : ''}
-  // 윤슬: 매끈한 기본 로브 + 발자국에 맞춘 두 스케일 셀의 HDR 반짝임
-  let hv = normalize(vd + L); let vh = dot(vd, hv); let n2 = pow(max(dot(normalize(n + vec3f(0, 2, 0)), hv), .01), 2.0); let rb = ro * 2.0 + .03;
-  let lb = exp((n2 - 1.0) / (n2 * rb)) * (1.0 - oc); let sb = lb * min((.02 + .98 * pow(1.0 - vh, 5.0)) * .5 / max(vh * vh, .1), 1.3) * min(1.0, sqrt(.08 / rb));
-  let gs = log2(${q ? 2.8 : 4} * sqrt(fp * fx) * pow(fp / fx, .15)); let g0 = exp2(floor(gs));
-  let sk = mix(gl(i.b, g0, lb * .45), gl(i.b, g0 * 2.0, lb * .45), fract(gs)) * ${q ? 22 : 5}.0 * saturate(2.0 - fp / (fx * 14.0));
+  // 윤슬: 통계적 기본 로브(너울 기울기 s0 만, 긴 꼬리 lw) × 잔물결 ±25% + 발자국에 맞춘 셀의 HDR 반짝임. 먼 곳(nr→0)은 로브가 대신함
+  let hv = normalize(vd + L); let vh = dot(vd, hv); let T = hv.xz / max(hv.y, .05); let x0 = s0 * .5 + T; let xd = sl + T;
+  let lw = (1.0 - oc) / (1.0 + dot(x0, x0) / (.03 + ro * .3)); let md = clamp(.3 - dot(xd, xd) * 2.0, -.25, .25); let nr = saturate(1.5 - fp / (fx * 28.0));
+  let sb = lw * (lw + .8 - nr * .8) * (1.0 + md) * min((.02 + .98 * pow(1.0 - vh, 5.0)) * .5 / max(vh * vh, .1), .8);
+  let gs = log2(${q ? 3.4 : 4} * sqrt(fp * fx) * pow(fp / fx, .25)); let g0 = exp2(floor(gs)); let ga = lw * (.45 + 1.4 * md);
+  let sk = mix(gl(i.b, g0, ga), gl(i.b, g0 * 2.0, ga), fract(gs)) * ${q ? 22 : 5}.0 * nr;
   let cl = g.fog.y * smoothstep(.4, .8, sn((i.b - vd.xz * (1500.0 / (vd.y + .2))) / 600.0 + wd * (t * .01)).x);
-  var col = mix(body * (.65 + .35 * sh) * (1.0 - .4 * oc), mix(mix(skyBase(r), g.sunCol.rgb * .2 + amb * .5, cl) * (.65 + .35 * sw), amb * .22 + sun * (ol * .1), oc), fr) + sun * (sb + sk);
+  var col = mix(body * (1.0 - .4 * oc), mix(mix(skyBase(r), g.sunCol.rgb * .2 + amb * .5, cl) * (.65 + .35 * sw), amb * .22 + sun * (ol * .1), oc), fr) + sun * (sb + sk);
   // 거품색: 태양(낮엔 흰색) + 하늘빛
-  let fc = mix(sun, vec3f(dot(sun, vec3f(.33))), saturate(L.y * 3.0) * .6) * (.3 + .5 * nl) + mix(amb, vec3f(dot(amb, vec3f(.33))), .4) * 1.3;
+  let fc = mix(sun, vec3f(dot(sun, vec3f(.33))), saturate(L.y * 3.0) * .9) * (.3 + .5 * nl) + mix(amb, vec3f(dot(amb, vec3f(.33))), .4) * 1.3;
   col = mix(col, fc * mix(vec3f(.2), vec3f(.13, .36, .34), saturate(L.y * 4.0 - .2)), min(ae * .55 + lg, .6));
   // 백파: 마루 모양의 부드러운 줄 + 꼬리
-  let wc = cd * .4 + sea * .45 - .22 + (lf - .5) * .5 + (nb.x - .5) * .3; let w = fp * .1;
-  let fw = min(smoothstep(.32 - w, .82 + w, cr + wc) + smoothstep(.27 - w, .82 + w, ct + wc) * nb.y * .6, .8) / (1.0 + fp * .15) * (.3 + .7 * ch) * (1.0 - .4 * up);
+  let wc = cd * .4 + sea * .5 - .22 + (gw.x - .5) * .5 + (nb.x - .5) * .3; let w = min(fp * .05, .2);
+  let fw = min(smoothstep(.32 - w, .82 + w, cr + wc) + smoothstep(.27 - w, .82 + w, ct + wc) * nb.y * .6, .8) / (1.0 + fp * .04) * (.3 + .7 * ch) * (1.0 - .6 * up);
   // 항적 밀도 → 넓은 문턱의 레이스
   fo = max(smoothstep(0.0, 1.1, fo * 1.7 - 1.1 + ch * 1.1), fw);
   col = mix(col, fc * (.6 + .4 * mix(nb.w, na.z, nf)) * (1.0 - .35 * nf * nc.z), fo);
@@ -145,8 +145,10 @@ ${R ? `  let zw = g.misc.x / i.pos.z; let pu = i.pos.xy * g.res.zw; // 굴절 + 
     let l = g.lights[k * 2]; let lv = l.xyz - i.w; let ld = length(lv);
     col += g.lights[k * 2 + 1].rgb * pow(max(1.0 - ld / (l.w * 1.3 + 1.0), 0.0), 2.0) * (pow(max(dot(r, lv / ld), 0.0), 40.0) * .3 + .004 + fo * .05);
   }
-  // 수평선: 안개 점근색(= 수평선 하늘)으로 수렴
-  return vec4f(mix(fogAt(col, g.cam.xyz - v * (1.0 + d / 2000.0)), skyBase(normalize(vec3f(-vd.x, .015, -vd.z))), exp(-vd.y / .034) * saturate(d / 300.0 - .2)), 1.0);
+  // 수평선: 맑으면 하늘보다 조금 어둡고 푸른 선으로, 연무가 짙으면 하늘색에 녹아듦
+  let hf = smoothstep(.3, .5, g.fog.z);
+  return vec4f(mix(fogAt(col, i.w), skyBase(normalize(vec3f(-vd.x, .015, -vd.z))) * mix(vec3f(.76, .82, .92), vec3f(1.0), hf),
+    exp(-vd.y / (.014 + .03 * hf)) * saturate(d / 300.0 - .2)), 1.0);
 }`;
   G.register('ocean', Object.assign(O, {
     init() {
