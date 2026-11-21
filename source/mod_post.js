@@ -1,5 +1,5 @@
 'use strict';
-/* POST — 빛줄기·블룸·톤맵·그레이드·디더 (LOW 1패스 / 그 외 ¼ 빛줄기 + 5·6단 블룸 + 샤픈) */
+/* POST — 빛줄기·블룸·국소 노출·톤맵·그레이드·디더 (LOW 1패스) */
 {
   const U = new Float32Array(4); let fl = 0;
   G.post = { flash(v) { fl = Math.max(fl, v); } }; // 노출 킥
@@ -33,7 +33,7 @@ fn X(uv: vec2f) -> vec3f { return textureSampleLevel(shf, smp, uv, 0.0).rgb; }
   return vec4f(c * smoothstep(1.4, 5.0, mx(c)) * pow(max(dot(viewRay(i.uv), g.sun.xyz), 0.0), 4.0) * k, 1.0);
 }
 fn rad(i: FSOut, k: f32, n: i32, fall: f32) -> vec4f { // 태양 쪽 방사형 적분
-  let p = g.viewProj * vec4f(g.sun.xyz, 0.0); // 지터 없음: 2패스 = n×8 표본, 마스크는 블룸 ⅛ 단(미리 흐림)
+  let p = g.viewProj * vec4f(g.sun.xyz, 0.0); // 2패스 = n×8 표본
   let d = (p.xy / max(p.w, 1e-3) * vec2f(.5, -.5) + .5 - i.uv) * k / f32(n); var uv = i.uv; var c = vec3f(0.0);
   for (var j = 0; j < n; j++) {
     c += S(uv) * (1.0 - fall * f32(j) / f32(n)) * f32(all(abs(uv - .5) < vec2f(.5)));
@@ -80,10 +80,12 @@ fn cr(uv: vec2f) -> vec3f { // Catmull-Rom 5탭 + 링잉 방지
       * (1.0 - exp(-g.misc.x / max(textureLoad(dep, vec2i(i.uv * vec2f(textureDimensions(dep))), 0), 1e-6) / 2500.0));
     c += s / (1.0 + .5 * mx(s));
     let b = textureSampleLevel(blm, smp, i.uv, 0.0).rgb; // 베일 + 광원
-    c = mix(c, b, .04) + b * smoothstep(2.5, 9.0, mx(b)) * .2;
+    let w = mx(textureSampleLevel(blm, smp, i.uv, 4.0).rgb); // 넓은 평균: 밝은 면(윤슬)은 블룸 문턱 ↑ · 국소 노출 ↓
+    c = (mix(c, b, .04) + b * smoothstep(2.5 + w, 9.0 + w, mx(b)) * .2) / (1.0 + 1.3 * max(w * u.x - .45, 0.0));
   }
-  c *= u.x * (1.0 - .28 * dot(q, q));
+  c *= u.x * (1.0 - .16 * dot(q, q));
   var l = dot(c, W); c = mix(c, vec3f(l), .4 * smoothstep(.6, 5.0, l)); // 고휘도 탈색
+  c = min(c, .8 + (c - .8) / (1.0 + max(c - .8, vec3f(0.0)) / 6.0)); // 긴 어깨
   c = clamp(c * (2.51 * c + .03) / (c * (2.43 * c + .59) + .14), vec3f(0.0), vec3f(1.0)); // ACES 근사
   l = dot(c, W);
   c = mix(vec3f(l), c, 1.08) * mix(vec3f(.93, 1.0, 1.07), vec3f(1.07, 1.0, .92), smoothstep(0.0, .5, l)); // 찬 그림자 · 따뜻한 하이라이트
@@ -104,17 +106,18 @@ fn cr(uv: vec2f) -> vec3f { // Catmull-Rom 5탭 + 링잉 방지
       const tex = (s, mipLevelCount = 1) => this.tx[this.tx.push(dev.createTexture({ size: [T.w >> s, T.h >> s], mipLevelCount, format: G.HDR, usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING })) - 1];
       for (const t of this.tx) t.destroy();
       this.tx = [];
+      let t;
       if (n) {
-        const t = tex(1, n); for (let i = 0; i < n; i++) V.push(t.createView({ baseMipLevel: i, mipLevelCount: 1 }));
+        t = tex(1, n); for (let i = 0; i < n; i++) V.push(t.createView({ baseMipLevel: i, mipLevelCount: 1 }));
         this.sv = [tex(2).createView(), tex(2).createView()]; this.sb = this.sv.map(v => bg(v));
       }
-      this.b = V.map(v => bg(v)); this.bc = bg(V[0], V[n && 1], n ? this.sv[0] : V[0]);
+      this.b = V.map(v => bg(v)); this.bc = bg(V[0], t ? t.createView() : V[0], n ? this.sv[0] : V[0]);
     },
     run(enc, dst) {
       const V = this.v, B = this.b, n = V.length - 1, T = G.targets, e = G.env, sv = this.sv, sb = this.sb, lo = 1 - G.clamp(e.sunEl / 22, 0, 1), v = G.cam.view, s = G.sun.dir;
       const f = Math.max(-v[2] * s[0] - v[6] * s[1] - v[10] * s[2], 0) ** 4; // 역광: 노출 ↓
       fl *= Math.exp(-G.dt * 12);
-      U[0] = e.exposure * .345 * (1 + 2 * fl) * (1 + .6 * lo * lo) * (1 - .2 * f); // 낮 +0.3 EV, 해 질 녘 그대로
+      U[0] = e.exposure * .345 * (1 + 2 * fl) * (1 + .6 * lo * lo) * (1 - (n ? .2 : .32) * f); // 낮 +0.3 EV, 해 질 녘 그대로
       U[1] = n && 1; U[2] = .6 + .9 * e.haze; U[3] = T.w < T.cw;
       G.dev.queue.writeBuffer(this.ub, 0, U);
       for (let i = 0; i < n; i++) pass(enc, V[i + 1], this.pd, B[i]);

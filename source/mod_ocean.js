@@ -31,7 +31,7 @@
 @group(1) @binding(2) var scn: texture_2d<f32>;
 @group(1) @binding(3) var dpt: texture_depth_2d;
 @group(1) @binding(4) var smp: sampler;
-struct V { @builtin(position) pos: vec4f, @location(0) w: vec3f, @location(1) b: vec2f };
+struct V { @builtin(position) pos: vec4f, @location(0) @interpolate(perspective, centroid) w: vec3f, @location(1) @interpolate(perspective, centroid) b: vec2f }; // centroid: MSAA 수평선 픽셀에서 보간값이 삼각형 밖으로 외삽되지 않게 (수평선 실선 방지)
 @vertex fn vs(@builtin(vertex_index) vi: u32) -> V { // 카메라 중심 링: 가까이 조밀, 마지막 링은 수평선 너머
   let c = vi / 6u; let k = vi % 6u;
   let ij = vec2f(vec2u((c + ((50u >> k) & 1u)) % ${N}u, c / ${N}u + ((44u >> k) & 1u))) / ${N}.0;

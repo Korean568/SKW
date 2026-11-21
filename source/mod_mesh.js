@@ -7,7 +7,7 @@
   G.addMesh = (name, verts, meta = {}) => {
     G.meshes[name]?.vb?.destroy();
     let r = 0; for (let i = 0; i < verts.length; i += 10) r = Math.max(r, H3(verts[i], verts[i + 1], verts[i + 2]));
-    G.meshes[name] = { verts, count: verts.length / 10, q: new Float32Array(80), n: 0, r, c: [0, 0], f: [0, 0] };
+    G.meshes[name] = { verts, count: verts.length / 10, lod: meta.lod || verts.length / 10, q: new Float32Array(80), n: 0, r, c: [0, 0], f: [0, 0] };
     G.modelData[name] = { verts, ...meta };
   };
   G.draw = (name, mat, t) => {
@@ -43,20 +43,28 @@ let px = length(fwidth(i.w)) * .7 + 1e-4;
 var N = normalize(i.n);
 var c = i.c * (mt - 1.0) * (3.0 - 2.0 * smoothstep(.05, .4, L.y)); var fk = 1.0; // 발광 · 안개 거리 배율
 if (mt < 2.0) {
-var al = i.c; var gl = clamp(mt, 0.0, 1.0); var ao = 1.0; var ww = 1.2; var sf = 1.0;
+var al = i.c; var gl = clamp(mt, 0.0, 1.0); var ao = 1.0; var ww = 1.2; var sf = 1.0; var S = g.sunCol.rgb;
 var y = i.w.y; if (y < 6.0) { y -= gerstner(i.w.xz, g.cam.w).y; }
 if (mt >= 0.0) { let sd = 1.0 - abs(i.o.w);
-N.y += sd * .4 * sin(clamp(P.y, 0.0, 7.0) * .67 - 1.57); N = normalize(N); // 현측 곡률 → 햇빛 띠
-if (hq) { // 강판: 얼룩 · 녹물 · 소금기
+S = mix(S, vec3f(dot(S, vec3f(.3, .5, .2))), .45); // 주광 화이트밸런스 (회색 도장)
+if (P.y < -.3) { ww = 3.0; } // 선저 도료
+N.y += sd * .4 * sin(clamp(P.y, 0.0, 7.0) * .67 - 1.57); // 현측 곡률 → 햇빛 띠
+gl += .25 * (1.0 - smoothstep(.5, 4.5, y)); // 물보라에 젖은 아랫부분
+if (hq) { // 강판: 판별 명도 · 뒤틀림(광택 얼룩) · 녹물 · 소금기
 let u = vec2f(P.z + P.x * .37, P.y + P.x * .71);
 let a = nz(u * .001); let d = nz(u * .0065 + a.xy * .004); let b = nz(vec2f(u.x * .0035, u.y * .0003) + a.zw * .004);
+let w = nz(u * .00022); let pv = nz((floor(u / vec2f(5.2, 2.6)) + .5) / 256.0).x;
 let fa = fd(3.9, px); let fe = fd(.6, px); let fw = fd(1.1, px) * sd;
-al *= 1.0 + (a.x - .5) * .36 * fa + (d.x - .5) * .14 * fe;
-al = mix(al, al * vec3f(.55, .46, .38), smoothstep(.4, .8, b.x) * fw * (.3 + .7 * a.z) * .8);
+N += ((w.xyz - .5) * .3 + (a.xyz - .5) * .12) * fa;
+al *= 1.0 + (a.x - .5) * .3 * fa + (d.x - .5) * .14 * fe + (pv - .5) * .14 * fd(2.6, px);
+al = mix(al, al * vec3f(.6, .54, .48), smoothstep(.5, .85, b.x) * fw * (.3 + .7 * a.z) * .8);
 al = mix(al, vec3f(dot(al, vec3f(.4)) + .04), (1.0 - smoothstep(1.0, 4.0 + 4.0 * a.y, y)) * sd * a.x * .5);
-gl *= .55 + .9 * mix(.5, a.w, fa);
-} } else if (mt > -1.5) { // 지형 (색 r = 상대 고도 · g = 베이크한 골짜기 차폐)
-let q = P.xz + P.y * vec2f(2.0, -1.5); // 높이로 비틀어 절벽에서 세로로 늘어지지 않게
+gl *= .5 + mix(.5, w.w * .6 + a.w * .5, fa);
+} else if (i.o.w > .9) { // LOW: 1px 미만 갑판 띠는 옆면처럼 (점선 방지)
+let t = smoothstep(1.2, 2.4, px); N = mix(N, E, t * .8); al *= 1.0 + t * clamp(.22 / dot(al, vec3f(.33)) - 1.0, 0.0, 1.5); }
+N = normalize(N);
+} else if (mt > -1.5) { // 지형 (색 r = 상대 고도 · g = 베이크한 골짜기 차폐)
+let q = P.xz + P.y * vec2f(2.0, -1.5);
 let a = nz(P.xz * .00007); let b = nz(q * .0005 + a.xy * .02); let d = nz(q * .0041 + b.zw * .01);
 let s = nz(vec2f((P.y + q.x * .12) * .0006 + a.z * .02, .3)).x; // 지층
 let fb = fd(9.0, px); let fc = fd(1.6, px); let f = vec2f(6.0 * fd(28.0, px), 2.5 * fb); let W = P + (a.xyz - .5) * 90.0;
@@ -68,13 +76,13 @@ N = normalize(N - gr + N * dot(gr, N));
 al = mix(vec3f(.06, .058, .055), vec3f(.34, .31, .26), smoothstep(.25, .75, mix(.5, s * .5 + t.x * .3 + b.y * .2, fb))) * (.75 + .5 * mix(.5, d.x, fc)); // 암석
 let vg = mix(mix(vec3f(.01, .026, .008), vec3f(.05, .085, .022), smoothstep(.2, .8, mix(.5, t.y * .6 + t.x * .4, fb))), vec3f(.17, .16, .07), smoothstep(.6, .85, a.y) * b.z); // 숲 · 풀 · 마른 풀
 al = mix(al, vg * (.7 + .6 * mix(.5, d.y, fc)), smoothstep(.5, .7, fl) * (1.0 - smoothstep(.55, .85, hh)));
-al = mix(al, vec3f(.4, .35, .25) * (.8 + .4 * b.y), (1.0 - smoothstep(1.0 + 7.0 * a.z, 3.0 + 20.0 * a.z, P.y)) * smoothstep(.35, .7, fl) * smoothstep(.3, .5, a.z)); // 해변
+al = mix(al, vec3f(.4, .35, .25) * (.8 + .4 * b.y), (1.0 - smoothstep(1.0 + 7.0 * a.z, 3.0 + 20.0 * a.z, P.y)) * smoothstep(.35, .7, fl) * smoothstep(.3, .5, a.z) * smoothstep(.3, .6, b.w)); // 해변 (조각)
 ao = i.c.g; gl = .03; ww = 2.0 + 6.0 * b.x;
-fk += 2.0 * (1.0 - smoothstep(0.0, 80.0, P.y)) * smoothstep(2e3, 6e3, distance(i.w, g.cam.xyz));
+fk += 3.0 * (1.0 - smoothstep(0.0, 90.0, P.y)) * smoothstep(500.0, 2500.0, distance(i.w, g.cam.xyz)); // 먼 섬: 수면부터 연무
 }
-let wt = 1.0 - smoothstep(.1, ww + px * 2.0, y); al *= 1.0 - .6 * wt; gl = max(gl, wt * .5); // 흘수선: 젖어 어두운 띠
+let wt = 1.0 - smoothstep(.1, ww + px * 2.0, y); al = mix(al, mix(al * .4, vec3f(dot(al, vec3f(.1))), step(0.0, mt)), wt); gl = max(gl, wt * .5); // 흘수선: 젖어 어두운 띠
 let sh = shadowAt(i.w, N) * mix(.35, 1.0, cloudVis(i.w)) * sf; let nl = max(dot(N, L), 0.0); let nv = max(dot(N, E), 0.0);
-let Hv = normalize(L + E); let nh = max(dot(N, Hv), 0.0); let R = reflect(-E, N); let sp = 6.0 + 420.0 * gl * gl; let S = g.sunCol.rgb * sh;
+let Hv = normalize(L + E); let nh = max(dot(N, Hv), 0.0); let R = reflect(-E, N); let sp = 6.0 + 420.0 * gl * gl; S *= sh;
 c = al * (S * nl + i.a * (.8 + .2 * sh) * ao + pointLights(i.w, N));
 // 정반사 (스치는 역광에도 남게 nl 조기 포화) + 넓은 광택
 c += S * min(nl * 6.0, 1.0) * ((.04 + .96 * pow(1.0 - max(dot(Hv, E), 0.0), 5.0)) * (sp + 2.0) * .125 * pow(nh, sp) * (.4 + 2.0 * gl) + pow(nh, 5.0) * gl * .8);
@@ -136,8 +144,8 @@ return vec4f(fogAt(c, mix(g.cam.xyz, i.w, fk)), 1.0);
         cone(x, y - 1, z, s, 0, s * (2 + r()), [.025, .045 + r() * .03, .018], -2, 4);
     }
     for (let i = 0; i < R * 20; i++) { // 갯바위 (곧은 해안선을 깸)
-      const x = (r() - .5) * 2.1 * R, z = (r() - .5) * 2.1 * R, y = Y(x, z), s = 3 + r() * r() * 14;
-      if (y < -1 && y > -8) cone(x, -3, z, s, 0, 3 + s * (.25 + r() * .5), [.3, .28, .24], -2, 5);
+      const x = (r() - .5) * 2.1 * R, z = (r() - .5) * 2.1 * R, y = Y(x, z), s = 3 + r() * r() * 14, c = .08 + r() * .2;
+      if (y < -1 && y > -8 && nz(x * 14 / R, z * 14 / R) > .5) cone(x, -3, z, s, 0, 3 + s * (.25 + r() * .5), [c, c * .93, c * .8], -2, 5);
     }
     if (lh) { // 등대
       for (t = R; t > 0 && Y(.75 * t, .66 * t) < 14; t -= 3);
@@ -151,7 +159,7 @@ return vec4f(fogAt(c, mix(g.cam.xyz, i.w, fk)), 1.0);
   const run = (p, pipe, s) => { // s: 0 본 패스 · 1 그림자
     if (!M.ib) return;
     p.setPipeline(pipe); p.setVertexBuffer(1, M.ib);
-    for (const k in G.meshes) { const m = G.meshes[k]; if (m.c[s]) { p.setVertexBuffer(0, m.vb); p.draw(m.count, m.c[s], 0, m.f[s]); } }
+    for (const k in G.meshes) { const m = G.meshes[k]; if (m.c[s]) { p.setVertexBuffer(0, m.vb); p.draw(s ? m.count : m.k, m.c[s], 0, m.f[s]); } }
   };
   G.register('mesh', Object.assign(M, {
     mk(vs, cullMode, ds, fragment, count = 1) {
@@ -172,15 +180,16 @@ return vec4f(fogAt(c, mix(g.cam.xyz, i.w, fk)), 1.0);
     prepare() { // 경계 구 컬링 → 인스턴스 버퍼
       const dev = G.dev, U = GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST; let n = 0;
       for (let s = 0; s < 2; s++) for (const k in G.meshes) {
-        const m = G.meshes[k], q = m.q, c = s ? G.Q.shadows && G.shadowVP : G.cam.viewProj; m.f[s] = n;
+        const m = G.meshes[k], q = m.q, c = s ? G.Q.shadows && G.shadowVP : G.cam.viewProj; let wm = 1e9; m.f[s] = n;
         for (let o = 0; c && o < m.n * 20; o += 20) {
           const x = q[o + 12], y = q[o + 13], z = q[o + 14], r = m.r * H3(q[o], q[o + 1], q[o + 2]), w = c[3] * x + c[7] * y + c[11] * z + c[15];
           if (Math.abs(c[0] * x + c[4] * y + c[8] * z + c[12]) > w + r * H3(c[0] + c[3], c[4] + c[7], c[8] + c[11]) ||
             Math.abs(c[1] * x + c[5] * y + c[9] * z + c[13]) > w + r * H3(c[1] + c[3], c[5] + c[7], c[9] + c[11])) continue;
           if (n * 20 + 20 > D.length) { const t = new Float32Array(n * 40 + 20); t.set(D); D = t; }
           for (let j = 0; j < 20; j++) D[n * 20 + j] = q[o + j];
-          n++;
+          n++; wm = Math.min(wm, w);
         }
+        if (!s) m.k = G.Q.msaa < 2 && wm * 2 / (G.cam.proj[5] * G.targets.h) > .3 ? m.lod : m.count;
         if ((m.c[s] = n - m.f[s]) && !m.vb) { m.vb = dev.createBuffer({ size: m.verts.byteLength, usage: U }); dev.queue.writeBuffer(m.vb, 0, m.verts); }
         if (s) m.n = 0;
       }

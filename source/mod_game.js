@@ -187,13 +187,13 @@
       const m = M4.mul(P.m, M4.trs(hp.ciws[i], c.yaw, c.pit)); G.draw('ciws', m);
       if (!best || Math.abs(wrap(wy - c.yaw)) > .08) return;
       firing = 1; c.t += dt; const mz = M4.point(m, HP('ciws').muzzle);
-      while (c.t > .04) { c.t -= .04; G.fx.tracer(mz, dir(c.yaw + P.yaw + rnd(-.012, .012), c.pit + rnd(-.012, .012)), 1100, c.t); } // 4번째 인자 = 이미 날아간 시간(초)
+      while (c.t > .04) { c.t -= .04; G.fx.tracer(mz, dir(c.yaw + P.yaw + rnd(-.012, .012), c.pit + rnd(-.012, .012)), 1100, c.t); } // 4번째 = 이미 날아간 시간
       if (Math.random() < dt * .13 * (1 - bd / 1600)) kill(best); else if (Math.random() < dt * 2) G.fx.burst('hit', best.p, { size: .4 });
     });
     G.sfx.loop('ciws', firing, { gain: .8 });
   }
-  function pick(next) { // next = 1 다음 표적 / 0 최우선 위협
-    const H = E.filter(e => e.side && live(e)).map(e => [V3.dist(e.p, P.p) * (e.k === 'msl' ? .3 : 1), e]).sort((a, b) => a[0] - b[0]).map(x => x[1]);
+  function pick(next) { // next = 1 다음 표적 / 0 최우선 위협 (날아오는 미사일이 항상 먼저 = HUD 의 '최우선' 표식과 같은 기준)
+    const H = E.filter(e => e.side && live(e)).map(e => [V3.dist(e.p, P.p) - (e.k === 'msl' ? 1e6 : 0), e]).sort((a, b) => a[0] - b[0]).map(x => x[1]);
     if (!H.length) return sel = null;
     sel = next ? H[(H.indexOf(sel) + 1) % H.length] : H[0]; G.sfx.play('lock');
   }
@@ -235,12 +235,12 @@
     if (state === 'play' && T % 2.86 < dt) G.sfx.play('ping', { gain: .35 });
     hud(dt, warn);
   }
-  /* ── HUD: 2D 캔버스(표식·레이더) + DOM 패널(0.2초마다) · 청록 = 아군 / 주황빨강 = 적 / 호박색 = 최우선 / 흰색 = 선택·교전 ── */
-  const OWN = '#6ef', HOS = '#ff5a3c', WARM = '#fdb', AMB = '#fb3', lab = [];
+  /* ── HUD: 캔버스(표식·레이더) + DOM 패널(0.2초마다) · 청록 = 아군 / 주황빨강 = 적 / 호박색 = 최우선만 / 흰색 = 선택 ── */
+  const OWN = '#6ef', HOS = '#ff5a3c', AMB = '#fb3', lab = [];
   let fz;
   // 표식: 미사일 ◇ · 항공기 △ · 함정 ⬟ · 지상 □ · 본함 ➤
   const SH = { msl: [0, -1, 1, 0, 0, 1, -1, 0], jet: [0, -1, 1, .8, -1, .8], ship: [0, -1.1, 1, -.1, .7, .8, -.7, .8, -1, -.1], site: [-1, -1, 1, -1, 1, 1, -1, 1], own: [0, -1.3, .8, .9, 0, .4, -.8, .9] };
-  const ink = (col, fill) => { X.strokeStyle = '#000c'; X.lineWidth = fill ? 3 : 4.5; X.stroke(); X.strokeStyle = X.fillStyle = col; X.lineWidth = 2; fill ? X.fill() : X.stroke(); };
+  const ink = (col, fill, w = 2) => { X.strokeStyle = '#000c'; X.lineWidth = fill ? 3 : w + 2.5; X.stroke(); X.strokeStyle = X.fillStyle = col; X.lineWidth = w; fill ? X.fill() : X.stroke(); };
   const ring = (x, y, r, col) => { X.beginPath(); X.arc(x, y, r, 0, 7); col && ink(col); };
   const mark = (k, sx, sy, r, fill) => { const s = SH[k]; X.beginPath(); for (let i = 0; i < s.length; i += 2) X.lineTo(sx + s[i] * r, sy + s[i + 1] * r); X.closePath(); ink(k === 'own' ? OWN : HOS, fill); };
   const font = px => X.font = `600 ${fz = px}px system-ui`, tw = s => X.measureText(s).width / 2 + fz * .4;
@@ -249,14 +249,15 @@
   // 겹치는 글자는 위(-1)·아래(1)로
   const slot = (x, y, w, s) => { for (let i = 0; i < lab.length; i += 3) if (Math.abs(lab[i] - x) < lab[i + 2] + w + 2 && Math.abs(lab[i + 1] - y) < fz * 1.4) { y = lab[i + 1] + s * fz * 1.5; i = -3; } lab.push(x, y, w); return y; };
   const put = (e, h) => { if (e.h !== h) e.innerHTML = e.h = h; }, bar = (w, c, o = 1) => `<div class="br" style="opacity:${o}"><i style="width:${w}%;color:${c}"></i></div>`;
+  const pct = (e, h = e.hp) => Math.ceil(h / TYPES[e.model].hp * 100);
   const deg = a => ('00' + Math.round((a * R2D % 360 + 360) % 360) % 360).slice(-3), brg = e => deg(Math.atan2(P.p[0] - e.p[0], e.p[2] - P.p[2]));
   function hud(dt, warn) {
     const W = innerWidth, H = innerHeight, cv = X.canvas, on = state === 'play', o = ui.hit.style; if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
     X.clearRect(0, 0, W, H); if (o.opacity > .01) o.opacity *= .94;
     if (ui.on !== on) ui.box.hidden = !(ui.on = on);
     if (!on) return;
-    // 선택 표적 명중·격파 (hp · S.kills 만 읽음)
-    if (sel && sel === ui.s0 && (live(sel) ? sel.hp < ui.h0 : S.kills > ui.k0)) { ui.ft = T; ui.fe = sel; ui.fh = ui.h0; ui.fm = live(sel) ? '명중 −' + (ui.h0 - sel.hp) : sel.name + ' 격파'; hudT = 1; }
+    // 선택 표적 명중·격파 감지
+    if (sel && sel === ui.s0 && (live(sel) ? sel.hp < ui.h0 : S.kills > ui.k0)) { ui.ft = T; ui.fe = sel; ui.fh = ui.h0; ui.fm = live(sel) ? '명중 −' + (pct(sel, ui.h0) - pct(sel)) + '%' : sel.name + ' 격파'; hudT = 1; }
     ui.s0 = sel; ui.h0 = sel && sel.hp; ui.k0 = S.kills;
     const tick = (hudT += dt) >= .2, fs = G.clamp(H * .019, 11.5, 16), f = dir(P.yaw), fr = G.frame, ht = T - ui.ft; if (tick) hudT = 0;
     font(fs); X.textAlign = 'center'; X.lineJoin = 'round';
@@ -266,73 +267,77 @@
     }
     for (const e of E) {
       if (e.k === 'shell' || !live(e)) continue;
-      const gnd = !isAir(e), s = G.project([e.p[0], e.p[1] + (gnd ? 8 : 0), e.p[2]]), d = V3.dist(e.p, P.p), eng = e.ef === fr, top = e === nm, me = e === sel, col = top ? AMB : WARM;
+      const gnd = !isAir(e), s = G.project([e.p[0], e.p[1] + (gnd ? 8 : 0), e.p[2]]), d = V3.dist(e.p, P.p), eng = e.ef === fr, top = e === nm, me = e === sel, col = top ? AMB : '#fdb';
       let sx = s[0], sy = s[1]; if (s[2] <= 0) { sx = W - sx; sy = H * 2; }
       if (!e.side) { ring(sx, sy, 3.5, OWN); continue; }
       if (tick || !e.lb) { e.lt = Math.ceil(d / Math.max(e.spd, 150)) + '초'; e.lb = (d / 1000).toFixed(1) + 'km' + (e.k === 'msl' ? ' ' + e.lt : ''); }
       const a = Math.atan2(sy - H / 2, sx - W / 2), x0 = sx, y0 = sy;
-      e.sx = sx = G.clamp(sx, 30, W - 30); e.sy = e.iy = sy = G.clamp(sy, 56, H * .79);
+      e.bx = e.sx = sx = G.clamp(sx, 30, W - 30); e.sy = sy = G.clamp(sy, 56, H * .79);
       if (sx !== x0 || sy !== y0) { // 화면 밖
         X.beginPath(); for (let i = -1; i < 2; i++) X.lineTo(sx + Math.cos(a + i * 2.5) * 11, sy + Math.sin(a + i * 2.5) * 11); X.closePath(); ink(HOS, 1);
         txt(e.lb, sx - Math.cos(a) * (fs * 2 + 22), sy - Math.sin(a) * 26 + fs * .35, col); continue;
       }
-      // ext = 화면상 선체 반길이: 큰 표적은 표식을 선체 위로
-      const mx = gnd && TYPES[e.model].hp, ext = gnd ? G.modelData[e.model].radius * H * 1.07 / s[2] : 0, r = (me ? 12 : 9) + (top ? 3 + Math.sin(T * 10) * 2 : 0), q = Math.max(r + 8, ext), qh = Math.max(r + 8, ext * .4),
-        up = G.clamp(ext / 8 - 1, 0, 1), iy = e.iy = Math.max(70, sy - up * (ext * .4 + r + fs + 22)), pu = T * 1.5 % 1;
-      mark(e.k, sx, iy, r);
+      // ext = 화면상 선체 반길이 (큰 표적: 선택 = 괄호만 / 그 밖 = 표식을 선체 위로)
+      const mx = gnd && TYPES[e.model].hp, ext = gnd ? G.modelData[e.model].radius * H * 1.07 / s[2] : 0, r0 = me ? 12 : 9, r = r0 + (top ? 3 + Math.sin(T * 10) * 2 : 0), q = Math.max(r0 + 11, ext), qh = Math.max(r0 + 11, ext * .4),
+        up = G.clamp(ext / 8 - 1, 0, 1), ic = !me || up < 1, iy = me ? sy : Math.max(70, sy - up * (ext * .4 + r + fs + 22)), pu = T * 1.5 % 1, g = Math.min(q, 30) * 1.2;
+      e.bx = sx + q;
+      if (ic) mark(e.k, sx, iy, r);
       if (top) { X.globalAlpha = 1 - pu; ring(sx, iy, r + 5 + pu * 12, AMB); X.globalAlpha = 1; }
-      if (eng) { X.setLineDash([3, 7]); X.lineDashOffset = -T * 30; ring(sx, iy, r + 5, '#fff'); X.setLineDash([]); }
-      if (me) {
-        X.setLineDash([14, q * 2 - 14, 14, qh * 2 - 14]); X.lineDashOffset = 7; X.beginPath(); X.rect(sx - q, sy - qh, q * 2, qh * 2); ink(e === ui.fe && ht < .5 ? HOS : '#fff'); X.setLineDash([]);
-      }
-      if (me || top) { // 꼬리표: [선택] 이름 · [최우선 [Q]] = 두 강조의 뜻과 Q 키
-        const tg = (top ? '최우선' : '') + (me ? (top ? ' · ' : '') + '선택' : ' [Q]'), n = me ? e.name + (eng ? ' · 교전 중' : '') : '', w1 = tw(tg), w2 = n ? tw(n) : 0, ty = slot(sx, iy - r - 15, w1 + w2, -1);
-        txt(tg, sx - w2, ty, 0, top ? AMB : '#fff'); if (n) txt(n, sx + w1, ty, '#fff');
-      }
-      const l = me || top || e.k !== 'msl' ? e.lb : e.lt, ly = slot(sx, iy + r + fs + (me ? 12 - up * 8 : 5), tw(l), 1);
-      txt(l, sx, ly, col);
+      if (eng && ic) { X.setLineDash([3, 7]); X.lineDashOffset = -T * 30; ring(sx, iy, r + 5, OWN); X.setLineDash([]); }
+      if (me) { X.setLineDash([g, q * 2 - g, g, qh * 2 - g]); X.lineDashOffset = g / 2; X.beginPath(); X.rect(sx - q, sy - qh, q * 2, qh * 2); ink(e === ui.fe && ht < .5 ? HOS : '#fff', 0, 3); X.setLineDash([]); }
+      let px = sx, w = 34, ly;
+      if (me || top) { // 꼬리표 한 줄 (공중: 위 / 수상·지상: 괄호 왼쪽 아래)
+        const tg = (top ? '최우선' : '') + (me ? (top ? ' · ' : '') + '선택' : ' [Q]'), n = (me ? e.name + ' ' : '') + e.lb, w1 = tw(tg), w2 = tw(n);
+        w = w1 + w2; px -= Math.max(0, q - w); ly = slot(px, gnd ? Math.min(sy + qh + fs + 7, H * .83) : sy - qh - 9, w, gnd ? 1 : -1);
+        txt(tg, px - w2, ly, 0, top ? AMB : '#fff'); txt(n, px + w1, ly, me ? '#fff' : col);
+      } else { const l = e.k === 'msl' ? e.lt : e.lb; ly = slot(sx, iy + r + fs + 5, tw(l), 1); txt(l, sx, ly, col); }
       if (mx && (me || e.hp < mx)) { // 선체 막대 (흰색 = 방금 깎인 양)
-        X.fillStyle = '#012d'; X.fillRect(sx - 34, ly + 7, 68, 9);
-        if (e === ui.fe && ht < 2.6) { X.fillStyle = '#fff'; X.fillRect(sx - 32, ly + 9, 64 * ui.fh / mx, 5); }
-        X.fillStyle = HOS; X.fillRect(sx - 32, ly + 9, 64 * e.hp / mx, 5);
+        const x = px - w + 1, y = ly + fs * .36 + 2, k = (w * 2 - 2) / mx;
+        X.fillStyle = '#000d'; X.fillRect(x - 1, y - 1, w * 2, 8);
+        if (e === ui.fe) { X.fillStyle = '#fff'; X.fillRect(x, y, k * (e.hp + (ui.fh - e.hp) * G.clamp(2 - ht, 0, 1)), 6); }
+        X.fillStyle = HOS; X.fillRect(x, y, k * e.hp, 6);
       }
     }
-    if (ht < 2.6) {
-      const e = ui.fe; font(fs * 1.5); X.globalAlpha = Math.min(1, (2.6 - ht) * 2);
-      txt('✦ ' + ui.fm, e.sx, Math.max(fz + 60, e.iy - fs * 3.7 - Math.min(ht, 1) * 16), '#fe7'); X.strokeStyle = AMB; X.lineWidth = 1.5; X.stroke(); X.globalAlpha = 1;
+    if (ht < 2.6) { // 명중 표시 (괄호 오른쪽)
+      const e = ui.fe, t = '✦ ' + ui.fm; font(fs * 1.3); X.globalAlpha = Math.min(1, (2.6 - ht) * 2);
+      txt(t, Math.min(e.bx + 12 + tw(t), W - tw(t) - 8), e.sy + 5 - Math.min(ht, 1) * 18, '#fff'); X.strokeStyle = HOS; X.lineWidth = 1.5; X.stroke(); X.globalAlpha = 1;
     }
-    // 레이더: 함수가 위 · 고리 1.5(CIWS)/4/8km
+    // 레이더: 함수가 위 · 고리 1.5(CIWS)/4/8km (반지름 ∝ √거리) · 부채꼴 = 시야
     const R = G.clamp(H * .15, 84, 140), cx = R + 14, cy = H - R - 14;
-    let bx, by; const at = p => { const dx = p[0] - P.p[0], dz = p[2] - P.p[2], u = (dz * f[0] - dx * f[2]) / 8000, v = (dx * f[0] + dz * f[2]) / 8000, l = Math.max(1, Math.hypot(u, v)); bx = cx + u / l * R; by = cy - v / l * R; return l; };
+    let bx, by; const at = p => { const dx = p[0] - P.p[0], dz = p[2] - P.p[2], u = (dz * f[0] - dx * f[2]) / 8000, v = (dx * f[0] + dz * f[2]) / 8000, l = Math.hypot(u, v) + 1e-9, k = R / Math.sqrt(Math.max(l, l * l)); bx = cx + u * k; by = cy - v * k; return l < 1; };
     font(Math.max(11, fs * .8)); ring(cx, cy, R); X.fillStyle = '#011a'; X.fill(); ink('#8dfa'); X.save(); X.clip();
-    for (const I of S.isl) if (at(I.p) === 1) {
-      const r = Math.max(7, I.r / 8000 * R); X.beginPath(); X.ellipse(bx, by, r * 1.25, r * .8, .5, 0, 7); X.fillStyle = '#586'; X.fill(); X.strokeStyle = X.fillStyle = '#ad9'; X.lineWidth = 1; X.stroke(); X.fillText('섬', bx, by + r + fz);
+    const va = 1.57 + P.yaw - cam.az; X.beginPath(); X.moveTo(cx, cy); X.arc(cx, cy, R, va - .7, va + .7); X.fillStyle = '#8df3'; X.fill();
+    for (const I of S.isl) if (at(I.p)) {
+      const r = Math.max(7, I.r / 8000 * R); X.beginPath(); X.ellipse(I.lx = bx, by, r * 1.25, r * .8, .5, 0, 7); X.fillStyle = '#586'; X.fill(); X.strokeStyle = X.fillStyle = '#ad9'; X.lineWidth = 1; X.stroke(); X.fillText('섬', bx, I.ly = by + r + fz);
     }
-    X.restore(); X.lineWidth = 1; X.strokeStyle = '#8df5'; ring(cx, cy, R / 2); X.moveTo(cx - R, cy); X.lineTo(cx + R, cy); X.moveTo(cx, cy - R); X.lineTo(cx, cy + R); X.stroke();
-    X.setLineDash([3, 4]); ring(cx, cy, R * .1875); X.stroke(); X.setLineDash([]);
-    const rl = (s, k) => txt(s, cx + R * k, cy + R * k + 4, '#bdf'); rl('1.5', -.21); rl('4', .35); rl('8 km', .62);
+    X.restore(); X.lineWidth = 1; X.strokeStyle = '#8df5'; ring(cx, cy, R * .707); X.moveTo(cx - R, cy); X.lineTo(cx + R, cy); X.moveTo(cx, cy - R); X.lineTo(cx, cy + R); X.stroke();
+    X.setLineDash([3, 4]); ring(cx, cy, R * .433); X.stroke(); X.setLineDash([]);
+    const rl = (s, k, j = k) => txt(s, cx + R * j, cy + R * k + 4, '#bdf'); rl('CIWS', .3, -.31); rl('4', .5); rl('8 km', .86, .3);
     txt('N', cx + Math.sin(P.yaw) * (R - 9), cy - Math.cos(P.yaw) * (R - 9) + 4, '#fff');
     lab.length = 0; // 겹친 같은 종류는 한 표식 + ×n (lab: x합, y합, 수, 종류, 선택)
     for (const e of E) if (e.k !== 'shell' && live(e)) {
       at(e.p); if (!e.side) { ring(bx, by, 1.5, OWN); continue; }
-      let i = 0; while (i < lab.length && (lab[i + 3] !== e.k || Math.hypot(lab[i] / lab[i + 2] - bx, lab[i + 1] / lab[i + 2] - by) > R * .2)) i += 5;
+      let i = 0; while (i < lab.length && (lab[i + 3] !== e.k || Math.hypot(lab[i] / lab[i + 2] - bx, lab[i + 1] / lab[i + 2] - by) > 5)) i += 5;
       if (i === lab.length) lab.push(0, 0, 0, e.k, 0);
       lab[i] += bx; lab[i + 1] += by; lab[i + 2]++; if (e === sel) lab[i + 4] = 2;
     }
-    for (let i = 0; i < lab.length; i += 5) { const n = lab[i + 2], x = lab[i] / n, y = lab[i + 1] / n; mark(lab[i + 3], x, y, 4.5 + lab[i + 4], 1); if (n > 1) txt('×' + n, x + 18, y + 4, 0, '#fff'); }
-    mark('own', cx, cy, 6, 1);
+    for (let i = 0; i < lab.length; i += 5) { const n = lab[i + 2], x = lab[i] / n, y = lab[i + 1] / n; mark(lab[i + 3], x, y, 4.5 + lab[i + 4], 1); if (n > 1) txt('×' + n, x + (S.isl.some(I => Math.hypot(I.lx - x - 18, I.ly - y) < 22) ? -18 : 18), y + 4, 0, '#fff'); }
+    mark('own', cx, cy, 7, 1);
     if (!tick) return;
-    const hp = Math.max(0, P.hp | 0), ok = live(sel), sa = ok && isAir(sel), mx = ok && !sa && TYPES[sel.model].hp, eh = mx && Math.ceil(sel.hp / mx * 100), pr = S.i / G.SCENARIO.steps.length * 100 | 0;
-    put(ui.warn, warn && nm ? `⚠ 대함미사일 <b>${cnt}</b>발 접근 · 방위 <b>${brg(nm)}</b>° <b>${nm.lb.replace(' ', '</b> · 충돌 <u>')}</u><s>${nm.ef === fr ? '◎ 최우선 위협 요격 중' : sel === nm ? '<kbd>Space</kbd> 요격 미사일 발사' : '<kbd>Q</kbd> 최우선 위협 선택'}</s>` : '');
+    const hp = Math.max(0, P.hp | 0), ok = live(sel), sa = ok && isAir(sel), mx = ok && !sa, eh = mx && pct(sel), pr = S.i / G.SCENARIO.steps.length * 100 | 0, wp = sa ? 'SAM' : 'SSM',
+      // a1 = Space 가 선택 표적에 하는 일 · a2 = Q 안내 (경보 밑 · 표적 카드 공통)
+      a1 = !ok ? '없음' : sel.ef === fr ? `◎ 선택 표적 ${sa ? '요격' : '교전'} 중 — ${wp} 비행 중` : `<kbd>Space</kbd> 선택 표적에 ${wp} 발사`, a2 = nm && nm !== sel ? '<em><kbd>Q</kbd> 최우선으로 전환</em>' : '',
+      inf = e => `<b>${e.lb.replace(' ', '</b> · 충돌 <b>')}</b> · 방위 <b>${brg(e)}</b>°`;
+    put(ui.warn, warn && nm ? `⚠ 대함미사일 <b>${cnt}</b>발 접근 · ${inf(nm)}<s>${a1}${a2 && ' · ' + a2}</s>` : '');
     put(ui.obj, `<div class="rw"><label>임무</label><s><kbd>H</kbd> 도움말</s></div><h4>${S.obj}</h4><div class="rw"><span>격파 <b>${S.kills}</b> · 잔여 위협 <b>${E.filter(e => e.side && live(e)).length}</b></span><label>작전 진행 ${pr}%</label></div>${bar(pr)}`
       + log.filter(l => T - l[2] < 14).map(l => `<div style="opacity:${Math.min(1, (14 - T + l[2]) / 3).toFixed(1)}"><i>${l[0]}</i> ${l[1]}</div>`).join(''));
-    put(ui.st.firstChild, `<label>선체</label> <b>${hp}</b>%${bar(hp, hp > 50 ? '#8f9' : hp > 25 ? '#fd6' : '#f65')}<div class="rw"><span><label>속력</label> <b>${(Math.abs(P.spd) * 1.94).toFixed(0)}</b>kn</span><span><label>침로</label> <b>${deg(-P.yaw)}</b>°</span><span><label>추력</label> <b>${(P.thr * 100).toFixed(0)}</b>%</span></div>`);
+    put(ui.st.firstChild, `<label>선체</label> <b>${hp}</b>%${bar(hp, hp > 50 ? '#8f9' : hp > 25 ? '#fa6' : '#f65')}<div class="rw"><span><label>속력</label> <b>${(Math.abs(P.spd) * 1.94).toFixed(0)}</b>kn</span><span><label>침로</label> <b>${deg(-P.yaw)}</b>°</span><span><label>추력</label> <b>${(P.thr * 100).toFixed(0)}</b>%</span></div>`);
     [P.sam, P.ssm, P.gun].forEach((a, i) => { // 무장 카드: on 발사 가능 · rl 재장전 · no 지금 표적에 못 씀
       const w = ui.st.children[i + 1], fit = ok && !i == sa, use = a && fit && (i < 2 || V3.dist(sel.p, P.p) < 7000), rl = use && P.cd[i] > 0;
-      put(w.children[1], `<kbd>${i > 1 ? 'F' : 'Space'}</kbd>${a}<small>발</small>`); put(w.children[2], !a ? '<i style="color:#f65">소진</i>' : !use ? fit ? '사거리 밖' : (i ? '수상' : '공중') + ' 표적용' : rl ? '재장전 ' + P.cd[i].toFixed(1) + '초' : '발사 가능');
+      put(w.children[1], `<kbd>${i > 1 ? 'F' : 'Space'}</kbd>${a}<small>발</small>`); put(w.children[2], !a ? '<i style="color:#f65">소진</i>' : !use ? fit ? '사거리 밖' : (i ? '수상' : '공중') + ' 표적용' : rl ? '장전 ' + P.cd[i].toFixed(1) + '초' : '발사 가능');
       w.lastChild.firstChild.style.width = G.clamp(1 - P.cd[i] / [.9, 3.5, 1.1][i], 0, 1) * 100 + '%'; w.className = 'w ' + (!use ? 'no' : rl ? 'rl' : 'on'); });
-    put(ui.tg, `<div class="rw"><label>표적 <kbd>Tab</kbd></label><u>${ht < 3 ? '✦ ' + ui.fm : ''}</u></div>` + (ok ? `<b style="color:${HOS}">${sel.name}</b>${mx ? ` 선체 <b>${eh}</b>%` : ''}${bar(eh, HOS, mx ? 1 : 0)}`
-      + `<b>${sel.lb.replace(' ', '</b> · 충돌 <b>')}</b> · 방위 <b>${brg(sel)}</b>°<br>` + (sel.ef === fr ? `<span>◎ 교전 중 — ${sa ? 'SAM' : 'SSM'} 추적</span>` : '<kbd>Space</kbd> ' + (sa ? 'SAM 발사' : 'SSM · <kbd>F</kbd> 함포')) : '없음'));
+    put(ui.tg, '<label>표적 <kbd>Tab</kbd></label><br>' + (ok ? `<b style="color:${HOS}">${sel.name}</b>${mx ? ` 선체 <b>${eh}</b>%` : ''}${bar(eh, HOS, mx ? 1 : 0)}${inf(sel)}<br>` : '')
+      + `<span>${a1}</span>` + (mx || a2 ? '<br>' + (mx ? '<kbd>F</kbd> 함포' + (a2 && ' · ') : '') + a2 : ''));
   }
   function over(text, col) { G.canvas.className = 'bl'; ui.ov.className = ''; ui.ov.style.display = ''; ui.ov.innerHTML = `<div><h1 style="color:${col}">${text}</h1><h2>격파 ${S.kills} · 선체 ${Math.max(0, P.hp | 0)}%</h2><button>다시 출격</button><kbd>Enter</kbd></div>`; G.sfx.loop('siren', 0); }
   function start() { reset(); state = 'play'; paused = 0; ui.ft = -9; ui.ov.style.display = 'none'; G.canvas.className = ''; G.sfx.init(); G.sfx.music('calm'); }
@@ -340,30 +345,29 @@
 
   G.register('game', {
     init() {
-      G.canvas.className = 'bl';
       G.css(`#c{transition:filter .9s,transform .9s}#c.bl{filter:blur(7px) brightness(.62);transform:scale(1.04)}#hud,#hit,#ov{position:absolute;inset:0}#hud{width:100%;height:100%}#hit{box-shadow:inset 0 0 160px 40px #f20a;opacity:0}
-.pn{position:absolute;padding:.6em .85em;background:#012e;border:1px solid #48b5;border-radius:8px;font-size:clamp(12px,1.7vh,17px);color:#cef}
-.pn b{color:#fff;font:700 1.2em ui-monospace,monospace}.pn label,.kg h3,small{margin:0;font:400 max(11.5px,.8em) system-ui;letter-spacing:.05em;color:#ace}.pn i{font-style:normal;color:#6ef}.pn span{color:#fff}s,u{text-decoration:none}
-kbd{margin:0 .15em;padding:0 .45em;border:1px solid #48a;border-radius:4px;background:#123;color:#eff;font:600 max(10.5px,.8em) ui-monospace,monospace;letter-spacing:0}
-#obj{left:12px;top:12px;width:min(29vw,27em);border-left:3px solid #8df}#obj h4{margin:0;font-size:1.12em;color:#fff;word-break:keep-all}#obj div{margin-top:.3em;font-size:.88em;transition:opacity .4s}
+.pn{position:absolute;padding:.6em .85em;background:#012e;border:1px solid #48b5;border-radius:8px;font-size:clamp(12.5px,1.75vh,17px);color:#cef}
+.pn b{color:#fff;font:700 1.2em ui-monospace,monospace}.pn label,.kg h3,small{margin:0;font:400 max(12px,.82em) system-ui;letter-spacing:.05em;color:#ace}.pn i,em{font-style:normal;color:#6ef}.pn span{color:#fff}s{text-decoration:none}.pn em{color:#fb3}
+kbd{margin:0 .15em;padding:0 .45em;border:1px solid #48a;border-radius:4px;background:#123;color:#eff;font:600 max(11.5px,.85em) ui-monospace,monospace;letter-spacing:0}
+#obj{left:12px;top:12px;width:min(29vw,27em);border-left:3px solid #8df}#obj h4{margin:0;font-size:1.12em;color:#fff;word-break:keep-all}#obj div{margin-top:.3em;font-size:.88em}
 #st,#warn,#warn s,#help{left:50%;transform:translateX(-50%);white-space:nowrap}#st{left:49%;bottom:12px;display:flex;gap:.5em}.rw{display:flex;gap:.6em;justify-content:space-between;align-items:baseline}
 .br{height:.4em;margin:.3em 0;border-radius:3px;background:#fff2}.br i{display:block;height:100%;background:currentColor;transition:width .2s linear}
-.w{width:6.6em;padding:.15em .4em 0;border:1px solid #48b4;border-radius:6px;background:#0a1622;font-size:max(11.5px,.88em);text-align:center}.w b{display:block}.w span{color:#9bc}
-.on{border-color:#8df;background:#146}.on span{font-weight:700;color:#fff}.rl{border-color:#fb3}.rl span,.rl i{color:#fb3}.no label,.no span,.no .br{opacity:.8}.rl kbd,.no kbd{opacity:.45}@media(max-width:1100px){.w{width:5.4em}.w kbd{display:none}}
-#tg{right:12px;bottom:12px;min-width:15em}#tg u,#warn s{color:#fb3;font-weight:700}
-#warn{left:max(50%,29vw + 14em + 60px);top:12px;padding:.1em 1.2em;border:2px solid #f54;border-radius:2em;background:#500e;font-size:clamp(13px,2vh,20px);animation:pu .6s infinite alternate}#warn:empty{display:none}#warn u{color:#fff;font:800 1.4em ui-monospace,monospace}@keyframes pu{to{box-shadow:0 0 20px 3px #f54}}
-#warn s{position:absolute;top:100%;margin-top:7px;padding:0 1em;border:1px solid;border-radius:2em;background:#012e;font-size:.8em}
-#help{top:24%}.kg{display:grid;grid-template-columns:auto auto;gap:.45em 2.2em}.kg i{display:inline-block;min-width:4.6em;margin-right:.5em}.kg h3{padding-bottom:.2em;border-bottom:1px solid #48b7;font-size:max(12px,.85em);color:#def}
+.w{width:6.8em;padding:.15em .4em 0;border:1px solid #48b4;border-radius:6px;background:#0a1622;font-size:max(12.5px,.95em);text-align:center}.w b{display:block}.w span{color:#bdf}
+.on{border-color:#8df;background:#146}.on span{font-weight:700;color:#fff}.rl{border-color:#8dfa}.no .br,.rl kbd,.no kbd{opacity:.45}@media(max-width:1100px){.w{width:5.6em}.w kbd,.w:last-child{display:none}#st{left:47%}}
+#tg{right:12px;bottom:12px;min-width:15em}#warn s{color:#fff;font-weight:700}
+#warn{left:max(50%,29vw + 14em + 60px);top:12px;padding:.1em 1.2em;border:2px solid #f54;border-radius:2em;background:#500e;font-size:clamp(13px,2vh,20px);animation:pu .6s infinite alternate}#warn:empty{display:none}#warn b:nth-child(3){font:800 1.4em ui-monospace,monospace}@keyframes pu{to{box-shadow:0 0 20px 3px #f54}}
+#warn s{position:absolute;top:100%;margin-top:7px;padding:0 1em;border:1px solid;border-radius:2em;background:#012e;font-size:max(12.5px,.85em)}
+#help{top:24%}.kg{display:grid;grid-template-columns:auto auto;gap:.45em 2.2em}.kg i{display:inline-block;min-width:4.6em;margin-right:.5em}.kg h3{padding-bottom:.2em;border-bottom:1px solid #48b7;color:#def}
 #ov{display:grid;place-items:center;text-align:center;background:radial-gradient(#0123 30%,#001c);pointer-events:auto;font-size:clamp(14px,1.45vw,21px)}#ov.t{place-items:center start;padding-left:7vw;text-align:left;background:radial-gradient(85% 130% at 0 55%,#001e 35%,#0000)}
 #ov h1{margin:0;font:900 3.9em/1.04 system-ui;letter-spacing:.06em;color:#fff;text-shadow:0 4px 18px #000c}#ov h1 b{color:#6cf}
 #ov h2{margin:.5em 0 .9em;font-size:1em;font-weight:400;letter-spacing:.14em;color:#9ce}#ov p{margin:0 0 1.5em;max-width:32em;color:#fff;word-break:keep-all}
 #ov button{margin-right:.6em;padding:.5em 2.7em .5em 3em;border:0;border-radius:8px;background:#5cf;box-shadow:0 0 30px #4bf9;color:#012;font:900 1.5em system-ui;letter-spacing:.3em;cursor:pointer}#ov button:hover{background:#aef}
-#ov .pn{position:static;display:table;margin-top:1.8em;font-size:max(12.5px,.8em)}#ov small{position:absolute;left:7vw;bottom:14px;opacity:.7}`);
+#ov .pn{position:static;display:table;margin-top:1.8em;font-size:max(12.5px,.8em)}#ov small{position:absolute;left:7vw;bottom:14px}`);
       X = G.el('canvas', { id: 'hud' }).getContext('2d'); ui.hit = G.el('div', { id: 'hit' });
       ui.box = G.el('div'); for (const k of ['obj', 'st', 'tg', 'warn', 'help']) ui[k] = G.el('div', { id: k, className: 'pn' }, ui.box);
       ui.st.innerHTML = '<div style="min-width:10em"></div>' + ['대공 SAM', '대함 SSM', '함포', 'CIWS'].map((n, i) => `<div class="w"><label>${n}</label><b>자동</b><span>1.5km 방어</span>${i > 2 ? '' : '<div class="br"><i></i></div>'}</div>`).join('');
       const KEYS = '<div class="kg"><h3>기동</h3><h3>교전</h3>' + 'W S|추력|Tab|다음 표적|A D|조타|Q|최우선 위협 선택|드래그|시점|Space|미사일 — 공중 SAM · 수상 SSM|휠|줌|F|함포 — 수상·지상 표적|P|일시정지|H|도움말|'
-        .replace(/(.+?)\|(.+?)\|/g, (m, k, t) => `<span><i>${k.replace(/\S+/g, '<kbd>$&</kbd>')}</i>${t}</span>`) + '</div>';
+        .replace(/(.+?)\|(.+?)\|/g, (m, k, t) => `<span><i>${k.replace(/\w+/g, '<kbd>$&</kbd>')}</i>${t}</span>`) + '</div>';
       ui.help.hidden = 1; ui.help.innerHTML = KEYS + '<br>' + 'M 음소거 F2 그래픽'.replace(/\w+/g, '<kbd>$&</kbd>');
       ui.ov = G.el('div', { id: 'ov', className: 't' });
       ui.ov.innerHTML = `<div><h1>SECOND<br><b>KOREAN WARS</b></h1><h2>해상 반격 — ${G.SCENARIO.title}</h2><p>날아오는 대함미사일을 요격하고 적 함대와 해안포대를 격파하라.</p><button>출 격</button><kbd>Enter</kbd><div class="pn">${KEYS}</div><small></small></div>`; ui.q = ui.ov.lastChild.lastChild;

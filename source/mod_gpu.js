@@ -96,7 +96,7 @@
       G.css(`#perf{position:absolute;right:12px;top:12px;max-width:300px;text-align:right;font:11px/1.6 ui-monospace,monospace;color:#9cd;pointer-events:auto}
 #perf>*{display:inline-block;padding:2px 11px;background:#012b;border:1px solid #3577;border-radius:12px}#perf .d{display:none;margin-top:5px;padding:8px 10px;border-radius:8px;text-align:left;overflow-wrap:anywhere}#perf:hover .d,#perf.op .d{display:block}
 #perf>div:first-child{white-space:nowrap}#perf i{display:inline-block;max-width:13em;margin-right:.7em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom;font-style:normal;opacity:.75}@media(max-width:1100px){#perf i{display:none}}
-#perf b{color:#fff}#perf .t0{color:#fb5}#perf .t1{color:#8df}#perf .t2{color:#8f9}
+#perf b{color:#fff}#perf .t0{color:#dde}#perf .t1{color:#8df}#perf .t2{color:#8f9}
 #perf button{font:inherit;margin:5px 4px 0 0;padding:1px 8px;color:#9cd;background:#123;border:1px solid #357;border-radius:4px;cursor:pointer}#perf button.on{color:#012;background:#8df;border-color:#8df}`);
       el = G.el('div', { id: 'perf' });
       const g = G.gpuInfo;
@@ -124,7 +124,7 @@
       if (low > 4) { low = 0; G.dyn = 1; G.gpuInfo.tier = TIERS[G.Q.level - 1]; G.gpuInfo.auto = '↓'; G.setQuality(G.gpuInfo.tier, false); }
       if ((acc += dt) < .25) return; acc = 0;
       const Q = G.Q, T = G.targets, f = G.fps;
-      el.firstChild.innerHTML = `<i>${G.gpuInfo.name}</i><b class="t${Q.level}">${Q.name}</b> · ${f.toFixed(0)} FPS`; // GPU 이름 · 등급 · 실시간 FPS (좁은 화면에서는 이름 숨김)
+      el.firstChild.innerHTML = `<i>${G.gpuInfo.name}</i><b class="t${Q.level}">${Q.name}</b> · ${f.toFixed(0)} FPS`;
       el.lastChild.children[2].textContent = `${G.qManual ? '수동' : '자동' + (G.gpuInfo.auto || '')} · ${T.w}×${T.h}${G.dyn < .99 ? ' (' + (G.dyn * 100 | 0) + '%)' : ''}${Q.msaa > 1 ? ' · MSAA' + Q.msaa : ''}${G.gpuMs ? ' · GPU ' + G.gpuMs.toFixed(1) + 'ms' : ''}`;
     }
   });

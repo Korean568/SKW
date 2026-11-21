@@ -46,8 +46,8 @@ CIWS(근접 방어)는 자동으로 작동합니다.
 ```
 cd source
 npm install
-npm run build        # index.html (자기해제 압축, 약 66KB)
-npm run build:raw    # 압축 없이 minify 만 (약 114KB, 코드가 그대로 보임)
+npm run build        # index.html (자기해제 압축, 약 68KB)
+npm run build:raw    # 압축 없이 minify 만 (약 116KB, 코드가 그대로 보임)
 ```
 
 ### 개발용 검증 도구 (선택)
