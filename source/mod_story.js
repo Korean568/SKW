@@ -44,7 +44,7 @@
   function walk(P,pts,sp,done){P.wp=pts;P.sp=sp;P.done=done;P.pose=sp>2?'run':'walk';P.vis=true;}
 
   /* ── 뉴스 화면 (512×288 캔버스 → 좌석 모니터) ── */
-  const cv=document.createElement('canvas');cv.width=512;cv.height=288;const x=cv.getContext('2d');
+  const cv=document.createElement('canvas');cv.width=512;cv.height=288;const x=cv.getContext('2d',{willReadFrequently:true});// CPU 캔버스: 좌석 화면 업로드가 어느 경로든 안정적
   const F=(c,a,b,w,h)=>{x.fillStyle=c;x.fillRect(a,b,w,h)};
   function news(){
     const t=S.t,g=x.createLinearGradient(0,0,512,288);

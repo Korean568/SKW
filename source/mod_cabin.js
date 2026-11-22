@@ -329,7 +329,9 @@ return vec4f(select(vec3f(1.,.93,.82)*u.s.y*.5,skyBase(vec3f(R.x,abs(R.y),R.z)),
    { arrayStride: 40,attributes: [[0,0,'x3'],[1,12,'x3'],[2,24,'x3'],[3,36,'']].map(([l,o,f])=>({ shaderLocation: l,offset: o,format: 'float32'+f })) },
    { arrayStride: 80,stepMode: 'instance',attributes: [4,5,6,7,8].map((l,i)=>({ shaderLocation: l,offset: i*16,format: 'float32x4' })) }] },
   fragment: { module: mod,entryPoint: fs,targets },primitive: { cullMode: 'none' },...o });
- C.screen=cv=>{ scv=cv; try { tex&&G.dev.queue.copyExternalImageToTexture({ source: cv },{ texture: tex },[512,288]); } catch (e) { G.err('cabin.screen '+e); } };
+ C.screen=cv=>{ scv=cv; if (!tex) return; // 좌석 화면 업로드: 캔버스 복사가 막힌 환경이면 픽셀을 읽어 writeTexture 로 (한 번 실패하면 계속 그 길로)
+ if (!C.sfb) try { G.dev.queue.copyExternalImageToTexture({ source: cv },{ texture: tex },[512,288]); return; } catch (e) { C.sfb=1; }
+ try { G.dev.queue.writeTexture({ texture: tex },cv.getContext('2d').getImageData(0,0,512,288).data,{ bytesPerRow: 2048 },[512,288]); } catch (e) { G.err('cabin.screen '+e); } };
  const run=(p,pl,t)=>{ // t: 0 불투명 · 1 그림자 · 2 유리
   if (!vb) return;
   p.setPipeline(pl); p.setBindGroup(1,bg); p.setVertexBuffer(0,vb); p.setVertexBuffer(1,ib); p.setIndexBuffer(xb,'uint32');
