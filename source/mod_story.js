@@ -337,6 +337,7 @@
     init(){
       G.css(`#ov,#dl,#cap,#ttl,#vl,#bk,#sk,#end{position:absolute}
 #ov{inset:0;display:grid;align-content:center;justify-items:start;padding:0 7vw;background:linear-gradient(90deg,#000d,#0007 45%,#0000 78%);pointer-events:auto;color:#dfe8f2}
+#ov .tb{margin:0 0 1.1em;padding:.25em .9em .3em;font:600 max(11px,.95vw) system-ui;letter-spacing:.28em;color:#dfe8f2;text-decoration:none;border:1px solid #fff5;border-radius:999px;background:#0006}#ov .tb b{color:#e03b3b}#ov .tb:hover{color:#fff;border-color:#e03b3b}
 #ov h1{margin:0;font:800 6.2vw/.95 system-ui;letter-spacing:.05em;color:#fff}#ov h1 i{display:block;font-style:normal;color:#e03b3b}
 #ov p{margin:.35em 0;font-size:1.6vw}#ov .k{font-size:max(11px,1.05vw);color:#9fb1c4;line-height:1.7;margin-top:1.4em}#ov .k b{color:#dfe8f2;font-weight:600}
 #ov button,#end button{margin:1.1em 0 .2em;padding:.5em 2.4em;font:700 1.9vw system-ui;letter-spacing:.3em;color:#fff;background:#b42222;border:0;border-radius:6px;cursor:pointer;box-shadow:0 6px 30px #b4222266;pointer-events:auto}
@@ -350,7 +351,7 @@
 #end h2{margin:0 0 .4em;font:800 5vw system-ui;letter-spacing:.08em}#end h2.r{color:#e03b3b}#end .c{font-style:italic;color:#aab8c6}`);
       const nh=G.params.has('nohud');
       ui.vl=G.el('div',{id:'vl'});ui.bk=G.el('div',{id:'bk'});
-      ui.ov=G.el('div',{id:'ov',innerHTML:`<h1>SECOND<i>KOREAN WARS</i></h1><p>스토리 1 — 서강시 : 전쟁의 시작 · 대한민국편</p><p>플레이어: 김민철 하사</p><button>시 작</button><div class=k><b>컷신</b> 마우스: 둘러보기 · Tab 누르기: 빨리 감기<br><b>전투</b> WASD 이동 · 마우스 조준 · 왼쪽 클릭 사격 · 오른쪽 클릭 정조준 · R 재장전 · E 줍기 · Shift 달리기 · C 앉기<br><b>F2</b> 그래픽 설정 · Enter 시작</div>`});
+      ui.ov=G.el('div',{id:'ov',innerHTML:`<a class=tb href="https://tribe3dgames.vercel.app/" target=_blank rel=noopener>TRIBE <b>3D</b> GAMES ↗</a><h1>SECOND<i>KOREAN WARS</i></h1><p>스토리 1 — 서강시 : 전쟁의 시작 · 대한민국편</p><p>플레이어: 김민철 하사</p><button>시 작</button><div class=k><b>컷신</b> 마우스: 둘러보기 · Tab 누르기: 빨리 감기<br><b>전투</b> WASD 이동 · 마우스 조준 · 왼쪽 클릭 사격 · 오른쪽 클릭 정조준 · R 재장전 · E 줍기 · Shift 달리기 · C 앉기<br><b>F2</b> 그래픽 설정 · Enter 시작</div>`});
       ui.dl=G.el('div',{id:'dl'});ui.cap=G.el('div',{id:'cap'});ui.ttl=G.el('div',{id:'ttl'});
       ui.sk=G.el('div',{id:'sk',textContent:'건너뛰기 ▸'});ui.end=G.el('div',{id:'end'});
       if(nh) for(const k of ['dl','cap','ttl','sk']) ui[k].style.visibility='hidden';
