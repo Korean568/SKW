@@ -1,0 +1,444 @@
+'use strict';
+/* FPS — 추락한 여객기 안팎의 1인칭 총격전: 플레이어 이동·사격 · 북한군 지휘(50명) · 아군 4명 · 전투 HUD */
+{
+  const C = G.cabin, PP = G.people, R = Math.random, { sin, cos, atan2, hypot, min, max, abs, PI } = Math, cl = G.clamp;
+  // 추락 시 뒤쪽 동체의 상대 변환 (mod_cabin 과 같은 상수) — 뒤 동체 바닥 높이 계산용
+  const TZ = -6.45, TR = M4.mul(M4.trs([-.5, .85, TZ - 1.3], .1, .03, -.16), M4.trs([0, -1, -TZ])), TRI = M4.invert(TR);
+  const WEP = {
+    pistol: { n: 'K5 권총', mag: 12, rate: .17, auto: 0, dmg: 36, sp: .01, kick: .03, rl: 1.4, max: 72, snd: 'pistol' },
+    ak: { n: 'AK 소총', mag: 30, rate: .1, auto: 1, dmg: 44, sp: .016, kick: .022, rl: 2.2, max: 240, snd: 'rifle' }
+  };
+  const D = { ht: 0, mh: 100, pk: 0, sh: 0 }; // 검증용 통계
+  const S = { hp: 100, ammo: 0, mag: 0, kills: 0, total: 50, alive: 0 };
+  // core 는 G.fps 를 프레임률 숫자로도 쓴다(G.fps += …, G.fps.toFixed) → 접근자로 두 역할을 함께 제공
+  const F = { on: false, bot: G.params.has('bot'), S, start, stop, rate: +G.fps || 60, D, valueOf() { return this.rate; }, toFixed(n) { return this.rate.toFixed(n); } };
+  Object.defineProperty(G, 'fps', { get: () => F, set: v => { if (typeof v === 'number' && v === v) F.rate = v; }, configurable: true });
+  const pl = { p: [0, 0, 0], yaw: 0, pit: 0, vy: 0, cr: 0, bob: 0, bobA: 0, ins: 1, w: 'pistol', inv: {}, cd: 0, rl: 0, spr: 0, kick: 0, ads: 0, hurt: 9, ex: 0, sw: [0, 0], dead: 0, end: 0, mv: 0 };
+  F.pl = pl; F.E = () => E; // 테스트 훅: 플레이어 상태 · 적 목록
+  const inp = { f: 0, s: 0, run: 0, cr: 0, fire: 0, ads: 0, rl: 0, use: 0 }, mouse = { l: 0, r: 0, dx: 0, dy: 0 };
+  let E = [], A = [], posts = [], routes = {}, occ = {}, dir = { t: 0, n: 0 }, o0 = {}, ui = {}, hud = { t: 0, hm: 0, dd: 0, dA: 0 }, T = 0;
+  const v3 = (a, b, s = 1) => [a[0] + b[0] * s, a[1] + b[1] * s, a[2] + b[2] * s], nrm = a => { const l = hypot(...a) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
+  const fwd = (y, p) => [sin(y) * cos(p), sin(p), cos(y) * cos(p)];
+  const wp = P => P.M ? C.w(P.p) : P.p; // 인물 발 위치 (월드)
+
+  /* ── 지형: 바닥 높이 · 충돌 · 광선 ── */
+  const plane = (M, x, z) => { const o = M4.point(M, [0, 0, 0]); return o[1] - (M[4] * (x - o[0]) + M[6] * (z - o[2])) / M[5]; };
+  function floorAt(x, z, y) { // 월드 xz 의 바닥 높이 → [y, 구역: 0 바깥 · 1 앞 객실 · 2 뒤 객실]
+    const l = C.l([x, y, z]);
+    if (abs(l[0]) < 1.64 && l[2] > TZ - 1.3 && l[2] < 14.98) return [plane(C.M, x, z), 1];
+    const q = M4.point(TRI, l);
+    if (abs(q[0]) < 1.64 && q[2] > -14.98 && q[2] <= TZ) return [plane(M4.mul(C.M, TR), x, z), 2];
+    return [C.ground(x, z), 0];
+  }
+  const BOX = () => C.K.cover.slice(8); // 엔진·날개 잔해 (흙더미는 지형이라 넘어감)
+  function move(p, dx, dz, r) { // 수평 이동 + 충돌 → p 갱신
+    let x = p[0] + dx, z = p[2] + dz;
+    const l = C.l([x, p[1], z]);
+    if (abs(l[0]) < 2.6 && l[2] > -23 && l[2] < 21) {
+      const c = C.collide([l[0], 0, l[2]], r), q = M4.point(TRI, c);
+      if (abs(c[0]) < 2.06 && c[2] > 15.2) c[0] = c[0] < 0 ? -2.07 : 2.07; // 막힌 기수
+      if (abs(q[0]) < 2.06 && q[2] < -15.2) { q[0] = q[0] < 0 ? -2.07 : 2.07; const b = M4.point(TR, q); c[0] = b[0]; c[2] = b[2]; } // 막힌 꼬리
+      const w = C.w([c[0], l[1], c[2]]); x = w[0]; z = w[2];
+    }
+    for (const b of BOX()) { // 잔해 상자 밀어내기
+      const cx = cl(x, b[0] - b[3], b[0] + b[3]), cz = cl(z, b[2] - b[5], b[2] + b[5]), d = hypot(x - cx, z - cz);
+      if (d < r && d > 1e-5) { x = cx + (x - cx) / d * r; z = cz + (z - cz) / d * r; }
+      else if (d <= 1e-5) x = b[0] + (x > b[0] ? 1 : -1) * (b[3] + r);
+    }
+    const e = C.w([-5.9, -1.6, 3]), d = hypot(x - e[0], z - e[2]); // 남은 오른쪽 엔진
+    if (d < 1.6 + r) { x = e[0] + (x - e[0]) / d * (1.6 + r); z = e[2] + (z - e[2]) / d * (1.6 + r); }
+    p[0] = x; p[2] = z;
+  }
+  function cabRay(o, d, mx) { const l = C.l(o), e = C.l(v3(o, d)); return C.ray(l, [e[0] - l[0], e[1] - l[1], e[2] - l[2]], mx); }
+  function boxRay(o, d, t) {
+    for (const b of BOX()) {
+      let s0 = 0, s1 = t;
+      for (let i = 0; i < 3 && s0 <= s1; i++) { const v = 1 / (d[i] || 1e-9), e = (b[i] - b[i + 3] - o[i]) * v, f = (b[i] + b[i + 3] - o[i]) * v; s0 = max(s0, min(e, f)); s1 = min(s1, max(e, f)); }
+      if (s0 <= s1 && s0 > 0) t = s0;
+    }
+    return t;
+  }
+  function gndRay(o, d, t) { // 지면 행진 (기내 바닥 아래는 객실 광선이 먼저 막음)
+    if (d[1] > .02) return t;
+    for (let s = .4, k = 0; s < t && k < 90; s += .5 + s * .04, k++) {
+      const x = o[0] + d[0] * s, z = o[2] + d[2] * s;
+      if (o[1] + d[1] * s < C.ground(x, z)) return s;
+    }
+    return t;
+  }
+  const solid = (o, d, mx) => gndRay(o, d, boxRay(o, d, cabRay(o, d, mx)));
+  function los(a, b) { const d = V3.sub(b, a), L = hypot(...d); return solid(a, nrm(d), L) >= L - .1; }
+
+  /* ── 경로: 평면 좌표 [x, z, 멈춤(1 웅크림 · 2 서서)] ── */
+  const RT = {
+    hole: [[5.4, 2.7, 1], [3.2, 2.9], [1.15, 2.9, 1]],
+    fl: [[3.8, 16], [3.4, 14.45], [.9, 14.45], [.05, 14.2], [.05, 11.2, 2], [0, 7.6, 1]],
+    fr: [[-3.8, 16], [-3.4, 14.45], [-.9, 14.45], [-.05, 14.2], [-.05, 11.2, 2], [0, 7.6, 1]],
+    bl: [[4.6, -7.4], [2.6, -7.2], [0, -7.1], [0, -5.4, 2], [0, -3, 1]],
+    br: [[-4.6, -7.4], [-2.8, -7.2], [0, -7.1], [0, -5.4, 2], [0, -3, 1]]
+  };
+  function route(sp) {
+    const l = C.l(sp), k = l[0] > 0 ? (l[2] > 12 ? 'fl' : l[2] < -5 ? 'bl' : R() < .55 ? 'hole' : R() < .5 ? 'fl' : 'bl') : (l[2] > -2 && R() < .7 ? 'fr' : 'br');
+    const pts = RT[k].map(a => { const w = C.w([a[0], 0, a[1]]); return { p: [w[0], 0, w[2]], st: a[2] || 0, key: k + a[1], ins: abs(a[0]) < 1.7 }; });
+    if (R() < .65) { // 가는 길의 흙더미 뒤에 먼저 숨는다
+      let best = null, bd = 9;
+      for (const b of C.K.cover.slice(0, 8)) {
+        const d = hypot(b[0] - sp[0], b[2] - sp[2]) + hypot(b[0] - pts[0].p[0], b[2] - pts[0].p[2]) - hypot(sp[0] - pts[0].p[0], sp[2] - pts[0].p[2]);
+        if (d < bd) { bd = d; best = b; }
+      }
+      if (best) { const n = nrm([best[0], 0, best[2]]); pts.unshift({ p: [best[0] + n[0] * 1.9, 0, best[2] + n[2] * 1.9], st: 1, key: 'm' + best[0], out: 1 }); }
+    }
+    return pts;
+  }
+
+  /* ── 시작 · 종료 ── */
+  function start(o = {}) {
+    stop(); o0 = o; T = 0;
+    Object.assign(D, { ht: 0, mh: 100, pk: 0, sh: 0 }); Object.assign(S, { hp: 100, kills: 0, total: o.total || 50, alive: 0 });
+    const s = o.pos || C.w([0, 0, 2]);
+    Object.assign(pl, { p: [s[0], s[1], s[2]], yaw: o.yaw ?? -PI / 2, pit: -.04, vy: 0, cr: 0, w: 'pistol', inv: { pistol: [12, 48] }, cd: 0, rl: 0, spr: 0, kick: 0, ads: 0, hurt: 9, ex: 0, dead: 0, end: 0 });
+    pl.p[1] = floorAt(pl.p[0], pl.p[2], pl.p[1] + 1)[0];
+    dir = { t: 0, n: 0 }; occ = {}; E = [];
+    // 아군 배치: 앞쪽 2명(웅크림·서서), 뒤쪽 2명 — 통로를 막지 않도록 플레이어가 밀면 비켜 줌
+    posts = [[0, 4.9, 1, 0], [0, 3.55, 0, 0], [0, -.85, 1, PI], [0, .5, 0, PI]];
+    A = (o.allies || []).slice(0, 4).map((P, i) => {
+      if (!P.M) { P.p = C.l(P.p); P.M = C.M; }
+      if (P.p[1] > .25) P.p[1] = 0;
+      P.gun = P.gun || 'rifle'; P.pose = 'stand'; P.dead = false; P.vis = true;
+      return { P, post: posts[i % 4], t: R(), tg: null, bt: 0, bn: 0, cd: 1 + R() };
+    });
+    F.on = true; ui.fh.style.display = G.params.has('nohud') ? 'none' : 'block'; ui.fe.style.opacity = 0;
+    PP.fp.on = 1; PP.fp.gun = 'pistol';
+    G.sfx.music('combat'); G.sfx.loop('wind', 1, { gain: .2 });
+  }
+  function stop() {
+    if (!F.on) return;
+    F.on = false; PP.fp.on = 0; for (const e of E) PP.remove(e.P); E = []; A = [];
+    ui.fh && (ui.fh.style.display = 'none'); G.sfx.loop('wind', 0);
+    try { document.exitPointerLock && document.pointerLockElement && document.exitPointerLock(); } catch (e) { }
+  }
+  function finish(win) {
+    if (pl.end) return; pl.end = T + (win ? 3 : 3.2);
+    ui.fe.innerHTML = win ? '<b>북한군 제압 완료</b><small>추락 현장을 지켜냈다</small>' : '<b>김민철 하사 전사</b><small>북한군에게 쓰러졌다</small>';
+    ui.fe.className = win ? 'w' : ''; ui.fe.style.opacity = 1; pl.win = win;
+  }
+
+  /* ── 적 지휘: 살아 있는 적 6~9명 유지, 보이지 않는 곳에서 등장 ── */
+  function spawn() {
+    const eye = v3(pl.p, [0, 1.6, 0]), K = C.K.spawn;
+    let sp = null;
+    for (let k = 0; k < 12 && !sp; k++) { const c = K[(R() * K.length) | 0]; if (k > 9 || !los(eye, v3(c, [0, 1.5, 0]))) sp = c; }
+    const P = PP.add('nk', { p: [sp[0] + R() * 2 - 1, sp[1], sp[2] + R() * 2 - 1], pose: 'run', gun: 'ak', seed: 100 + dir.n * 7 });
+    P.p[1] = C.ground(P.p[0], P.p[2]);
+    E.push({ P, path: route(P.p), wi: 0, st: 'go', t: 0, tg: null, re: 0, bn: 0, bt: 0, nb: 0, hp: 100, stuck: 0, slot: [0, 0], key: '' });
+    dir.n++;
+  }
+  function director(dt) {
+    dir.t -= dt; S.alive = E.filter(e => !e.P.dead).length;
+    const want = min(9, 6 + (S.kills / 12 | 0));
+    if (dir.n < S.total && S.alive < want && dir.t <= 0) { spawn(); dir.t = dir.n < 6 ? .35 : 1 + R(); }
+  }
+  const chest = P => { const e = PP.eye(P); return [e[0], e[1] - .3, e[2]]; };
+  function slotPos(e, w) { // 같은 자리의 여러 명은 플레이어 반대쪽으로 줄을 선다
+    const n = occ[w.key] = (occ[w.key] || 0) + 1; e.key = w.key;
+    if (n < 2) return w.p.slice();
+    const l = C.l(w.p), k = n - 1;
+    if (w.ins) { if (abs(l[0]) < .3) l[2] += (l[2] > C.l(pl.p)[2] ? 1 : -1) * k * 1.05; else l[2] += (k % 2 ? .7 : -.7) * ((k + 1) >> 1); }
+    else l[0] += (k % 2 ? 1.3 : -1.3) * ((k + 1) >> 1) * (l[0] < 0 ? -1 : 1) * .7, l[2] += (k % 2 ? 1.2 : -1.2) * ((k + 1) >> 1);
+    const p = C.w(l); return [p[0], 0, p[2]];
+  }
+  function enemy(e, dt) {
+    const P = e.P; if (P.dead) return;
+    e.t += dt;
+    const w = e.path[e.wi], fz = floorAt(P.p[0], P.p[2], P.p[1] + .8);
+    P.p[1] += (fz[0] - P.p[1]) * min(1, dt * (fz[0] > P.p[1] ? 7 : 12));
+    if (e.st === 'go') {
+      const tgt = e.goal || (e.goal = w.st ? slotPos(e, w) : w.p), d = [tgt[0] - P.p[0], 0, tgt[2] - P.p[2]], L = hypot(d[0], d[2]);
+      const sp = fz[1] ? 1.7 : 3.3;
+      P.pose = fz[1] ? 'walk' : 'run'; P.aim = null;
+      if (L < .15 || e.t > 14) { // 도착 (또는 막힘 → 다음 지점)
+        e.goal = null; e.t = 0;
+        if (w.st && L < .5) { e.st = 'hold'; e.ht = 4 + R() * 5 + (e.wi === e.path.length - 1 ? 1e9 : 0); e.cpose = w.st === 1 ? 'crouch' : 'aim'; e.bn = 0; }
+        else e.wi = min(e.wi + 1, e.path.length - 1);
+      } else {
+        const ox = P.p[0], oz = P.p[2], s = min(L, sp * dt);
+        if (fz[1]) move(P.p, d[0] / L * s, d[2] / L * s, .2); else { P.p[0] += d[0] / L * s; P.p[2] += d[2] / L * s; }
+        P.yaw = atan2(P.p[0] - ox, P.p[2] - oz) || P.yaw;
+        P.look = v3(P.p, [sin(P.yaw) * 5, 1.6, cos(P.yaw) * 5]);
+      }
+      return;
+    }
+    // hold: 표적 탐색 → 반응 지연 → 점사 → 일정 시간 뒤 자리 이동
+    e.ht -= dt; e.bt -= dt;
+    const eye = PP.eye(P);
+    if ((e.scan = (e.scan || 0) - dt) <= 0) {
+      e.scan = .3 + R() * .2;
+      const pe = v3(pl.p, [0, 1.55 - .55 * pl.cr, 0]), opts = [];
+      if (!pl.dead && los(eye, pe)) opts.push({ pl: 1, p: pe });
+      for (const a of A) { const c = chest(a.P); if (hypot(...V3.sub(c, eye)) < 40 && los(eye, c)) opts.push({ a, p: c }); }
+      const pick = opts.length ? (opts[0].pl && R() < .65 ? opts[0] : opts[(R() * opts.length) | 0]) : null;
+      if (pick && (!e.tg || !!e.tg.pl !== !!pick.pl || e.tg.a !== pick.a)) e.re = .5 + R() * .6; // 반응 지연 0.5~1.1초
+      e.tg = pick;
+    }
+    const tg = e.tg;
+    if (tg) {
+      if (tg.pl) tg.p = v3(pl.p, [0, 1.5 - .55 * pl.cr, 0]);
+      P.aim = tg.p; P.look = tg.p; P.yaw += cl(atan2(tg.p[0] - P.p[0], tg.p[2] - P.p[2]) - P.yaw + (abs(atan2(tg.p[0] - P.p[0], tg.p[2] - P.p[2]) - P.yaw) > PI ? (P.yaw > 0 ? 2 * PI : -2 * PI) : 0), -4 * dt, 4 * dt);
+      e.re -= dt;
+      if (e.re <= 0 && e.bt <= 0) {
+        if (e.nb <= 0) { e.nb = 3 + (R() * 4 | 0); }
+        shotE(e, tg); e.nb--; e.bt = e.nb > 0 ? .1 : (e.bn++, .7 + R() * 1.3);
+      }
+    } else { P.aim = null; }
+    P.pose = tg && e.bt > 0 && e.nb > 0 ? 'fire' : e.cpose;
+    if (e.ht <= 0 || (e.bn >= 3 && e.wi < e.path.length - 1)) { occ[e.key]--; e.st = 'go'; e.t = 0; e.wi = min(e.wi + 1, e.path.length - 1); e.bn = 0; }
+  }
+  function shotE(e, tg) { // 적 사격: 명중은 확률(노출 시간이 길수록 정확), 예광탄은 항상 보인다
+    const m = PP.muzzle(e.P), o = [m[0], m[1], m[2]], d = hypot(...V3.sub(tg.p, o));
+    let hit = 0;
+    if (tg.pl) {
+      const acc = cl(.035 + pl.ex * .045, .035, .26) * (pl.cr > .5 ? .6 : 1) * (pl.mv > 3 ? .65 : 1) * (d < 7 ? 1.3 : d > 22 ? .55 : 1);
+      hit = R() < acc;
+      if (hit && !G.params.has('god') && !pl.dead) { S.hp -= 6 + R() * 6; D.ht++; D.mh = min(D.mh, S.hp); pl.hurt = 0; hud.dd = 1; hud.dA = atan2(o[0] - pl.p[0], o[2] - pl.p[2]); G.sfx.play('hit', { gain: .6 }); }
+    } else if (R() < .12) { tg.a.P.pose = 'hit'; hit = 1; }
+    const miss = hit ? .05 : .35 + d * .03, tp = [tg.p[0] + (R() - .5) * miss * 2, tg.p[1] + (R() - .6) * miss, tg.p[2] + (R() - .5) * miss * 2];
+    const dd = nrm(V3.sub(tp, o));
+    G.fx.tracer(o, dd, 320, 0); G.fx.burst('muzzle', o, { size: .025, dir: dd });
+    G.addLight(o, [1, .7, .35], 2.5, 4, .05); G.sfx.play('rifle', { pos: o, gain: .7 });
+    if (!hit) { const t = solid(o, dd, 60); if (t < 60) G.fx.burst('hit', v3(o, dd, t), { size: .12 }); }
+  }
+  function kill(e, head) {
+    const P = e.P; P.pose = 'dead'; P.dead = true; P.aim = null; e.ammo = 20 + (R() * 30 | 0); e.td = T;
+    occ[e.key] && e.st === 'hold' && occ[e.key]--; S.kills++;
+    const dead = E.filter(x => x.P.dead), cap = G.Q.level ? 22 : 9; // 시신 수 제한 (LOW 는 적게)
+    if (dead.length > cap) { const o = dead[0]; PP.remove(o.P); E.splice(E.indexOf(o), 1); }
+    if (S.kills >= S.total) finish(true);
+  }
+  function damage(e, dmg, part) {
+    if (e.P.dead) return;
+    e.hp -= part === 'head' ? 999 : part === 'limb' ? dmg * .6 : dmg;
+    if (e.hp <= 0) kill(e, part === 'head'); else { e.P.pose = 'hit'; e.re = max(e.re, .3); }
+  }
+
+  /* ── 아군: 엄폐 자리에서 보이는 적을 쏜다 (죽지 않음) ── */
+  function ally(a, dt) {
+    const P = a.P, q = a.post, lp = C.l(pl.p);
+    // 플레이어가 가까이 오면 옆 좌석 열 사이(다리 공간)로 비켜 선다
+    const yield_ = abs(lp[2] - q[1]) < 1 && abs(lp[0]) < .6, rz = 11.6 - Math.round((11.6 - q[1]) / .8) * .8 + .42, tx = yield_ ? .62 : q[0];
+    const tz = yield_ ? rz : q[1], dx = tx - P.p[0], dz = tz - P.p[2];
+    if (abs(dz) > .3 && abs(P.p[0]) > .15 && !yield_) { P.p[0] += cl(-P.p[0], -2 * dt, 2 * dt); P.pose = 'walk'; return; }
+    if (hypot(dx, dz) > .08) { const L = hypot(dx, dz), s = min(L, (L > 1 ? 2.4 : 1.5) * dt); P.p[0] += dx / L * s; P.p[2] += dz / L * s; if (L > .3) { P.pose = L > 1 ? 'run' : 'walk'; P.yaw = atan2(dx, dz); P.aim = null; return; } }
+    if ((a.t -= dt) <= 0) { // 표적 고르기
+      a.t = .5; const eye = PP.eye(P); let best = null, bd = 45;
+      for (const e of E) { if (e.P.dead || e.P.vis === false) continue; const c = chest(e.P), d = hypot(...V3.sub(c, eye)); if (d < bd && los(eye, c)) { bd = d; best = e; } }
+      if (best !== a.tg) a.cd = max(a.cd, .4); a.tg = best;
+    }
+    const e = a.tg && !a.tg.P.dead ? a.tg : null;
+    if (e) {
+      const c = chest(e.P), l = C.l(c); P.aim = c; P.look = c; P.yaw = atan2(l[0] - P.p[0], l[2] - P.p[2]);
+      a.cd -= dt;
+      if (a.cd <= 0) { // 3발 점사
+        const m = PP.muzzle(P), o = [m[0], m[1], m[2]], h = R() < .1, tp = h ? c : v3(c, [(R() - .5) * 1.2, (R() - .4) * .8, (R() - .5) * 1.2]), d = nrm(V3.sub(tp, o));
+        G.fx.tracer(o, d, 340, 0); G.fx.burst('muzzle', o, { size: .025, dir: d }); G.addLight(o, [1, .75, .4], 2, 4, .05); G.sfx.play('rifle', { pos: o, gain: .6 });
+        if (h) { damage(e, 40, 'body'); G.fx.burst('hit', c, { size: .1 }); }
+        a.bn = (a.bn || 0) + 1; a.cd = a.bn % 3 ? .12 : .9 + R() * 1.2; P.pose = 'fire';
+      } else if (a.cd > .3) P.pose = q[2] ? 'crouch' : 'aim';
+    } else { P.aim = null; P.look = null; P.pose = q[2] ? 'crouch' : 'stand'; P.yaw += ((q[3] || 0) - P.yaw) * min(1, dt * 3); }
+  }
+
+  /* ── 플레이어 ── */
+  function shootP() {
+    const W = WEP[pl.w], inv = pl.inv[pl.w];
+    if (pl.cd > 0 || pl.rl > 0) return;
+    if (inv[0] <= 0) { G.sfx.play('click'); pl.cd = .3; if (inv[1] > 0) reload(); return; }
+    inv[0]--; pl.cd = W.rate; pl.kick = 1; D.sh++;
+    const eye = G.cam.pos, f = fwd(pl.yaw, pl.pit), sp = spread(), a = R() * 2 * PI, r = sp * Math.sqrt(R());
+    const rt = nrm(V3.cross(f, [0, 1, 0])), up = V3.cross(rt, f), d = nrm(v3(v3(f, rt, cos(a) * r), up, sin(a) * r));
+    pl.spr = min(pl.spr + W.sp * 1.4, .07);
+    pl.pit = min(1.2, pl.pit + W.kick * (pl.ads > .5 ? .6 : 1)); pl.yaw += (R() - .5) * W.kick * .7;
+    const t = solid(eye, d, 150);
+    for (const x of A) x.P.vis = false; // 아군 오사 없음
+    const h = PP.ray(eye, d, t);
+    for (const x of A) x.P.vis = true;
+    const m = PP.muzzle(PP.fp), mo = [m[0], m[1], m[2]];
+    G.fx.burst('muzzle', mo, { size: .02, dir: d }); G.addLight(v3(eye, f, .9), [1, .78, .45], 2.2, 4, .05);
+    G.fx.tracer(mo, nrm(V3.sub(v3(eye, d, h ? h.t : t), mo)), 380, .01); G.sfx.play(W.snd, { gain: 1 });
+    if (h) {
+      const e = E.find(x => x.P === h.P), hp = v3(eye, d, h.t);
+      G.fx.burst('hit', hp, { size: .1 });
+      if (e) { damage(e, W.dmg, h.part); hud.hm = e.P.dead ? 2 : 1; e.P.dead && D.pk++; }
+    } else if (t < 150) { const hp = v3(eye, d, t); G.fx.burst('hit', hp, { size: .14 }); G.fx.burst('smoke', hp, { size: .04 }); }
+  }
+  function spread() { const W = WEP[pl.w]; return (W.sp * (1 + pl.mv * .5 + inp.run * 2 + (pl.vy ? 2 : 0)) * (1 - pl.cr * .3) + pl.spr) * (1 - pl.ads * .7); }
+  function reload() { const W = WEP[pl.w], inv = pl.inv[pl.w]; if (pl.rl > 0 || inv[0] >= W.mag || inv[1] <= 0) return; pl.rl = W.rl; G.sfx.play('reload'); }
+  function pickups(use) { // 쓰러진 적의 AK·탄약 — 밟고 지나가거나 E
+    let near = null, nd = 2.4;
+    for (const e of E) if (e.P.dead && e.ammo > 0 && T - e.td > .6) { const d = hypot(e.P.p[0] - pl.p[0], e.P.p[2] - pl.p[2]); if (d < nd && abs(e.P.p[1] - pl.p[1]) < 1.3) { nd = d; near = e; } }
+    if (near && (use || nd < 1)) {
+      const ak = pl.inv.ak;
+      if (!ak) { pl.inv.ak = [30, near.ammo]; sw('ak'); }
+      else if (ak[1] < WEP.ak.max) ak[1] = min(WEP.ak.max, ak[1] + near.ammo);
+      else return near;
+      near.ammo = 0; near.P.gun = 0; G.sfx.play('click'); hud.pk = 1.2; return null;
+    }
+    return near;
+  }
+  function sw(w) { if (pl.inv[w] && pl.w !== w) { pl.w = w; pl.rl = 0; pl.cd = .45; PP.fp.gun = w; PP.fp.reload = .01; pl.sw0 = .45; } }
+
+  function botThink(dt) { // 테스트용 자동 플레이어
+    const b = pl.bot || (pl.bot = { t: 0, tg: null, idle: 0, sh: 0 }), eye = G.cam.pos;
+    Object.assign(inp, { f: 0, s: 0, run: 0, cr: 0, fire: 0, ads: 0, rl: 0, use: 0 });
+    if ((b.t -= dt) <= 0) {
+      b.t = .25; let best = null, bd = 60;
+      for (const e of E) { if (e.P.dead) continue; const c = chest(e.P), d = hypot(...V3.sub(c, eye)); if (d < bd && los(eye, c)) { bd = d; best = e; } }
+      b.tg = best;
+    }
+    if (pl.inv.ak && (pl.inv.ak[0] + pl.inv.ak[1] > 0) && pl.w !== 'ak') sw('ak');
+    const inv = pl.inv[pl.w];
+    if (b.tg && !b.tg.P.dead) {
+      b.idle = 0; const c = chest(b.tg.P), d = V3.sub(c, eye), ty = atan2(d[0], d[2]), tp = atan2(d[1], hypot(d[0], d[2]));
+      let dy = ty - pl.yaw; dy -= Math.round(dy / (2 * PI)) * 2 * PI;
+      pl.yaw += cl(dy, -5 * dt, 5 * dt); pl.pit += cl(tp - pl.pit, -4 * dt, 4 * dt);
+      inp.ads = 1; inp.cr = hypot(...d) > 8 ? 1 : 0;
+      const err = abs(dy) + abs(tp - pl.pit);
+      if (err < .05 + spread() && inv[0] > 0) { b.sh -= dt; if (WEP[pl.w].auto || b.sh <= 0) { inp.fire = 1; b.sh = .22; } }
+      if (inv[0] === 0) inp.rl = 1;
+    } else {
+      b.idle += dt; if (inv[0] < WEP[pl.w].mag * .5) inp.rl = 1;
+      const lp = C.l(pl.p); let goal = null, pd = 9;
+      if (!pl.inv.ak || pl.inv.ak[1] < 90) for (const e of E) if (e.P.dead && e.ammo > 0 && abs(e.P.p[1] - pl.p[1]) < 1) { const d = hypot(e.P.p[0] - pl.p[0], e.P.p[2] - pl.p[2]); if (d < pd) { pd = d; goal = e.P.p; inp.use = 1; } }
+      else if (b.idle > 2.5) { // 가장 가까운 적 쪽으로 통로를 따라 이동
+        let ne = null, nd = 1e9; for (const e of E) if (!e.P.dead) { const d = hypot(e.P.p[0] - pl.p[0], e.P.p[2] - pl.p[2]); if (d < nd) { nd = d; ne = e; } }
+        if (ne) { const l = C.l(ne.P.p); goal = C.w([abs(lp[0]) > .4 ? 0 : cl(l[0], -.1, .1), 0, cl(l[2], -5, 13)]); if (abs(goal[2] - pl.p[2]) + abs(goal[0] - pl.p[0]) < .5) goal = null; }
+      }
+      if (goal) { const d = [goal[0] - pl.p[0], goal[2] - pl.p[2]]; pl.yaw += cl(atan2(d[0], d[1]) - pl.yaw, -3 * dt, 3 * dt); pl.pit *= .9; inp.f = 1; }
+    }
+  }
+
+  function player(dt) {
+    const W = WEP[pl.w], K = G.keys, lock = document.pointerLockElement === G.canvas;
+    if (F.bot) botThink(dt);
+    else Object.assign(inp, { f: (K.KeyW ? 1 : 0) - (K.KeyS ? 1 : 0), s: (K.KeyD ? 1 : 0) - (K.KeyA ? 1 : 0), run: K.ShiftLeft || K.ShiftRight ? 1 : 0, cr: K.KeyC || K.ControlLeft ? 1 : 0, fire: mouse.l, ads: mouse.r, rl: K.KeyR, use: K.KeyE });
+    if (!F.bot && (K.Digit1 || K.Digit2)) sw(K.Digit1 ? 'pistol' : 'ak');
+    // 시점
+    pl.yaw -= mouse.dx * .0022 * (1 - pl.ads * .4); pl.pit = cl(pl.pit - mouse.dy * .0022 * (1 - pl.ads * .4), -1.35, 1.35); pl.sw = [cl(pl.sw[0] * .85 - mouse.dx * .0015, -.12, .12), cl(pl.sw[1] * .85 + mouse.dy * .0015, -.12, .12)]; mouse.dx = mouse.dy = 0;
+    // 이동
+    pl.cr += ((inp.cr ? 1 : 0) - pl.cr) * min(1, dt * 10);
+    const run = inp.run && inp.f > 0 && !inp.ads, spd = run ? 5.6 : 3.1 * (1 - pl.cr * .5) * (1 - pl.ads * .35), fx = sin(pl.yaw), fz = cos(pl.yaw);
+    const mx = fx * inp.f - fz * inp.s, mz = fz * inp.f + fx * inp.s; // +X 가 왼쪽: 오른쪽(D) = (-cos, sin)
+    const ml = hypot(mx, mz), ox = pl.p[0], oz = pl.p[2];
+    if (ml > 0 && !pl.dead) move(pl.p, mx / ml * spd * dt, mz / ml * spd * dt, .22);
+    for (const a of A) { const w = wp(a.P), d = hypot(pl.p[0] - w[0], pl.p[2] - w[2]); if (d < .35 && d > 1e-4) move(pl.p, (pl.p[0] - w[0]) / d * (.35 - d), (pl.p[2] - w[2]) / d * (.35 - d), .22); } // 아군과 겹치지 않게 (아군이 비켜 줌)
+    pl.mv = hypot(pl.p[0] - ox, pl.p[2] - oz) / dt;
+    const fz2 = floorAt(pl.p[0], pl.p[2], pl.p[1] + .9); pl.ins = fz2[1];
+    if (fz2[0] > pl.p[1]) { pl.p[1] = min(fz2[0], pl.p[1] + max(.05, (fz2[0] - pl.p[1])) * min(1, dt * 9)); pl.vy = 0; } // 문턱·구멍으로 올라서기
+    else { pl.vy -= 9.8 * dt; pl.p[1] = max(fz2[0], pl.p[1] + pl.vy * dt); if (pl.p[1] <= fz2[0]) pl.vy = 0; }
+    pl.bob += pl.mv * dt * (run ? 1.5 : 1.9); pl.bobA += ((pl.mv > .3 ? min(1, pl.mv / 4) : 0) - pl.bobA) * min(1, dt * 8);
+    // 무기
+    pl.cd -= dt; pl.spr = max(0, pl.spr - dt * .09); pl.kick = max(0, pl.kick - dt * 7); pl.sw0 = max(0, (pl.sw0 || 0) - dt);
+    pl.ads += ((inp.ads && !run && pl.rl <= 0 ? 1 : 0) - pl.ads) * min(1, dt * 11);
+    const inv = pl.inv[pl.w];
+    if (pl.rl > 0) { pl.rl -= dt; if (pl.rl <= 0) { const n = min(W.mag - inv[0], inv[1]); inv[0] += n; inv[1] -= n; pl.rl = 0; } }
+    if (inp.rl) reload();
+    if (inp.fire && !run && !pl.dead && (W.auto || !pl.trig)) shootP();
+    pl.trig = inp.fire;
+    const pk = pickups(inp.use && !pl.use0); pl.use0 = inp.use; hud.pkN = pk;
+    if (inv[0] === 0 && inv[1] > 0 && pl.rl <= 0 && pl.cd < -.4) reload();
+    if (pl.w === 'ak' && inv[0] + inv[1] === 0) sw('pistol');
+    // 체력 · 노출
+    pl.hurt += dt; if (pl.hurt > 4 && S.hp > 0) S.hp = min(100, S.hp + 14 * dt);
+    if (S.hp <= 0 && !pl.dead) { pl.dead = T; S.hp = 0; finish(false); }
+    // 카메라
+    const dk = pl.dead ? min(1, (T - pl.dead) / 1.1) : 0, eh = 1.62 - .62 * pl.cr - 1.1 * dk * dk, b = pl.bobA * (1 - pl.ads * .8);
+    const eye = [pl.p[0] + cos(pl.yaw) * sin(pl.bob) * .025 * b, pl.p[1] + eh + abs(cos(pl.bob)) * .045 * b, pl.p[2] - sin(pl.yaw) * sin(pl.bob) * .025 * b];
+    const f = fwd(pl.yaw + dk * .5, (pl.pit + pl.kick * .012) * (1 - dk) + dk * .25);
+    G.cam.pos = eye; G.cam.target = v3(eye, f); G.cam.up = dk ? nrm([cos(pl.yaw) * dk * .9, 1, -sin(pl.yaw) * dk * .9]) : [0, 1, 0]; G.cam.near = .08;
+    G.cam.fov = 1.13 - pl.ads * (pl.w === 'ak' ? .28 : .2) + (run ? .06 : 0);
+    const fp = PP.fp; Object.assign(fp, { on: pl.dead ? 0 : 1, gun: pl.w, aim: pl.ads, kick: pl.kick, reload: pl.rl > 0 ? 1 - pl.rl / W.rl : pl.sw0 > 0 ? 1 - pl.sw0 / .45 : 0, bob: pl.bob, sway: pl.sw });
+    S.mag = inv[0]; S.ammo = inv[1];
+    // 노출 시간: 적에게 보일수록 명중률 상승
+    let seen = 0; for (const e of E) if (e.st === 'hold' && e.tg && e.tg.pl) seen = 1;
+    pl.ex = seen ? min(5, pl.ex + dt) : max(0, pl.ex - dt * 2);
+  }
+
+  /* ── 조명 · 환경 ── */
+  function env(dt) {
+    const ins = pl.ins ? 1 : 0;
+    pl.envK = (pl.envK ?? ins) + (ins - (pl.envK ?? ins)) * min(1, dt * 3);
+    G.setEnv({ indoor: pl.envK, exposure: 1 - pl.envK * .38 });
+    G.shadowFocus = G.cam.pos; G.shadowRange = ins ? 26 : 70;
+    if (ins) { // 비상등: 카메라 앞뒤 천장 (주로 인물을 비춤)
+      const l = C.l(G.cam.pos), fl = .55 + .45 * (sin(T * 19) > -.85);
+      G.addLight(C.w([0, 1.95, l[2] + 2.2]), [1, .9, .76], 5 * fl, 6, .05);
+      G.addLight(C.w([0, 1.95, l[2] - 2.6]), [1, .9, .76], 4 * fl, 6, .05);
+    }
+    G.sfx.listener(G.cam.pos, fwd(pl.yaw, pl.pit));
+  }
+
+  /* ── HUD (텍스트는 5Hz, 조준선·피격 표시는 매 프레임 스타일 한두 개만) ── */
+  function hudUp(dt) {
+    hud.hm = max(0, hud.hm - dt * 4); hud.dd = max(0, hud.dd - dt * .9); hud.pk = max(0, (hud.pk || 0) - dt);
+    const px = spread() / (G.cam.fov / 2) * innerHeight / 2 + 4, sp = Math.round(px * 2) / 2;
+    if (sp !== hud.sp) { hud.sp = sp; ui.xh.style.setProperty('--s', sp + 'px'); }
+    ui.xh.style.opacity = pl.ads > .6 || pl.dead ? 0 : 1;
+    ui.hm.style.opacity = min(1, hud.hm); ui.hm.style.borderColor = hud.hm > 1 ? '#f44' : '#fff';
+    ui.dd.style.opacity = hud.dd; ui.dd.style.transform = `rotate(${(pl.yaw - hud.dA) * 180 / PI}deg)`;
+    if ((hud.t -= dt) > 0) return; hud.t = .2;
+    const W = WEP[pl.w], inv = pl.inv[pl.w];
+    ui.am.innerHTML = `<b>${inv[0]}</b> / ${inv[1]}<small>${W.n}</small>`;
+    ui.hp.innerHTML = `<i style="width:${S.hp | 0}%"></i><b>${S.hp | 0}</b>`;
+    ui.ct.innerHTML = `북한군 <b>${S.kills}</b> / ${S.total}<small>북한군을 제압하라</small>`;
+    ui.vg.style.opacity = cl(1 - S.hp / 70, 0, 1); ui.vg.className = S.hp < 35 && !pl.dead ? 'p' : '';
+    const pr = pl.dead ? '' : hud.pkN ? (pl.inv.ak ? '[E] 탄약 줍기' : '[E] AK 소총 줍기') : hud.pk > 0 ? '획득!' : pl.rl > 0 ? '재장전 중…' : inv[0] === 0 ? (inv[1] ? '[R] 재장전' : '탄약 없음') : inv[0] <= W.mag / 4 ? '[R] 재장전' : '';
+    ui.pr.textContent = pr;
+    ui.lk.style.display = F.bot || pl.end || document.pointerLockElement === G.canvas || G.params.has('step') ? 'none' : 'block';
+  }
+
+  function update(dt) {
+    if (!F.on) return;
+    try {
+      T += dt;
+      if (!pl.end || T < pl.end) {
+        player(dt); director(dt);
+        for (const e of E) enemy(e, dt);
+        for (let i = 0; i < E.length; i++) for (let j = i + 1; j < E.length; j++) { // 서로 겹치지 않게
+          const a = E[i].P, b = E[j].P; if (a.dead || b.dead) continue;
+          const dx = a.p[0] - b.p[0], dz = a.p[2] - b.p[2], d = hypot(dx, dz);
+          if (d < .55 && d > 1e-4) { const k = (.55 - d) / d * .5; if (E[i].st === 'go') { a.p[0] += dx * k; a.p[2] += dz * k; } if (E[j].st === 'go') { b.p[0] -= dx * k; b.p[2] -= dz * k; } }
+        }
+        for (const a of A) ally(a, dt);
+      } else if (pl.end && !pl.ended) { pl.ended = 1; const cb = o0.onEnd; cb ? (cb(!!pl.win), F.on && stop()) : 0; return; }
+      if (pl.end) { player(0.0001); }
+      env(dt); hudUp(dt);
+    } catch (e) { G.err('fps: ' + (e.stack || e)); }
+  }
+
+  G.register('fps', {
+    init() {
+      G.css(`#fh{position:absolute;inset:0;display:none;color:#fff;font-family:system-ui,'Malgun Gothic',sans-serif;text-shadow:0 1px 3px #000c}
+#xh{position:absolute;left:50%;top:50%;--s:6px;transition:opacity .1s}#xh i{position:absolute;background:#fffd;box-shadow:0 0 2px #000}
+#xh i:nth-child(1),#xh i:nth-child(2){width:2px;height:7px;left:-1px}#xh i:nth-child(1){top:calc(-7px - var(--s))}#xh i:nth-child(2){top:var(--s)}
+#xh i:nth-child(3),#xh i:nth-child(4){height:2px;width:7px;top:-1px}#xh i:nth-child(3){left:calc(-7px - var(--s))}#xh i:nth-child(4){left:var(--s)}
+#hm{position:absolute;left:50%;top:50%;width:16px;height:16px;margin:-8px;border:2px solid #fff;border-width:0 2px;transform:rotate(45deg) scaleY(1);opacity:0;clip-path:polygon(0 0,35% 0,35% 100%,0 100%,0 0,100% 0,100% 100%,65% 100%,65% 0)}
+#am{position:absolute;right:4vw;bottom:5vh;text-align:right;font-size:22px;color:#cde}#am b{font-size:46px;color:#fff;font-weight:700}#am small{display:block;font-size:14px;letter-spacing:.15em;color:#9bc}
+#hp{position:absolute;left:4vw;bottom:5vh;width:220px;height:8px;background:#0007;border-radius:4px}#hp i{position:absolute;inset:0 auto 0 0;background:linear-gradient(90deg,#e33,#fd8);border-radius:4px}#hp b{position:absolute;bottom:12px;left:0;font-size:30px}
+#ct{position:absolute;left:50%;top:3.5vh;transform:translateX(-50%);text-align:center;font-size:19px;letter-spacing:.06em}#ct b{font-size:26px;color:#fc6}#ct small{display:block;font-size:14px;color:#bcd;letter-spacing:.2em}
+#pr{position:absolute;left:50%;top:62%;transform:translateX(-50%);font-size:18px;color:#fe9}
+#dd{position:absolute;inset:0;background:radial-gradient(ellipse 34% 22% at 50% 0,#e00a,#0000);opacity:0}
+#vg{position:absolute;inset:0;box-shadow:inset 0 0 18vmin 4vmin #a00c;opacity:0}#vg.p{animation:vp .9s infinite}@keyframes vp{50%{box-shadow:inset 0 0 26vmin 8vmin #c00e}}
+#lk{position:absolute;left:50%;top:40%;transform:translate(-50%,-50%);padding:.6em 1.4em;background:#000a;border-radius:8px;font-size:17px;text-align:center}#lk small{display:block;color:#abc;font-size:13px;margin-top:.3em}
+#fe{position:absolute;left:50%;top:42%;transform:translate(-50%,-50%);text-align:center;opacity:0;transition:opacity 1.2s}#fe b{display:block;font-size:clamp(28px,4.5vw,56px);color:#f55;letter-spacing:.12em}#fe.w b{color:#fd7}#fe small{font-size:18px;color:#ddd}`);
+      ui.fh = G.el('div', { id: 'fh' });
+      ui.xh = G.el('div', { id: 'xh', innerHTML: '<i></i><i></i><i></i><i></i>' }, ui.fh);
+      for (const k of ['hm', 'am', 'hp', 'ct', 'pr', 'dd', 'vg', 'lk', 'fe']) ui[k] = G.el('div', { id: k }, ui.fh);
+      ui.lk.innerHTML = '화면을 클릭하면 조준이 시작됩니다<small>WASD 이동 · Shift 달리기 · C 앉기 · 좌클릭 사격 · 우클릭 조준 · R 재장전 · E 줍기 · 1/2 무기</small>';
+      G.canvas.addEventListener('click', () => { F.on && !F.bot && G.canvas.requestPointerLock && G.canvas.requestPointerLock(); });
+      addEventListener('mousemove', e => { if (F.on && document.pointerLockElement === G.canvas) { mouse.dx += e.movementX; mouse.dy += e.movementY; } });
+      addEventListener('mousedown', e => { if (!F.on) return; if (e.button === 0) mouse.l = 1; if (e.button === 2) mouse.r = 1; });
+      addEventListener('mouseup', e => { if (e.button === 0) mouse.l = 0; if (e.button === 2) mouse.r = 0; });
+      addEventListener('contextmenu', e => F.on && e.preventDefault());
+    },
+    update
+  }, 'story');
+  G.mode === 'story' && G.order.unshift(G.order.pop()); // story 다음, people·cabin 보다 먼저 update
+}

@@ -2,11 +2,14 @@
 //   node build.js [출력 경로]            압축 빌드 (WGSL 축약 + JS/CSS minify) — 기본 출력 ../index.html
 //   node build.js [출력 경로] --readable 읽기 쉬운 빌드 (디버깅용)
 //   node build.js [출력 경로] --raw      자기해제 압축 없이 minify 만 (JS 가 그대로 보임)
+//   --naval : 예전 해상 반격 임무 모듈도 포함 (?mode=naval)
 //   --stubs : 아직 없는 모듈을 stubs.js 로 채움 (개발용)
 // 기본 빌드는 minify 한 JS 를 gzip + base64 로 담고, 브라우저 내장 DecompressionStream 으로 풀어 실행하는 자기해제 방식 (외부 라이브러리 없음)
 const fs = require('fs'), path = require('path'), zlib = require('zlib'), D = __dirname;
 const out = process.argv[2] && !process.argv[2].startsWith('--') ? process.argv[2] : path.join(D, '..', 'index.html'), stubs = process.argv.includes('--stubs'), readable = process.argv.includes('--readable'), raw = process.argv.includes('--raw');
-const MODS = ['gpu', 'sky', 'post', 'ocean', 'mesh', 'models', 'fx', 'audio', 'game', 'people', 'cabin', 'fps', 'story'];
+// 기본 빌드 = 스토리 1 (여객기). 예전 해상 반격 임무(ocean·models·game)는 --naval 을 붙일 때만 함께 넣음 (그때는 ?mode=naval 로 실행)
+const naval = process.argv.includes('--naval');
+const MODS = ['gpu', 'sky', 'post', 'ocean', 'mesh', 'models', 'fx', 'audio', 'game', 'people', 'cabin', 'fps', 'story'].filter(m => naval || !['ocean', 'models', 'game'].includes(m));
 const strip = s => s.replace(/^'use strict';\s*/, '').trimEnd();
 const read = f => strip(fs.readFileSync(path.join(D, f), 'utf8'));
 
@@ -42,11 +45,15 @@ function shrinkWgsl(src) {
 }
 
 let code = read('core.js'); const rep = [['core', Buffer.byteLength(code)]];
+if (!naval) code = code.replace(/G\.mode = new URLSearchParams[^;]*;/, "G.mode = 'story';");
 for (const m of MODS) {
   if (!fs.existsSync(path.join(D, `mod_${m}.js`))) { console.log(`  (없음) mod_${m}.js`); continue; }
   const s = read(`mod_${m}.js`); code += '\n\n' + s; rep.push([m, Buffer.byteLength(s)]);
 }
 if (stubs) code += '\n\n' + read('stubs.js');
+// 녹음 파일 넣기: 소스의 /*__PULLUP__*/'' 자리를 base64 로 채움 (파일이 없으면 빈 문자열 → 합성음으로 대신)
+const snd = path.join(D, 'snd_pullup.mp3');
+if (fs.existsSync(snd)) code = code.replace("/*__PULLUP__*/''", () => `'${fs.readFileSync(snd).toString('base64')}'`);
 code += '\n\nG.boot();';
 let html = fs.readFileSync(path.join(D, 'template.html'), 'utf8');
 const srcKB = Buffer.byteLength(code) / 1024; let rawKB = 0;

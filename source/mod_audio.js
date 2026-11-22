@@ -2,7 +2,8 @@
 /* ═══ AUDIO — Web Audio 실시간 합성 ═══ */
 {
   const LPF = 'lowpass', BPF = 'bandpass', HPF = 'highpass', SAW = 'sawtooth', SIN = 'sine';
-  let c, vol, mix, echo, NB, MB, V, LP, src, end, rt, mode, mt, mi, Lp = [0, 0, 0], Lf = Lp;
+  let c, vol, mix, echo, NB, MB, V, LP, src, end, rt, mode, mt, mi, Lp = [0, 0, 0], Lf = Lp, PB;
+  const PULLUP = /*__PULLUP__*/''; // 지상 접근 경보 'Whoop whoop, pull up' 녹음 (사용자 제공 파일 snd_pullup.mp3 — 빌드 때 base64 로 들어옴)
   const to = (n, dst) => (n.connect(dst), n);
   const gn = (gain, dst) => to(new GainNode(c, { gain }), dst);
   const bq = (type, frequency, Q, dst) => to(new BiquadFilterNode(c, { type, frequency, Q }), dst);
@@ -34,6 +35,11 @@
     hit: [[HPF, 3500, .001, .04, .6, .7], ...[523, 811, 1287, 1962, 3140].map((f, i) => [SIN, f, .001, .45 - i * .07, .3])],
   };
   const LOOP = { // 지속음: 출력 노드 → rate 함수
+    alarm(d) { // 조종석 지상 접근 경보 (녹음 반복)
+      if (!PB) return LOOP.siren(d);
+      const s = go(new AudioBufferSourceNode(c, { buffer: PB, loop: true }), gn(1.6, d), c.currentTime, 0);
+      return r => tgt(s.playbackRate, r || 1);
+    },
     ciws(d) { // 70Hz 톱니 + 임펄스열 게이트 잡음 → 왜곡
       const sat = ws(5, gn(.7, d)), o = osc(SAW, 70, bq(BPF, 500, .5, sat)), ng = gn(0, bq(BPF, 1800, .6, sat));
       nz(ng); o.connect(bq(HPF, 300, 1, gn(3, ng.gain)));
@@ -69,7 +75,14 @@
     MB = { calm: gn(0, mus), combat: gn(0, mus) };
   };
   const api = {
-    init() { c || use(new AudioContext()); c.resume(); },
+    init() {
+      if (!c) {
+        use(new AudioContext());
+        (PULLUP ? Promise.resolve(Uint8Array.from(atob(PULLUP), ch => ch.charCodeAt(0)).buffer) : fetch('snd_pullup.mp3').then(r => r.arrayBuffer()))
+          .then(b => c.decodeAudioData(b)).then(b => PB = b, () => { });
+      }
+      c.resume();
+    },
     play(name, o) {
       const f = SND[name], p = (o = o || {}).pos, now = c.currentTime; if (!f) return;
       let g = o.gain ?? 1, out, d = 0, dx, dz;

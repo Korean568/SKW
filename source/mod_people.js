@@ -84,6 +84,9 @@ fn wp(i:VI)->vec4f{ // 스키닝한 월드 위치 (w = 보임 여부)
 let o=i.i*19u;let X=pal[o+18u];let m=i.b.w;var p=i.p;let mx=max(i.b.x,i.b.y);
 if(m<.5){p.x*=X[2].z;p.y-=X[1].w*.012*ss(1.6,1.565,p.y)*ss(.04,.09,p.z);} // 얼굴 폭 · 말할 때 턱
 else if(m<3.5){p+=normalize(i.n)*X[2].y;} // 체격
+if(m>.5&&m<1.5&&p.y<.79){ // 손가락 말아 쥠 (총을 잡으면 주먹)
+let k=sign(p.x);let a=-k*X[2].w*(.79-p.y)*26.0;let d=p.xy-vec2f(k*.172,.79);
+p=vec3f(k*.172+d.x*cos(a)-d.y*sin(a),.79+d.x*sin(a)+d.y*cos(a),p.z);}
 let hd=(m>5.5&&m<9.5&&abs(m-X[0].w)>.5)||(X[2].x>.5&&(mx<4.5||(mx>10.5&&mx<16.5)));
 let w=mix(pal[o+u32(i.b.x)]*vec4f(p,1.0),pal[o+u32(i.b.y)]*vec4f(p,1.0),i.b.z);
 return vec4f(w.xyz,select(1.0,0.0,hd));
@@ -284,9 +287,9 @@ return vec4f(fogAt(c,i.w),1.0);
  const F={on:0,gun:'pistol',aim:0,kick:0,reload:0,bob:0,sway:[0,0]};
  const fpose=a=>{ // 1인칭: 모델 공간 = 카메라 공간(+Z 전방). 어깨는 화면 아래, 주먹 목표는 허리 사격 ↔ 조준
   const ad=F.aim||0,rl=F.reload?sin(PI*F.reload):0,ps=F.gun==='pistol',kk=F.kick||0,bb=F.bob||0,sw=F.sway||[0,0];
-  a.fill(0);a[1]=-.72;a[2]=.12;
-  S3(a,15,L(.04,.172,ad)+cos(bb*.5)*.004+.03*rl,L(.075,ps?.162:.138,ad)+sin(bb)*.006-.07*rl+.01*kk,L(ps?.34:.25,ps?.3:.13,ad)-.045*kk);
-  S3(a,24,sw[0]*.4+.22*rl,sw[1]*.4+.05*kk+.3*rl,1);a[27]=1-rl;S3(a,12,-.2,-.12,.3);
+  a.fill(0);a[1]=-.63;a[2]=.12;
+  S3(a,15,L(ps?.072:.042,.172,ad)+cos(bb*.5)*.004+.03*rl,L(ps?.01:-.015,ps?.072:.048,ad)+sin(bb)*.006-.07*rl+.01*kk,L(ps?.34:.25,ps?.3:.26,ad)-.045*kk);
+  S3(a,24,sw[0]*.4+.22*rl,sw[1]*.4+.05*kk+.3*rl,1);a[27]=1-rl;S3(a,12,-.2,-.2,.3);
  };
  const solve=(P,a,sl)=>{
   const pst=P.gun==='pistol',yw=a[4]+a[7],cy=cos(yw),sy=sin(yw);
@@ -323,7 +326,7 @@ return vec4f(fogAt(c,i.w),1.0);
   }
   const o=(sl*NB+4)*16;for(let k=0;k<3;k++)j[51+k]=PAL[o+k]*0+PAL[o+4+k]*YC+PAL[o+8+k]*.012+PAL[o+12+k]; // 머리 중심 (피격 판정)
   const kd=KIND[P.kind]||0;P._ok=1;
-  PAL.set([kd,P._r,K[0],kd<2?6:kd>2?9:K[3]>.35?7:8,a[30],P._g[0],P._g[1],a[31],+!!P._W,(K[1]-.4)*.012,.96+K[2]*.09,0],(sl*NB+18)*16);
+  PAL.set([kd,P._r,K[0],kd<2?6:kd>2?9:K[3]>.35?7:8,a[30],P._g[0],P._g[1],a[31],+!!P._W,(K[1]-.4)*.012,.96+K[2]*.09,P.gun?1:.2],(sl*NB+18)*16);
  };
  const mk=(kind,o)=>{
   const P=Object.assign({kind,p:[0,0,0],yaw:0,pose:'stand',look:null,aim:null,talk:0,gun:0,seed:1,hp:100,dead:false,M:null,vis:true},o),r=G.rng(P.seed*7919+131);
