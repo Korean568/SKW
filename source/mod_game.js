@@ -389,5 +389,5 @@ kbd{margin:0 .15em;padding:0 .45em;border:1px solid #48a;border-radius:4px;backg
     },
     onQuality(Q) { ui.q.innerHTML = `<kbd>F2</kbd> 그래픽 설정 · ${G.qManual ? '수동' : '자동 감지'}: ${Q.name}`; },
     update
-  });
+  }, 'naval');
 }

@@ -34,8 +34,9 @@
     }
   });
 
-  if (!has('ocean')) {
-    G.ocean = { wake() { }, ripple() { } };
+  if (!G.ocean) G.ocean = { wake() { }, ripple() { } };
+  const nav = G.mode === 'naval'; // 해상 전용 스텁(바다·함정 상자·데모 장면)은 naval 모드에서만
+  if (nav && !has('ocean')) {
     G.register('ocean', {
       init() {
         const N = 96, v = new Float32Array(N * N * 12); let o = 0;
@@ -108,7 +109,7 @@
     }));
   }
   // 모델 스텁: 규격 크기의 상자 (원점 규약은 CONTRACT.md 와 동일)
-  G.register('stubmodels', {
+  if (nav) G.register('stubmodels', {
     init() {
       const B = (name, parts, meta) => { if (!G.meshes[name]) { const o = []; for (const p of parts) box(...p, .2, o); G.addMesh(name, new Float32Array(o), meta); } };
       const gy = [.5, .53, .56], rd = [.5, .32, .3], dk = [.25, .27, .3];
@@ -129,7 +130,7 @@
   if (!has('audio')) { G.sfx = { init() { }, play() { }, loop() { }, music() { }, listener() { }, volume() { } }; }
 
   // 데모 장면: 모듈 단독 확인용. ?cam=방위,고도,거리,목표높이  (예: cam=35,12,260,12)
-  if (!has('game')) G.register('game', {
+  if (nav && !has('game')) G.register('game', {
     init() { const c = (G.params.get('cam') || '').split(',').map(Number); this.cam = c.length >= 3 && !c.some(isNaN) ? c : null; G.time = +(G.params.get('t0') || 0); this.acc = 0; this.k = 0; },
     update(dt) {
       const show = G.params.get('show'); // ?show=모델이름 → 그 모델만 원점에 (함정·섬은 수면, 나머지는 고도 30m)

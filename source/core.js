@@ -67,7 +67,9 @@ G.clamp = (x, a, b) => Math.min(b, Math.max(a, x));
 G.lerp = (a, b, t) => a + (b - a) * t;
 G.rng = s => () => { s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 G.err = m => { m = String(m); if (G.errors.length < 40 && !G.errors.includes(m)) { G.errors.push(m); console.error('[SKW]', m); } };
-G.register = (name, mod) => { G.mods[name] = mod; G.order.push(mod); return mod; };
+// 게임 모드: 기본 'story'(스토리 1 — 여객기), '?mode=naval' = 해상 반격 임무. 세 번째 인자가 있으면 그 모드에서만 등록 (API 객체는 그대로 남음)
+G.mode = new URLSearchParams(location.search).get('mode') === 'naval' ? 'naval' : 'story';
+G.register = (name, mod, mode) => { if (mode && mode !== G.mode) return mod; G.mods[name] = mod; G.order.push(mod); return mod; };
 G.ui = document.getElementById('ui');
 G.el = (tag, props = {}, parent = G.ui) => { const e = document.createElement(tag); Object.assign(e, props); parent.appendChild(e); return e; };
 G.css = t => { G.el('style', { textContent: t }, document.head); };
@@ -84,7 +86,8 @@ G.PRESETS = {
   HIGH: { name: 'HIGH', level: 2, scale: 1, dprCap: 2, maxPx: 4.2e6, particles: 12000, ocean: 2, clouds: 2, shadows: 1, bloom: 1, refract: 1, shadowRes: 4096, msaa: 4 },
 };
 /* ───────── 환경(태양·바람·파도) ───────── */
-G.env = { sunAz: 40, sunEl: 26, cloud: .45, haze: .35, sea: .55, windDir: .6, windSpd: 9, fogDen: 1 / 9000, exposure: 1 };
+if (G.mode === 'story') Object.assign(G.PRESETS.MEDIUM, { shadows: 1, shadowRes: 2048 });
+G.env = { indoor: 0, sunAz: 40, sunEl: 26, cloud: .45, haze: .35, sea: .55, windDir: .6, windSpd: 9, fogDen: 1 / 9000, exposure: 1 };
 G.sun = { dir: [0, 1, 0], col: [3, 3, 3] };
 G.waves = new Float32Array(48); // 6개 거스트너 파: [dirx,dirz,진폭,k, ω,가파름Q,위상,0]
 G.setEnv = (o = {}) => {
@@ -125,7 +128,7 @@ struct Globals {
   sunCol: vec4f,         // rgb 태양광(HDR), w 그림자 사용 0/1
   res: vec4f,            // 렌더 타깃 w,h,1/w,1/h
   fog: vec4f,            // x 안개 밀도(/m), y 구름량 0..1, z 연무 0..1, w 해상 상태 0..1
-  wind: vec4f,           // xy 바람 방향(xz 평면, 단위), z 풍속 m/s
+  wind: vec4f,           // xy 바람 방향(xz 평면, 단위), z 풍속 m/s, w 실내 계수 0..1 (기내 = 1: 하늘 환경광·직사광 차폐)
   misc: vec4f,           // x near, y dt, z 프레임, w 노출
   waves: array<vec4f, 12>, // 파 i: [2i]=(dirx,dirz,진폭,k) [2i+1]=(ω,Q,위상,0)
   lights: array<vec4f, 8>, // 점광 i: [2i]=(pos,반경) [2i+1]=(rgb*세기,0)
@@ -195,6 +198,13 @@ fn cloudVis(P: vec3f) -> f32 { // 구름 그림자: 1 = 햇빛, 0 = 완전 그�
   if (g.cmap.w < .5) { return 1.0; }
   // 태양이 낮으면 그림자가 수 km 로 늘어져 흐려짐 → 구름량에 따른 평균 밝기로 수렴 (해 질 녘 윤슬이 조각나지 않게)
   return mix(1.0 - .45 * g.fog.y, textureSampleLevel(cloudTex, linSamp, (P.xz - g.cmap.xy) * g.cmap.z + .5, 0.0).r, saturate(g.sun.y * 6.0 - .4));
+}
+fn sunAt(P: vec3f, N: vec3f) -> f32 { // 직사광 가시성: 그림자 맵 × 구름 그림자. 실내인데 그림자 맵이 없는 등급이면 0 (벽을 뚫는 햇빛 방지)
+  return shadowAt(P, N) * mix(mix(.35, 1.0, cloudVis(P)), g.sunCol.w, g.wind.w);
+}
+fn ambAt(N: vec3f) -> vec3f { // 하늘 반구 환경광 (실내에서는 12% 만)
+  let k = skyBase(normalize(vec3f(N.x, abs(N.y) * .6 + .4, N.z)));
+  return mix(k, vec3f(dot(k, vec3f(.33))), .3) * (.3 + .7 * (N.y * .5 + .5)) * mix(1.0, .12, g.wind.w);
 }
 fn gerstner(p: vec2f, t: f32) -> vec3f { // 기준 수면 변위 (JS G.waveAt 과 동일한 6파)
   var d = vec3f(0.0);
@@ -286,7 +296,7 @@ function writeGlobals() {
     GF.set(G.shadowVP, 32);
   }
   GF.set([c.pos[0], c.pos[1], c.pos[2], G.time, ...G.sun.dir, Q.level, ...G.sun.col, Q.shadows, T.w, T.h, 1 / T.w, 1 / T.h,
-    e.fogDen, e.cloud, e.haze, e.sea, Math.sin(e.windDir), Math.cos(e.windDir), e.windSpd, 0, c.near, G.dt, G.frame, e.exposure], 48);
+    e.fogDen, e.cloud, e.haze, e.sea, Math.sin(e.windDir), Math.cos(e.windDir), e.windSpd, e.indoor, c.near, G.dt, G.frame, e.exposure], 48);
   GF.set(G.waves, 76);
   G.lights = G.lights.filter(l => (l.life -= G.dt) > 0);
   G.lights.sort((a, b) => b.intensity * b.life / b.max - a.intensity * a.life / a.max);

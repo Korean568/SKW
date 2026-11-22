@@ -1,4 +1,4 @@
-// 사용: node shot.js "<dev.html 쿼리 또는 전체 URL>" out.png [--frames 20] [--dt 0.0333] [--w 960] [--h 540] [--wait 1500] [--eval "JS식"] [--nowebgpu] [--click]
+// 사용: node shot.js "<dev.html 쿼리 또는 전체 URL>" out.png [--frames 20] [--dt 0.0333] [--w 960] [--h 540] [--wait 1500] [--pre "JS" | --prefile f.js] [--eval "JS식"] [--nowebgpu] [--click]
 // 쿼리에 step 이 있으면 G.test.run(frames, dt) 로 결정적 스텝, 없으면 실시간 루프를 --wait(ms) 동안 돌린 뒤 캡처.
 const DIR = require('path').basename(__dirname); // 이 폴더 이름 (서버 루트는 한 단계 위)
 const { chromium } = require('playwright');
@@ -20,6 +20,8 @@ const has = k => a.includes('--' + k);
   if (has('click')) { await p.mouse.click(W / 2, H / 2); await p.waitForTimeout(200); }
   const step = /[?&]step\b/.test(url), frames = +(opt('frames') || 20), dt = +(opt('dt') || 1 / 30);
   let ms = 0;
+  const pre = opt('prefile') ? require('fs').readFileSync(opt('prefile'), 'utf8') : opt('pre'); // 스텝 전에 실행할 장면 준비 코드 (--pre "JS" 또는 --prefile 파일)
+  if (pre) { const r = await p.evaluate(pre).catch(e => 'PRE ERR ' + e.message); if (r !== undefined) console.log('pre →', typeof r === 'string' ? r : JSON.stringify(r)); }
   if (step) { const t1 = Date.now(); await p.evaluate(([n, d]) => G.dead ? 0 : G.test.run(n, d), [frames, dt]).catch(e => logs.push('[shot] run 실패: ' + e.message)); ms = (Date.now() - t1) / frames; }
   else await p.waitForTimeout(+(opt('wait') || 1500));
   const ev = opt('eval'); let evr;

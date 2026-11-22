@@ -6,7 +6,7 @@
 // 기본 빌드는 minify 한 JS 를 gzip + base64 로 담고, 브라우저 내장 DecompressionStream 으로 풀어 실행하는 자기해제 방식 (외부 라이브러리 없음)
 const fs = require('fs'), path = require('path'), zlib = require('zlib'), D = __dirname;
 const out = process.argv[2] && !process.argv[2].startsWith('--') ? process.argv[2] : path.join(D, '..', 'index.html'), stubs = process.argv.includes('--stubs'), readable = process.argv.includes('--readable'), raw = process.argv.includes('--raw');
-const MODS = ['gpu', 'sky', 'post', 'ocean', 'mesh', 'models', 'fx', 'audio', 'game'];
+const MODS = ['gpu', 'sky', 'post', 'ocean', 'mesh', 'models', 'fx', 'audio', 'game', 'people', 'cabin', 'fps', 'story'];
 const strip = s => s.replace(/^'use strict';\s*/, '').trimEnd();
 const read = f => strip(fs.readFileSync(path.join(D, f), 'utf8'));
 
