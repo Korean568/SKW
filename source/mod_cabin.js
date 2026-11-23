@@ -95,6 +95,8 @@
   const n=P.length-1,x=cl(t,0,1)*n,i=min(x|0,n-1),f=x-i,g=k=>P[cl(i+k,0,n)];
   return [0,1].map(d=>{ const a=g(-1)[d],b=g(0)[d],c=g(1)[d],e=g(2)[d]; return b+.5*f*(c-a+f*(2*a-5*b+4*c-e+f*(3*(b-c)+e-a))); });
  };
+ // 관: 경로 f(v),반지름 r
+ const tube=(f,r,c,m,n=8)=>surf(5,n,(u,v)=>{ const t=V3.norm(V3.sub(f(v+.01),f(v-.01))),a=V3.norm(V3.cross(t,[0,0,1])),b=V3.cross(t,a),k=u*2*PI; return V3.add(f(v),V3.add(V3.mul(a,r*cos(k)),V3.mul(b,r*sin(k)))); },c,m);
  // 익형 단면 날개: 뿌리 앞전 A·시위 ca → 끝 B·cb,두께비 th,두께 축 ax
  const foil=(A,ca,B,cb,th,ax,col,fl,w)=>surf(24,20,(u,v)=>{
   const p=V3.lerp(A,B,u),ch=L(ca,cb,u),x=(1+cos(v*2*PI))/2;
@@ -105,7 +107,7 @@
  const ins=(p,yaw=0,part=0,flag=0,w=0,pitch=0,roll=0,s=1)=>[...M4.trs(p,yaw,pitch,roll,s),part,rnd(),flag,w];
  // 배치: fn 이 만든 형상 + 인스턴스 목록(또는 앞선 배치와 공유). fl 1 그림자 · 2 유리 · 4 추락 현장
  const bat=(fn,I,fl=1)=>{ const i0=X.length; fn(); const b={ i0,n: X.length-i0,f: I.f??IN.length/20,c: I.c??I.length,fl }; if (I.map) for (const q of I) IN.push(...q); B.push(b); return b; };
- const W=[1,1,1],WG=[.62,.64,.66],LC=[.6,.61,.6],NV=[.03,.045,.1],PG=[.3,.31,.33],DK=[.045,.045,.05],MT=[.5,.5,.52],MC=[.5,.51,.5];
+ const W=[1,1,1],WG=[.62,.64,.66],LC=[.58,.6,.63],NV=[.03,.045,.1],PG=[.55,.57,.6],DK=[.045,.045,.05],MT=[.5,.5,.52],MC=[.58,.59,.62];
  const rc=p=>{ const y=p[1]-.42,z=p[2]+.24; p[1]=.42+y*.978+z*.208; p[2]=-.24+z*.978-y*.208; return p; }; // 등받이 12° 젖힘
  const SY=rc([0,.9,-.36])[1],SH=rc([0,1.06,-.36])[1]-SY;
  const fus=z=>{ const n=cl((z-15)/4.5,0,1),t=cl((-15-z)/6,0,1),r=R*(1-n ** 2.4) ** .62*L(1,.08,t ** 1.7); return [z,CY-.5*n*n+(R-r)*.8*(t>0),r]; };
@@ -140,7 +142,7 @@
     const m=(a,b)=>s>0?[a,b]:[PI-b,PI-a];
     ring(56,5,zs(-15,15,RI),...m(AF,AC-WA),lin,0); ring(56,3,zs(-15,15,RI),...m(AC+WA,AB+.05),lin,0);
     for (const e of [ZW,-15]) ring(3,6,zs(e,e+15-ZW,RI),...m(AC-WA,AC+WA),lin,0);
-    surf(60,32,(u,v)=>{ const [x,y]=cr([[1.5,1.6],[1.4,1.615],[.8,1.63],[.64,1.66],[.565,1.8],[.56,1.98],[.61,2.09],[.54,2.12],[.4,2.14],[.15,2.17],[0,2.175]],v); return [s*x,y,L(-15,15,u)]; },p=>V3.mul([.66,.66,.64],L(.55,1,sm(1.5,1.3,abs(p[0])))),11,s<0);
+    surf(60,32,(u,v)=>{ const [x,y]=cr([[1.5,1.6],[1.4,1.615],[.8,1.63],[.64,1.66],[.565,1.8],[.56,1.98],[.61,2.09],[.54,2.12],[.4,2.14],[.15,2.17],[0,2.175]],v); return [s*x,y,L(-15,15,u)]; },p=>V3.mul([.62,.63,.66],L(.55,1,sm(1.5,1.3,abs(p[0])))),11,s<0);
     for (const z of [13.17,-13.17]) pill([s*1.02,1.06,z],[.72,1.07,.72],9,MC,14,inF,16,12);
     surf(20,6,(u,v)=>[s*(.29+.16*u),L(.06,2.1,v),12.38+.035*sin(u*30)*(.5+.5*v)],[.05,.07,.13],15);
     foil([s*.5,1.75,-16.4],3.4,[s*6.3,2.25,-19.5],1.2,.1,1,WG,s>0);
@@ -184,17 +186,37 @@
     pill([s*.17,.14,.05],[.016,.14,.16],3,MT,3,0,6,4);
    }
   },seats);
-    /* 산소 마스크 (flag 3) */
+    /* 산소 마스크 (flag 3): PSU 칸·덮개·컵·끈 / 투명 관·백 */
   const mk=[]; for (let r=0; r<30; r++) for (const s of sides) mk.push(ins([s*.98,1.625,Z1-r*PZ+.22],0,0,3));
-  bat(()=>{ for (let k=-1; k<2; k++) {
-   const y=-.5-.05*(k*k);
-   pill([k*.3,y,0],[.042,.032,.042],2.2,[.9,.65,.04],9,0,8,5); pill([k*.3,y/2,0],[.004,-y/2,.004],2,[.8,.8,.74],9,0,5,2);
-  } },mk,0);
-    /* 구멍 속: 휜 프레임 · 세로대 · 늘어진 단열재 (flag 2) */
-  const H=C.K.hole,bl=p=>{ const k=exp(-.9*((p[0]-H[0]) ** 2+(p[1]-H[1]) ** 2+(p[2]-H[2]) ** 2)); p[0]+=.55*k; p[1]+=(p[1]-H[1])*.25*k; p[2]+=(p[2]-H[2])*.3*k; return p; };
+  const cup=k=>{ const A=V3.norm([.12*(k-1),-.55,-.84]),T=V3.norm(V3.cross(A,[1,0,0])),Q=V3.cross(T,A),C=[(k-1)*.3,-.47+.03*(k&1),-.04];
+   return { A,T,Q,C,at: (v,a,s=1)=>V3.add(C,V3.add(V3.mul(A,.06*v-.06),V3.add(V3.mul(Q,.052*s*cos(a)),V3.mul(T,.06*s*sin(a))))) }; };
+  const mb=bat(()=>{
+   pill([0,-.004,0],[.4,.005,.06],6,DK,9,0,8,4);
+   surf(1,1,(u,v)=>[L(-.3,.3,u),-.1*v,-.063-.02*v],[.6,.62,.65],9);
+   for (let k=0; k<3; k++) { const c=cup(k);
+    surf(12,4,(u,v)=>c.at(v,u*2*PI,Math.sqrt(v)),(p,u,v)=>v>.8?[.85,.8,.62]:[.82,.5,.05],9);
+    tube(v=>c.at(1,v*PI,1.08+.6*sin(v*PI)).map((x,i)=>x-(i==1)*.07*sin(v*PI)),.0025,[.92,.92,.9],17,10);
+   } },mk,0);
+  bat(()=>{ for (let k=0; k<3; k++) { const c=cup(k),b=c.at(0,0,0);
+   pill(V3.add(b,[0,.075,.012]),[.042,.07,.012],2.2,[.85,.9,.9],19,p=>{ p[2]+=.006*sin(p[1]*90+p[0]*60); return p; },8,6);
+   tube(v=>[L((k-1)*.12,b[0],v),L(-.01,b[1]+.145,v),L(.02,b[2]+.012,v)+.03*sin(v*PI)],.003,[.55,.7,.82],16);
+  } },mb,2);
+    /* 구멍 (flag 2): 프레임·젖혀진 외피·세로대·단열재·전선·천장 판 */
+  const H=C.K.hole,aH=Math.atan2(H[1]-CY,H[0]),hs=k=>{ k=sin(k*127.1)*43758.5; return k-Math.floor(k); },on=(z,s,r)=>{ const a=aH+s/R; return [r*cos(a),CY+r*sin(a),H[2]+z]; };
+  const bl=p=>{ const k=exp(-.9*((p[0]-H[0]) ** 2+(p[1]-H[1]) ** 2+(p[2]-H[2]) ** 2)); p[0]+=.55*k; p[1]+=(p[1]-H[1])*.25*k; p[2]+=(p[2]-H[2])*.3*k; return p; };
   bat(()=>{
    for (let k=3; k<9; k++) surf(26,5,(u,v)=>{ const a=L(-.5,1.25,u),b=v*2*PI,r=1.89+.05*cos(b); return bl([r*cos(a),CY+r*sin(a),k*WP+.018*sin(b)]); },[.32,.37,.27],3);
-   for (let k=0; k<5; k++) pill([1.76-.06*(k&1),1.72-.12*(k % 3),2+k*.4],[.05,.22+.08*(k&1),.2],2.5,[.55,.5,.3],15,0,8,6);
+   for (let j=0; j<16; j++) { const f=(j+.4*hs(j))/16*2*PI,c=cos(f),s=sin(f),t0=.55+.35*hs(j+9),w=.07+.12*hs(j+3),b=.18+.3*hs(j+5);
+    surf(3,10,(u,v)=>{ const p=L(1.7,t0,v),t=(u-.5)*2*w*((p-t0)/(1.7-t0)+.08)*(.8+.2*sin(p*41+j)); return on(p*c-t*s,p*s+t*c,R+.006+b*sm(1.25,t0,p) ** 2); },[.62,.64,.66],20);
+   }
+   for (let j=0; j<10; j++) { const s=(j>>1)*.32-.55,g=j&1?1:-1,e=.45+.5*hs(j+20);
+    surf(10,1,(u,v)=>on(g*L(1.8,e,u),s,R-.012-.035*v+.25*sm(1.1,e,L(1.8,e,u)) ** 2),[.34,.38,.3],3);
+   }
+   for (let j=0; j<9; j++) { const z0=1.7+j*.28+.1*hs(j+5),wd=.14+.18*hs(j+7),ln=.22+.33*hs(j+11),x0=1.52+.12*hs(j);
+    surf(4,10,(u,v)=>[x0+.18*v*v+.025*sin(u*8+j*3),1.62-ln*v,z0+wd*(u-.5)+.06*v*sin(j+v*3)],(p,u,v)=>[u,v,j*.13],4);
+   }
+   for (const [x,y,z,l,c] of [[1.56,1.62,2.1,.7,DK],[1.6,1.62,3.3,.55,[.6,.6,.58]],[1.54,1.62,2.6,.4,[.35,.06,.04]],[.15,2.16,2.5,.55,DK]]) tube(v=>[x+.12*v*v*(x>1),y-l*v,z+.06*sin(v*3+z)],.008,c,9);
+   for (const [z0,z1,t,q] of [[2.06,2.43,.85,1],[2.47,2.86,.5,0]]) surf(6,4,(u,v)=>{ const s=.44*u,a=t+.2*u*v; return [s*cos(a),2.165-s*sin(a),L(z0,z1,v)+.03*sin(u*23)*(q?v:1-v)]; },[.62,.63,.65],9);
   },[ins([0,0,0],0,0,2)],0);
     /* 추락 현장: 지면 · 나무 · 짐 */
   bat(()=>surf(128,128,(u,v)=>{ const s=u*2-1,t=v*2-1; return gp(s*abs(s) ** 1.6*320,t*abs(t) ** .3*320); },p=>{
@@ -222,31 +244,37 @@ fn tf(i:I,vp:mat4x4f)->V{
 var p=i.p;let f=i.t.z;let cr=u.s.w>.5;let hl=u.s.x>.5;
 let z=(f==1.&&hl)||(f==2.&&!hl)||(f==5.&&!cr)||(f==6.&&cr)||(f==4.&&(cr||u.t.y>300.))||(f==3.&&u.s.z<.01);
 if(i.m==10.){let a=(1.-i.t.w)*.27;let d=p.xy-vec2f(0.,${CY});p=vec3f(d.x*cos(a)-d.y*sin(a),${CY} +d.x*sin(a)+d.y*cos(a),p.z);}
-if(f==3.){p.y=min(p.y+(1.-u.s.z)*.62,0.);let s=p.y*.12*sin(g.cam.w*vec2f(2.1,1.7)+i.t.y*40.);p=vec3f(p.x+s.x,p.y,p.z+s.y);}
+if(f==3.){p.y=min(p.y+(1.-u.s.z)*.8,0.);let s=p.y*.14*sin(g.cam.w*vec2f(2.1,1.7)+i.t.y*40.+p.x*5.);p=vec3f(p.x+s.x,p.y,p.z+s.y);}
+if(i.m==4.){p+=vec3f(.06*sin(g.cam.w*9.+i.c.z*7.+i.c.y*3.),0.,.03*sin(g.cam.w*6.+i.c.z*5.))*i.c.y*i.c.y*(1.-.8*u.s.w);}
 let M=mat4x4f(i.a,i.b,i.d,i.e);var l=(M*vec4f(p,1.)).xyz;let q=normalize((M*vec4f(i.n,0.)).xyz);
 if(f==4.){l-=vec3f(0.,1.,.7)*u.t.y;}
-var w=l;var n=q;var sd=0.;var c=i.c;
+var w=l;var n=q;var sd=0.;var c=i.c;var o=i.p;
 if(i.t.x>1.5){c*=.55+.9*i.t.y;}
 else if(l.z<u.t.z){sd=1.;w=(u.A*vec4f(l,1.)).xyz;n=(u.A*vec4f(q,0.)).xyz;}
 else{w=(u.M*vec4f(l,1.)).xyz;n=(u.M*vec4f(q,0.)).xyz;}
-return V(select(vp*vec4f(w,1.),vec4f(9.,9.,9.,1.),z),w,n,c,i.m,l,i.p,q,vec3f(sd,f32(i.t.x<1.5&&i.m!=6.&&i.m!=12.),i.t.y));
+if(i.m==16.||i.m==17.){let e=max((vp*vec4f(w,1.)).w*1.2/(g.res.y*length(vec3f(vp[0].y,vp[1].y,vp[2].y)))-.003,0.);w+=n*e;o.x=.003/(.003+e);}
+return V(select(vp*vec4f(w,1.),vec4f(9.,9.,9.,1.),z),w,n,c,i.m,l,o,q,vec3f(sd,f32(i.t.x<1.5&&i.m!=6.&&i.m!=12.),i.t.y));
 }
 @vertex fn vs(i:I)->V{return tf(i,g.viewProj);}
 @vertex fn vsS(i:I)->V{return tf(i,g.shadowVP);}
 fn nz(p:vec2f)->f32{return textureSampleLevel(noiseTex,linSamp,p,0.).x;}
 fn cut(i:V)->f32{ // < 0 = 뚫린 곳(버림),그 외 = 그을음 0..1
-let m=i.m;let P=i.l;let cr=u.s.w>.5;
+let m=i.m;let P=i.l;let cr=u.s.w>.5;let c=i.c;
 if(cr&&abs(i.k.x-.5)<.499){return-1.;}
+if(m==4.){return select(0.,-1.,abs(c.x-.5)>.39+.11*nz(vec2f(c.y*.5,c.z))||c.y>.7+.3*nz(vec2f(c.x*.3,c.z+.5)));}
 let fr=m==2.||m==11.;
-if(!fr&&m!=0.&&m!=6.&&m!=8.&&m!=3.&&m!=10.){return 0.;}
-let v=P-u.h.xyz;let d=length(v);let n=nz(v.zy*.03)*.8+nz(v.zy*.08)*.2;
-let r=u.h.w*u.s.x*(.7+.6*n)*select(1.,.7,m==3.);
-if(!fr&&d<r){return-1.;}
+if(m==11.&&u.s.x>.5&&P.x>0.&&P.x<.44&&abs(P.z-2.46)<.4&&P.y>2.1){return-1.;}
+if(!fr&&m!=0.&&m!=6.&&m!=8.&&m!=3.&&m!=10.&&m!=20.){return 0.;}
 if(cr){
 if(abs(P.z-u.t.z)<.1+.5*nz(vec2f(P.x*.07+P.y*.05,.3))){return-1.;}
 if(!fr&&abs(abs(P.z)-14.45)<.42&&abs(P.y-.95)<.95&&abs(P.x)>1.){return-1.;}
 }
-return select((1.-smoothstep(r,r+.5,d))*u.s.x,0.,fr);
+let v=P-u.h.xyz;let d=length(v);
+if(fr||d>2.7||u.s.x<.01){return 0.;}
+let n=nz(v.zy*.03)*.55+nz(v.zy*.13)*.25+abs(nz(v.zy*.5)-.5)*.4;
+let r=u.h.w*u.s.x*(.7+.6*n)*select(1.,.7,m==3.);
+if(m!=20.&&d<r){return-1.;}
+return (1.-smoothstep(r,r+.1+.5*nz(v.zy*vec2f(.09,.2)),d))*u.s.x*(.7+.3*nz(v.zy*.7));
 }
 @fragment fn fsS(i:V){if(cut(i)<0.){discard;}}
 fn fd(s:f32,px:f32)->f32{return clamp(s/px*.35-.5,0.,1.);}
@@ -266,7 +294,7 @@ al*=1.+.45*sin((P.x+P.z)*44.)*sin((P.x-P.z)*44.)*fd(.07,px)+(nz(P.xz*3.)-.5)*.5*
 ao=mix(1.,.3,smoothstep(.25,.5,ax)*step(abs(P.z),12.3));
 em=vec3f(.2,1.3,.5)*ln(ax-.262,.008,px)*step(.25,fract(P.z*2.))*(1.-pw)*2.5;
 }else if(m==0.){
-if(bk){al=vec3f(.5,.44,.2);}else{
+if(bk){al=vec3f(.33,.34,.33);}else{
 al*=1.-.3*ln(fract(P.z/${WP} +.5)-.5,.004,px*2.);
 al=mix(al,al*vec3f(.5,.55,.66),step(P.y,.42))*(.55+.45*step(.5,fract(P.y*50.)+step(.16,P.y)));
 }
@@ -280,7 +308,7 @@ al*=1.-.5*ln(max(abs(abs(P.z)-14.45)-.42,abs(P.y-.95)-.93),.008,px);
 }else{gl=.35;}
 }else if(m==11.){
 let q=vec2f((fract((ax-.75)/.2)-.5)*.2,(fract((P.z-.3)/${PZ} +.5)-.5)*${PZ});let r=length(q);
-if(P.y>2.08&&ax>.46&&ax<.6){em=vec3f(1.,.93,.82)*7.*pw;}
+if(P.y>2.08&&ax>.46&&ax<.6){em=vec3f(1.,.96,.91)*7.*pw;}
 else if(P.y<1.67&&ax>.75&&ax<1.35){em=vec3f(1.,.9,.7)*step(r,.02)*pw*3.;al*=1.-.5*ln(r-.032,.004,px);}
 else if(P.y<2.08&&ax>.5){let c=fract(P.z/1.0667+.5)-.5;
 al*=1.-.5*ln(c,.003,px)-.35*ln(P.y-1.69,.006,px)-.5*step(max(abs(abs(c)-.5)-.04,abs(P.y-1.74)-.012),0.);}
@@ -291,7 +319,8 @@ if(max(abs(s.x),abs(s.y))<.06){al=mix(vec3f(.02,.08,.3),vec3f(.9),step(min(lengt
 let uv=vec2f(.5-o.x/.26,1.-(o.y- ${SY.toFixed(4)})/${SH.toFixed(4)});
 al=vec3f(.004);gl=.9;em=textureSampleLevel(scr,linSamp,uv,0.).rgb*u.t.x*2.2*step(max(abs(uv.x-.5),abs(uv.y-.5)),.47);
 }else if(m==12.){em=al*14.*mix(1.,step(.9,fract(g.cam.w*.9)),step(1.5,al.r+al.g));al=vec3f(0.);
-}else if(m==3.){gl=.6;
+}else if(m==3.||m==20.){gl=.6;
+}else if(m==4.){al=select(vec3f(.72,.66,.46)*(.8+.3*nz(o.zy*vec2f(.6,2.))),vec3f(.62,.64,.67)*(.8+.4*nz(o.zy*.8)),bk);gl=select(.1,.9,bk);
 }else if(m==7.){
 let a=nz(i.w.xz*.004);let b=nz(i.w.xz*.03+a);let d=nz(i.w.xz*.23);
 let gr=mix(vec3f(.04,.07,.018),vec3f(.13,.13,.04),b)*(.65+.7*mix(.5,d,fd(.5,px)));
@@ -302,7 +331,7 @@ if(i.k.y>.5){ // 실내: 천장 띠(선광원) + 창 주광 + 구멍으로 드�
 var e=vec3f(.03);let dc=skyBase(vec3f(0.,.5,.86))*1.6+g.sunCol.rgb*.06;
 for(var s=-1.;s<2.;s+=2.){
 var v=vec2f(s*.54-P.x,2.1-P.y);var d=length(v);
-e+=vec3f(1.,.93,.82)*pw*(max(dot(Q.xy,v/d),0.)*.8+.2)/(d+.3)*.55;
+e+=vec3f(1.,.96,.91)*pw*(max(dot(Q.xy,v/d),0.)*.8+.2)/(d+.3)*.55;
 v=vec2f(s*1.8-P.x,1.1-P.y);d=length(v);
 e+=dc*(max(dot(Q.xy,v/d),0.)*.85+.15)/(d+.5)*.35;
 }
@@ -319,6 +348,7 @@ return vec4f(fogAt(mix(c,c*.03,ch)+em,i.w),1.);
 @fragment fn fsT(i:V)->@location(0)vec4f{ // 창유리: 프레넬 반사 (밖 = 하늘,안 = 객실 조명)
 if(cut(i)<0.){discard;}
 let E=normalize(g.cam.xyz-i.w);let N=normalize(i.n);let d=dot(N,E);let F=.04+.96*pow(1.-abs(d),5.);let R=reflect(-E,N*sign(d));
+if(i.m>15.){let k=select(1.,i.o.x,i.m<18.);let a=min(select(select(.2,.95,i.m==17.),.08,i.m==19.)+F*.7,1.)*k;return vec4f((i.c*a+F*.5*k)*((.12+.5*u.s.y)+pointLights(i.w,N*sign(d))*.3+ambAt(N)),a);}
 return vec4f(select(vec3f(1.,.93,.82)*u.s.y*.5,skyBase(vec3f(R.x,abs(R.y),R.z)),d>0.)*F,F+select(.03,.3,d>0.));
 }`;
 /*GPU*/

@@ -59,10 +59,12 @@
   const nh=lo?14:24,hr=[];
   for(let k=0;k<nh;k++){const y=.105-k*.223/(nh-1),s=-y/.118;hr.push([YC+y,y>0?.0765*(1-(y/.116)**2)**.45:.0765*(1-.46*s**1.3-.24*ss(.8,1,s)),1]);}
   loft(hr,lo?20:32,0,.012,HB,()=>0,0,0,face,1.3);
-  // 머리쓰개: 6 전투모 · 7 철모 · 8 정모 · 9 머리카락 (인스턴스마다 하나만 보임)
-  const hg=(m,R,z0=.008)=>loft(R.map(r=>[YC+r[0],r[1],r[2]]),n,0,z0,HB,()=>m);
-  for(const m of[6,8])hg(m,[[.04,.062,.04],[.034,.07,.048],[.028,.062,.04]],.118); // 챙
-  hg(6,[[.133,.05,.062],[.126,.078,.095],[.1,.083,.101],[.037,.081,.099],[.03,.078,.096]]);
+  // 머리쓰개: 6 특전사 검은 베레모 · 7 철모 · 8 정모 · 9 머리카락 (인스턴스마다 하나만 보임)
+  const hg=(m,R,z0=.008,f)=>loft(R.map(r=>[YC+r[0],...r.slice(1)]),n,0,z0,HB,()=>m,0,0,f);
+  hg(8,[[.04,.062,.04],[.034,.07,.048],[.028,.062,.04]],.118); // 정모 챙
+  // 베레모: 이마 위 수평 가죽 테(눈썹 위 ~2 cm) · 부드러운 둥근 크라운을 오른쪽(−X) 귀 위로 당겨 내림
+  hg(6,[[.128,.02,.02,-.03,-.01],[.122,.07,.075,-.03,-.01],[.106,.098,.106,-.028,-.008],[.088,.104,.11,-.024,-.004],[.072,.092,.104,-.01,0],[.064,.083,.1],[.04,.081,.099],[.036,.077,.095]],.008,
+   p=>{p[1]-=.038*ss(-.03,-.12,p[0])*ss(YC+.066,YC+.1,p[1]);});
   hg(7,[[.146,.03,.036],[.134,.062,.075],[.108,.083,.1],[.075,.092,.111],[.042,.095,.114],[.034,.101,.12],[.03,.1,.119]]);
   hg(8,[[.13,.09,.104],[.118,.106,.122],[.1,.105,.12],[.078,.083,.1],[.036,.081,.099],[.03,.078,.096]]);
   hg(9,[[.122,.03,.036],[.112,.058,.07],[.085,.076,.093],[.05,.081,.099],[.01,.08,.098],[-.03,.07,.085],[-.045,.05,.06]],-.006);
@@ -136,10 +138,27 @@ al=mix(al,al*vec3f(.8,.5,.52),ss(.0095,.004,abs(ly))*lw*.85);al*=1.0-.65*ss(.001
 if(kd==1.0){let mk=ss(-.008,-.013,h.y-ax*.12)*ss(-.03,-.012,h.z);al=mix(al,vec3f(.012),mk);sk*=1.0-mk;cf=mk;gl=mix(gl,.1,mk);} // 검은 마스크
 }}else if(m<3.5||m==6.0||m==8.0){ // 천
 cf=1.0;gl=.08;let up=m<2.5;
-if(kd<1.5){ // ROK 디지털 무늬: 직사각 픽셀 4색 (멀면 픽셀 격자를 풂)
-let s=b*vec3f(160.0,210.0,160.0);let q=mix(s,floor(s)+.5,clamp(1.5-px*350.0,0.0,1.0));
-let a=n3(q*.075);let c=n3(q*.19+31.7);
-al=vec3f(.29,.25,.17);if(a>.5){al=vec3f(.12,.14,.07);}if(c>.6){al=vec3f(.04,.055,.032);}if(a+c<.8){al=vec3f(.07,.047,.03);}
+if(m==6.0){ // 검은 울 베레모 · 가죽 테 · 왼눈 위 플래시 + 은색 휘장
+al=vec3f(.017,.017,.02);gl=.05;
+if(h.y<.067){al=vec3f(.01);gl=.5;cf=.2;}
+let fp=vec2f(h.x-.036,h.y-.087);
+if(h.z>.04&&abs(fp.x)<.019&&abs(fp.y)<.021-max(-fp.y-.008,0.0)*.9){al=select(vec3f(.05,.045,.03),vec3f(.03,.045,.035),max(abs(fp.x)-.016,abs(fp.y)-.018)<0.0);
+if(length(fp)<.0085){al=vec3f(.62,.62,.6);gl=.85;cf=0.0;}}
+}else if(kd<1.5){ // ROK 화강암 디지털 무늬: 1 cm 직사각 픽셀 · 5-15 cm 덩어리 · 4색. 픽셀이 화면 픽셀에 가까워지면 4 cm 덩어리 → 평균색으로 (잡음을 보간하지 않음)
+let fa=ss(.004,.01,px);let fb=ss(.015,.04,px);let av=vec3f(.118,.112,.077);al=av;
+if(fa>0.0&&fb<1.0){al=mix(select(vec3f(.15,.13,.093),vec3f(.085,.095,.06),n3((floor(b*25.0)+.5)*.36)>.52),av,fb);}
+if(fa<1.0){let q=floor(b*100.0)+.5;let a=n3(q*.09);let c=n3(q*.21+31.7);
+var f=vec3f(.2,.18,.13);if(a>.52){f=vec3f(.09,.105,.06);}if(a+c<.82){f=vec3f(.085,.06,.04);}if(c>.63){f=vec3f(.03,.032,.026);}al=mix(f,al,fa);}
+if(up){ // 왼팔 특전사 부대 마크 · 오른팔 태극기 · 오른가슴 명찰
+let u=vec2f(b.z,b.y-1.3);
+if(b.x>.2&&abs(u.x)<.027-max(-u.y-.02,0.0)*1.2&&abs(u.y)<.036){al=vec3f(.02,.022,.026);cf=.5;
+if((abs(u.x)<.0035&&u.y<.026&&u.y>-.028)||(abs(u.y-.012)<.004&&abs(u.x)<.019-abs(u.y-.012))){al=vec3f(.32,.3,.24);}}
+let r=vec2f(b.z,b.y-1.335);
+if(b.x<-.2&&abs(r.x)<.024&&abs(r.y)<.016){al=vec3f(.42,.42,.4);let d=length(r);
+if(d<.0075){al=select(vec3f(.05,.1,.3),vec3f(.4,.04,.04),r.y+r.x*.6>0.0);}
+if(abs(abs(r.x)-.016)<.004&&abs(abs(r.y)-.009)<.004&&fract(b.y*500.0)>.4){al=vec3f(.02);}}
+if(b.z>.05&&b.x<-.045&&b.x>-.135&&abs(b.y-1.378)<.012){al=vec3f(.075,.08,.05);if(abs(b.y-1.378)<.006&&fract(b.x*110.0)>.45&&fract(b.x*33.0+.2)<.8){al=vec3f(.015);}}
+}
 }else if(kd<2.5){ // KPA 카키: 가죽 허리띠 · 멜빵 · 탄입대 · 깃 표지
 al=vec3f(.125,.12,.068);
 if(up){
@@ -157,7 +176,8 @@ if(m<3.5&&kd<2.5){ // 주머니 재봉선
 let pk=select(vec2f(abs(b.x)-.1,b.y-.7),vec2f(abs(b.x)-.09,b.y-1.31),up);let e=max(abs(pk.x)-.045,abs(pk.y+.01)-.055);
 al*=1.0-.3*ss(.004+px,0.0,min(abs(e),abs(pk.y-.02)+step(0.0,e)))*step(.02,b.z+f32(!up));
 }
-}else if(m<4.5){al=vec3f(.018);gl=.55;} // 군화
+}else if(m<4.5){al=vec3f(.018);gl=.55; // 군화 · 끈
+let bx=abs(b.x)-.09;if(b.y>.11&&b.y<.26&&b.z>.03&&abs(bx)<.02&&fract(b.y*85.0)>.55){al=vec3f(.05,.048,.045);gl=.2;}}
 else if(m==7.0){al=vec3f(.07,.085,.045);gl=.4;} // 철모
 else if(m==9.0){al=hc;gl=.35;}
 else if(m==10.0){al=vec3f(.035,.036,.04);gl=.65;} // 총: 강철 · 목재 · 수지
@@ -180,7 +200,7 @@ return vec4f(fogAt(c,i.w),1.0);
 }`;
 
  /* ───── 뼈대 풀이 (모델 공간 4x4, 할당 없음) ───── */
- const B=new Float32Array(18*16),T=new Float32Array(16),PAL=new Float32Array(MAXP*NB*16),TA=new Float32Array(32),IB=new Uint32Array(MAXP*2),GL=[0,1,2,3].map(()=>[]);
+ const B=new Float32Array(18*16),T=new Float32Array(16),PAL=new Float32Array(MAXP*NB*16),TA=new Float32Array(33),IB=new Uint32Array(MAXP*2),GL=[0,1,2,3].map(()=>[]);
  for(let i=15;i<288;i+=16)B[i]=1;
  const mm=(O,o,A,a,C,c)=>{ // O[o] = A[a]·C[c]
   for(let k=0;k<16;k+=4){const x=C[c+k],y=C[c+k+1],z=C[c+k+2],w=C[c+k+3];for(let r=0;r<4;r++)O[o+k+r]=A[a+r]*x+A[a+4+r]*y+A[a+8+r]*z+A[a+12+r]*w;}
@@ -220,8 +240,8 @@ return vec4f(fogAt(c,i.w),1.0);
   const ps=P._cp,u=t-P._t0,sd=P._r,sg=sd>.5?1:-1,g=P.gun,pst=g==='pistol',br=sin(t*1.4+sd*9),sw=sin(t*.45+sd*6),sit=P._sit;
   const fy=(P.p[1]>.3&&P.p[1]<.62?-P.p[1]:-.47)/P._sc,live=ps!=='dead'&&ps!=='sleep';
   a.fill(0);
-  if(sit){ // 좌석: 엉덩이 = 원점, 등받이 12°, 허벅지 수평, 발은 바닥, 손은 무릎 위
-   a[3]=-.21;a[6]=.1+.012*br;a[9]=.1+.01*sw;a[28]=a[29]=-.35;
+  if(sit){ // 좌석: 엉덩이 = 원점(골반은 등받이 쪽으로 11 cm), 등받이 12°, 허벅지 수평, 발은 바닥, 손은 무릎 위
+   a[2]=-.11;a[3]=-.21;a[6]=.1+.012*br;a[9]=.1+.01*sw;a[28]=a[29]=-.35;
    S3(a,12,-.07,-.39,.33);S3(a,15,.07,-.39,.33);S3(a,18,.1,fy,.41+.06*sd);S3(a,21,-.1,fy,.47-.06*sd);
   }else{ // 서기: 호흡 · 체중 이동, 발은 제자리
    S3(a,0,.012*sw,.915,0);a[5]=-.02*sw;a[6]=.03+.01*br;
@@ -230,9 +250,10 @@ return vec4f(fogAt(c,i.w),1.0);
   S3(a,24,0,-.92,.38);
   if(g&&!pst&&!sit){S3(a,15,.08,-.33,.16);S3(a,24,.5,-.42,.76);a[27]=1;} // 소총: 앞에총
   if(ps==='sleep'){a[3]=-.3;a[6]=.12+.02*sin(t*.9+sd*9);a[9]=.22;a[10]=sg*.25;a[11]=sg*.28;a[30]=1;}
-  else if(ps==='brace'){ // 충격 방지 자세: 숙이고 손으로 머리를 감쌈, 떨림
-   const j=.02*sin(t*27+sd*9);a[3]=.45+j;a[6]=.7;a[9]=.35;a[28]=a[29]=0;a[30]=.85;
-   S3(a,12,-.1,.16+j,.2);S3(a,15,.1,.16-j,.2);
+  else if(ps==='brace'){ // 충돌 대비 자세 (좌석 간격 0.8 m): 엉덩이를 깊이, 상체를 숙여 팔짱 낀 팔뚝을 앞 좌석 등받이에 대고 이마를 그 위에. 발은 바닥, 겁먹은 떨림
+   const j=.012*sin(t*23+sd*9),k=.006*sin(t*31+sd*5);
+   a[2]=-.13;a[3]=.06;a[6]=.26+j;a[9]=.4;a[11]=k*4;a[28]=a[29]=.2;a[30]=.85;a[32]=1; // a[32] = 손 목표가 모델 공간 절대 좌표 + 팔꿈치 앞쪽
+   S3(a,12,-.1,.56+k,.23);S3(a,15,.1,.6-k,.21);S3(a,18,.12,fy,.42);S3(a,21,-.12,fy,.42);
   }else if(ps==='walk'||ps==='run'){ // 보행: 실제 속도로 보폭·주기 결정 (디딤발은 미끄러지지 않음)
    const rn=ps==='run',v=P._v,c=rn?.38:.6,A=c/2*v/(.9+.2*v),k=Math.min(1,v/.7),ph=P._ph,cs=cos(ph);
    for(let j=0;j<2;j++){
@@ -303,11 +324,11 @@ return vec4f(fogAt(c,i.w),1.0);
   }
   for(let k=1;k>=0;k--){ // 팔 IK (오른팔 먼저: 무기가 오른 주먹에 붙고 왼손이 총을 받침)
    const i=5+k*3,s=k?-.172:.172,o=12+k*3,n=(i+2)*16,sx=B[44]+B[32]*s+B[36]*.18,sy2=B[45]+B[33]*s+B[37]*.18,sz=B[46]+B[34]*s+B[38]*.18;
-   let fx=sx+a[o],fy=sy2+a[o+1],fz=sz+a[o+2];
+   const ab=a[32];let fx=L(sx,0,ab)+a[o],fy=L(sy2,0,ab)+a[o+1],fz=L(sz,0,ab)+a[o+2];
    if(!k){const w=a[27],q=pst?.02:.24,e=pst?-.02:-.035;fx=L(fx,B[284]+B[280]*q+B[276]*e+.03*pst,w);fy=L(fy,B[285]+B[281]*q+B[277]*e,w);fz=L(fz,B[286]+B[282]*q+B[278]*e,w);}
    let tx=fx,ty=fy,tz=fz;
    for(let it=0;it<2;it++){ // 주먹 중심이 목표에 오도록 한 번 보정
-    ik(i,sx,sy2,sz,tx,ty,tz,.29,.26,s*2.5*cy-.6*sy,-.75,-.6*cy-s*2.5*sy,1);fk(i+2,i+1,a[28+k],0,0);
+    ik(i,sx,sy2,sz,tx,ty,tz,.29,.26,L(s*2.5*cy-.6*sy,s*2.5,ab),L(-.75,-.6,ab),L(-.6*cy-s*2.5*sy,0,ab),1);fk(i+2,i+1,a[28+k],0,0);
     tx+=fx-B[n+12]+B[n+4]*.075;ty+=fy-B[n+13]+B[n+5]*.075;tz+=fz-B[n+14]+B[n+6]*.075;
    }
    if(k){ // 무기 뼈: 원점 = 오른 주먹, Z = 포즈가 정한 방향
@@ -330,7 +351,7 @@ return vec4f(fogAt(c,i.w),1.0);
  };
  const mk=(kind,o)=>{
   const P=Object.assign({kind,p:[0,0,0],yaw:0,pose:'stand',look:null,aim:null,talk:0,gun:0,seed:1,hp:100,dead:false,M:null,vis:true},o),r=G.rng(P.seed*7919+131);
-  P._r=r();P._k=[r(),r(),r(),r()];P._sc=.96+r()*.08;P._a=new Float32Array(32);P._s=new Float32Array(32);P._j=new Float32Array(54);
+  P._r=r();P._k=[r(),r(),r(),r()];P._sc=.96+r()*.08;P._a=new Float32Array(33);P._s=new Float32Array(33);P._j=new Float32Array(54);
   P._g=[0,0];P._lp0=[...P.p];P._e=[0,SIT[P.pose]?.66:1.6,.09];P._mz=[0,1.3,.5,0,0,1];P._bt=1;P._t0=P._v=P._ph=P._ly=P._lp=0;P._ht=-9;
   return P;
  };
@@ -343,7 +364,7 @@ return vec4f(fogAt(c,i.w),1.0);
   if(dt>0)P._v+=(cl(d/dt,0,7)-P._v)*Math.min(1,dt*8);
   P._ph+=dt*(.9+.2*P._v)*2*PI;
   tgt(P,TA,t,dt);P._bt=Math.min(1,P._bt+dt/.3);
-  const k=ss(0,1,P._bt);for(let i=0;i<32;i++)P._a[i]=L(P._s[i],TA[i],k);
+  const k=ss(0,1,P._bt);for(let i=0;i<33;i++)P._a[i]=L(P._s[i],TA[i],k);
  };
  const list=[],FP=mk('rok',{seed:3});
  // 광선–캡슐: 광선과 선분의 최근접 거리 ≤ r 이면 진입 거리(근사)

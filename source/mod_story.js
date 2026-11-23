@@ -133,7 +133,7 @@
     if(a==='boom'){// (큰 폭발 · 김전부 자리 벽이 터진다)
       G.sfx.loop('missile',0);S.cm='seat';S.yaw=.95;S.pit=0;S.mv=0;
       boomState();S.sh=1.4;S.fix=C.K.hole;P.vis=false;P.wp=null;
-      const h=C.w(C.K.hole);G.fx.burst('explosion',h,{size:1.4});G.fx.burst('flash',h,{size:1});G.post.flash(4);
+      const h=C.w(C.K.hole);G.fx.burst('explosion',h,{size:1.4});G.fx.burst('flash',h,{size:1});G.post.flash(2.2);S.bt=G.time;
       G.sfx.play('explosion',{gain:1.6});G.sfx.play('crash');G.sfx.loop('wind',1,{gain:.7});G.sfx.loop('siren',1,{gain:.2});
       for(const k of ['col','lee','shin']) W[k].pose='brace';
       S.fm=1;S.ft=0;S.boomT=S.t;
@@ -150,7 +150,7 @@
     if(a==='glance') S.fix=C.K.hole;
     if(a==='approach'){S.cm='seat';S.fm=2;S.ft=0;S.yaw=1.05;S.pit=-.12;S.fix=[6,-1.5,5];S.spk=null;for(const k of ['col','lee','shin','park']) W[k].pose='brace';}
     if(a==='impact'){// 충돌 → 섬광 → 암전 · 이명
-      G.post.flash(6);G.sfx.play('crash',{gain:1.5});G.sfx.play('explosion',{gain:1.5});G.sfx.play('ring');
+      G.post.flash(3);G.sfx.play('crash',{gain:1.5});G.sfx.play('explosion',{gain:1.5});G.sfx.play('ring');
       for(const k of ['engine','wind','siren','cabin']) G.sfx.loop(k,0);
       S.blk=1;S.sh=2;later(.35,()=>{crashState();S.cm='seat';S.yaw=.7;S.pit=-.05;});
    }
@@ -266,16 +266,17 @@
     T[0]=eye[0] + sin(yw)*cos(pt);T[1]=eye[1] + sin(pt);T[2]=eye[2] + cos(yw)*cos(pt);
     c.pos=C.w(eye);c.target=C.w(T);const o=C.w([0,0,0]),u=C.w([0,1,0]);c.up=[u[0] - o[0],u[1] - o[1],u[2] - o[2]];
     c.near=.08;c.fov=S.cm==='scr'?.62:stand?1.15:1.12;
-    G.setEnv({indoor:C.S.crash?.7:1,exposure:C.S.crash?.72:1.15});G.shadowFocus=C.w([0,1,2]);G.shadowRange=26;
+    const wr=S.fm===3;G.setEnv({indoor:wr?.7:1,exposure:wr?.9:C.S.power<1?.95:1});G.shadowFocus=C.w([0,1,2]);G.shadowRange=26;
  }
-  function dress(dt){// 조명 · 불 · 연기 (점광 4개 예산: 천장 2 · 창/구멍 1 · 불/섬광 1)
+  function dress(dt){// 조명 · 불 · 연기 (점광 4개 예산, 센 것부터: 천장등 · 구멍/절단부 주광 · 불 · 피격 섬광)
     if(S.cm==='title'||S.cm==='ext') return;
-    const p=C.S.power,fl=p<1?p*(.7 + .3*sin(G.time*43))*(sin(G.time*3.1) + sin(G.time*7.7)>1.4?.2:1):1;
-    L(C.w([.15,1.95,3.4]),[1,.9,.76],2.4*fl,4.5);
-    L(C.w([-.3,1.9,1]),[1,.88,.74],1.6*fl,4);
+    const t=G.time,p=C.S.power,wr=S.fm===3,fl=p<1?p*(.7 + .3*sin(t*43))*(sin(t*3.1) + sin(t*7.7)>1.4?.2:1):1,
+      lc=p<1?[.86,.93,1.05]:[1,.93,.84],dl=[.82,.9,1.06];// 천장등: 정상 = 중성-따뜻 · 피격 후 = 약간 차가운 비상 전원 / 주광 = 차가운 흰빛
+    L(C.w([.15,1.95,3.4]),lc,(wr?1.2:2.2)*fl,4.5);
+    if(!wr) L(C.w([-.3,1.9,1]),lc,1.5*fl,4);
     if(C.S.hole>.5){
-      L(C.w([1.5,1.2,2.8]),C.S.crash?[1,.93,.8]:[.85,.92,1.1],1.3,4.5);
-      const h=C.w([2.1,.6,2.1]);L(h,[1,.45,.15],.8 + .4*sin(G.time*17)*sin(G.time*5),4.5);
+      L(C.w([2.7,1.4,2.8]),dl,wr?2:2.6,5.5);// 구멍 바깥에 둔 주광 → 구멍 쪽에서 드는 방향성 빛
+      const h=C.w([2.1,.6,2.1]);L(C.w([2,.8,2.4]),[1,.42,.12],.7 + .4*sin(t*17)*sin(t*5) + .25*sin(t*31),2.2);// 불: 구멍 2 m 안만 주황
       if(S.cm!=='fps'||G.frame % 2) G.fx.trail(h,C.S.crash?[0,.4,0]:C.w([0,0,-30]).map((v,i)=>v - C.w([0,0,0])[i]),'fire',dt);
       if(!C.S.crash&&R()<dt*6) G.fx.burst('smoke',C.w([1.4,1 + R(),2 + R()]),{size:.5,vel:[0,0,-25]});
    } else L(C.w([1.4,1.1,2.6]),[.8,.88,1],1.4,3.5);
@@ -283,6 +284,9 @@
       if(R()<dt*2) G.fx.burst('smoke',C.w([(R() - .5)*2.4,1.2,R()*6 - 1]),{size:.35,vel:[0,.2,0]});
       G.fx.trail(C.w([5,-.4,-2]),[0,1,0],'fire',dt*.6);
    }
+    if(wr) L(C.w([0,1.5,-7.4]),dl,2.4,8);// 꼬리 절단부로 드는 주광
+    const u=t - S.bt;if(u>=0&&u<.35) L(C.w(C.K.hole),[1,.85,.7],12*(1 - u/.35)**2,7);// 피격 섬광 (짧게)
+    if(S.cm!=='fps'||G.env.indoor>.5) G.lights=G.lights.filter(l=>l.radius<50);// fx 불 · 폭발 점광(반경 수백 m, 카메라 쪽으로 당김: 바다용)은 객실을 통째로 주황으로 물들임 → 객실에선 뺀다
  }
   function people(dt){
     for(const P of PP.list) if(P.wp){
