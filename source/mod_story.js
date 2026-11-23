@@ -17,17 +17,17 @@
     ['@','hit'],['!','missile',3.6],['!','boom',3],
     ['@','fall'],['!','fall',1.1],
     ['박창원','무슨일입니까?'],['마스크 대령','나도 몰라!'],['김민철','아니 이게 무슨..'],['신영호','추락한다!'],
-    ['김민철','이제 어떻게합니까?'],['박창원','몰라!'],['김민철','이런 젠장 환장하겠네 시발!'],
+    ['김민철','이제 어떻게합니까?'],['박창원','몰라!'],['김민철','이런 젠장 환장하겠네 시X!'],
     ['마스크 대령','야 그래도 이륙한지 20분 밖에 안 지났으니 괜찮을 거야!'],
     ['!','gear',5.5],['!','seat',.5],
-    ['마스크 대령','이게 무슨 소리야?'],['이자용','아마도 랜딩기어가 떨어지는 소리같습니다!'],['박창원','아 시발 환장하겠네!!'],['마스크 대령','이런 젠장!'],
+    ['마스크 대령','이게 무슨 소리야?'],['이자용','모르겠습니다!'],['박창원','아 tlqkf 환장하겠네!!'],['마스크 대령','이런 젠장!'],
     ['@','news'],['!','news',1.6],
     ['뉴스 앵커','속보입니다. 일주일전, 리충성이라는 인민군이 김준호 국무위원장을 살해했습니다. 이것으로 인해 대한민국 공격이 우려되며...'],
-    ['!','seat',.4],['박창원','야 김민철!'],['김민철','옙!'],['박창원','김전부는?'],['!','glance',0],['김민철','전사했습니다..'],['박창원','이런 시발! 벌써 뒤졌어?'],
+    ['!','seat',.4],['박창원','야 김민철!'],['김민철','옙!'],['박창원','김전부는?'],['!','glance',0],['김민철','전사했습니다..'],['박창원','이런 tlqkf! 벌써 뒤졌어?'],
     ['@','crash'],['!','approach',4.6],['!','impact',3.4],['!','wake',3.2],
-    ['@','board'],['!','storm',2.6],['마스크 대령','저기 북한새끼들이다!'],['박창원','시발놈들!! 복수할거다!!'],['!','level',2.2],
+    ['@','board'],['!','storm',2.6],['마스크 대령','저기 북한ㅅㄲ들이다!'],['박창원','저 🐶ㅅㄲ들!! 복수할거다!!'],['!','level',2.2],
     ['@','fight'],['!','fight',.3],
-    ['박창원','돌격!!'],['김민철','죽어라!!'],['마스크 대령','돌격하라!!'],['김민철','저 시발놈들의 두개골을 박살내주마!!!'],['박창원','뒤져라 이 개씹새끼들아!!'],['신영호','뒤져!!!'],
+    ['박창원','돌격!!'],['김민철','죽어라!!'],['마스크 대령','돌격하라!!'],['김민철','저 tlqkf놈들의 두개골을 박살내주마!!!'],['박창원','뒤져라 이 🐶씹ㅅㄲ들아!!'],['신영호','뒤져!!!'],
     ['!','hold',0],
   ];
   const BEATS=['cruise','talk','hit','fall','news','crash','board','fight','end'];
@@ -341,10 +341,10 @@
     init(){
       G.css(`#ov,#dl,#cap,#ttl,#vl,#bk,#sk,#end{position:absolute}
 #ov{inset:0;display:grid;align-content:center;justify-items:start;padding:0 7vw;background:linear-gradient(90deg,#000d,#0007 45%,#0000 78%);pointer-events:auto;color:#dfe8f2}
-#ov .tb{margin:0 0 1.1em;padding:.25em .9em .3em;font:600 max(11px,.95vw) system-ui;letter-spacing:.28em;color:#dfe8f2;text-decoration:none;border:1px solid #fff5;border-radius:999px;background:#0006}#ov .tb b{color:#e03b3b}#ov .tb:hover{color:#fff;border-color:#e03b3b}
-#ov h1{margin:0;font:800 6.2vw/.95 system-ui;letter-spacing:.05em;color:#fff}#ov h1 i{display:block;font-style:normal;color:#e03b3b}
+#ov .tb{margin:0 0 1.1em;padding:.25em .9em .3em;font:600 max(11px,.95vw) system-ui;letter-spacing:.28em;color:#dfe8f2;text-decoration:none;border:1px solid #fff5;border-radius:999px;background:#0006}#ov .tb b{color:#fff}#ov .tb:hover{color:#fff;border-color:#fff}
+#ov h1{margin:0;font:800 6.2vw/.95 system-ui;letter-spacing:.05em;color:#fff}#ov h1 i{display:block;font-style:normal;color:#fff}
 #ov p{margin:.35em 0;font-size:1.6vw}#ov .k{font-size:max(11px,1.05vw);color:#9fb1c4;line-height:1.7;margin-top:1.4em}#ov .k b{color:#dfe8f2;font-weight:600}
-#ov button,#end button{margin:1.1em 0 .2em;padding:.5em 2.4em;font:700 1.9vw system-ui;letter-spacing:.3em;color:#fff;background:#b42222;border:0;border-radius:6px;cursor:pointer;box-shadow:0 6px 30px #b4222266;pointer-events:auto}
+#ov button,#end button{margin:1.1em 0 .2em;padding:.5em 2.4em;font:700 1.9vw system-ui;letter-spacing:.3em;color:#0b0f14;background:#fff;border:0;border-radius:6px;cursor:pointer;box-shadow:0 6px 30px #fff4;pointer-events:auto}
 #dl{left:50%;bottom:6vh;transform:translateX(-50%);width:min(820px,88vw);padding:.7em 1.4em .8em;background:#0a0e14d8;border-radius:8px;font:500 2.4vh/1.45 system-ui;color:#f2f4f7;text-align:center;opacity:0;transition:opacity .35s}
 #dl b{display:block;font-size:.66em;letter-spacing:.12em;margin-bottom:.2em}
 #cap{left:50%;top:12vh;transform:translateX(-50%);width:min(860px,84vw);text-align:center;font:italic 400 2.5vh/1.7 serif;color:#fff;text-shadow:0 0 14px #000;transition:opacity 1.2s;opacity:0}
