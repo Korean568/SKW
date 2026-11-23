@@ -208,7 +208,19 @@
     S.cm={cruise:'ext',talk:'seat',hit:'ext',fall:'seat',news:'scr',crash:'seat',board:'stand',fight:'stand'}[name]||'seat';
     S.yaw=name==='board'?.55:.3;S.pit=-.05;showDl(0);
  }
-  function start(){G.sfx.init();G.sfx.loop('engine',1,{gain:.3,rate:1.6});G.sfx.loop('cabin',1,{gain:.4});G.sfx.music('calm');go(G.params.get('scene')||'cruise');}
+  let sel=1;// 챕터 선택 (1 = 스토리 1)
+  function pick(n){sel=n;ui.ov&&ui.ov.querySelectorAll('.ch>div').forEach((e,i)=>e.className=i + 1===n?'on':'');}
+  function begin(n){
+    if(n!==2) return start();
+    ui.ov.style.display='none';ui.end.style.display='none';C.on=false;G.village&&(G.village.on=true);PP.clear();
+    G.story2&&G.story2.start&&G.story2.start();
+ }
+  function title(){// 스토리 2 → 처음 화면
+    try {G.story2&&G.story2.stop&&G.story2.stop();} catch (e){G.err('[story] ' + e);}
+    C.on=true;G.village&&(G.village.on=false);S.on=0;S.beat='title';S.cm='title';S.blk=0;wait.length=0;stage();
+    G.setEnv({sunEl:34,sunAz:65,indoor:0,exposure:1});ui.end.style.display='none';ui.ov.style.display='grid';G.sfx.music('calm');
+ }
+  function start(){G.sfx.init();G.sfx.loop('engine',1,{gain:.3,rate:1.6});G.sfx.loop('cabin',1,{gain:.4});G.sfx.music('calm');go(G.params.get('story')!=='2'&&G.params.get('scene')||'cruise');}
 
   /* ── 매 프레임 ── */
   function fly(dt){
@@ -310,8 +322,9 @@
     try {
       if(!S.st){// 첫 프레임: 배치 (다른 모듈 init 이후)
         S.st=1;
-        if(!S.on){stage();if(G.params.has('autostart')||G.params.has('scene')) start();}
+        if(!S.on&&!(G.story2&&G.story2.on)){stage();if(G.params.get('story')==='2') begin(2);else if(G.params.has('autostart')||G.params.has('scene')) start();}
      }
+      if(G.story2&&G.story2.on) return;// 스토리 2 진행 중: 스토리 1 은 쉼
       const sk=S.on&&G.keys.Tab&&S.cm!=='fps'?4:1,sd=dt*sk;// Tab 누르고 있으면 빨리 감기
       if(S.on){
         S.t+=sd;
@@ -336,14 +349,15 @@
       if(G.frame % 6===0&&G.cam.target) G.sfx.listener(G.cam.pos,V3.norm(V3.sub(G.cam.target,G.cam.pos)));
    } catch (e){G.err('[story] ' + (e.stack||e));}
  }
-  G.story={S,go,start,news};
+  G.story={S,go,start,news,title,begin,pick};
   G.register('story',{
     init(){
       G.css(`#ov,#dl,#cap,#ttl,#vl,#bk,#sk,#end{position:absolute}
 #ov{inset:0;display:grid;align-content:center;justify-items:start;padding:0 7vw;background:linear-gradient(90deg,#000d,#0007 45%,#0000 78%);pointer-events:auto;color:#dfe8f2}
 #ov .tb{margin:0 0 1.1em;padding:.25em .9em .3em;font:600 max(11px,.95vw) system-ui;letter-spacing:.28em;color:#dfe8f2;text-decoration:none;border:1px solid #fff5;border-radius:999px;background:#0006}#ov .tb b{color:#fff}#ov .tb:hover{color:#fff;border-color:#fff}
 #ov h1{margin:0;font:800 6.2vw/.95 system-ui;letter-spacing:.05em;color:#fff}#ov h1 i{display:block;font-style:normal;color:#fff}
-#ov p{margin:.35em 0;font-size:1.6vw}#ov .k{font-size:max(11px,1.05vw);color:#9fb1c4;line-height:1.7;margin-top:1.4em}#ov .k b{color:#dfe8f2;font-weight:600}
+#ov p{margin:.35em 0;font-size:1.6vw}
+#ov .ch{margin-top:.4em}#ov .ch>div{margin:.5em 0;padding:.1em 0 .1em 1em;border-left:3px solid #fff3;opacity:.5;cursor:pointer;pointer-events:auto;transition:opacity .3s,border-color .3s}#ov .ch>div.on{opacity:1;border-color:#e03b3b}#ov .ch p{margin:.2em 0;font-size:1.35vw}#ov .ch p+p{font-size:1.05vw;color:#aebccb}#ov .k{font-size:max(11px,1.05vw);color:#9fb1c4;line-height:1.7;margin-top:1.4em}#ov .k b{color:#dfe8f2;font-weight:600}
 #ov button,#end button{margin:1.1em 0 .2em;padding:.5em 2.4em;font:700 1.9vw system-ui;letter-spacing:.3em;color:#0b0f14;background:#fff;border:0;border-radius:6px;cursor:pointer;box-shadow:0 6px 30px #fff4;pointer-events:auto}
 #dl{left:50%;bottom:6vh;transform:translateX(-50%);width:min(820px,88vw);padding:.7em 1.4em .8em;background:#0a0e14d8;border-radius:8px;font:500 2.4vh/1.45 system-ui;color:#f2f4f7;text-align:center;opacity:0;transition:opacity .35s}
 #dl b{display:block;font-size:.66em;letter-spacing:.12em;margin-bottom:.2em}
@@ -355,13 +369,19 @@
 #end h2{margin:0 0 .4em;font:800 5vw system-ui;letter-spacing:.08em}#end h2.r{color:#e03b3b}#end .c{font-style:italic;color:#aab8c6}`);
       const nh=G.params.has('nohud');
       ui.vl=G.el('div',{id:'vl'});ui.bk=G.el('div',{id:'bk'});
-      ui.ov=G.el('div',{id:'ov',innerHTML:`<a class=tb href="https://tribe3dgames.vercel.app/" target=_blank rel=noopener>TRIBE <b>3D</b> GAMES ↗</a><h1>SECOND<i>KOREAN WARS</i></h1><p>스토리 1 — 서강시 : 전쟁의 시작 · 대한민국편</p><p>플레이어: 김민철 하사</p><button>시 작</button><div class=k><b>컷신</b> 마우스: 둘러보기 · Tab 누르기: 빨리 감기<br><b>전투</b> WASD 이동 · 마우스 조준 · 왼쪽 클릭 사격 · 오른쪽 클릭 정조준 · R 재장전 · E 줍기 · Shift 달리기 · C 앉기<br><b>F2</b> 그래픽 설정 · Enter 시작</div>`});
+      ui.ov=G.el('div',{id:'ov',innerHTML:`<a class=tb href="https://tribe3dgames.vercel.app/" target=_blank rel=noopener>TRIBE <b>3D</b> GAMES ↗</a><h1>SECOND<i>KOREAN WARS</i></h1><div class=ch><div class=on><p>스토리 1 — 서강시 : 전쟁의 시작 · 대한민국편</p><p>플레이어: 김민철 하사</p></div><div><p>스토리 2 — 북한 마을 : 5일전으로 · 조선민주주의인민공화국편</p><p>플레이어: 북한 군인(동무) · AKM 소총</p></div></div><button>시 작</button><div class=k><b>컷신</b> 마우스: 둘러보기 · Tab 누르기: 빨리 감기<br><b>전투</b> WASD 이동 · 마우스 조준 · 왼쪽 클릭 사격 · 오른쪽 클릭 정조준 · R 재장전 · E 줍기 · Shift 달리기 · C 앉기<br><b>F2</b> 그래픽 설정 · Enter 시작</div>`});
       ui.dl=G.el('div',{id:'dl'});ui.cap=G.el('div',{id:'cap'});ui.ttl=G.el('div',{id:'ttl'});
       ui.sk=G.el('div',{id:'sk',textContent:'건너뛰기 ▸'});ui.end=G.el('div',{id:'end'});
       if(nh) for(const k of ['dl','cap','ttl','sk']) ui[k].style.visibility='hidden';
-      ui.ov.querySelector('button').onclick=start;
+      ui.ov.querySelector('button').onclick=()=>begin(sel);
+      ui.ov.querySelectorAll('.ch>div').forEach((e,i)=>{e.onclick=()=>pick(i + 1);e.ondblclick=()=>begin(i + 1);});
       ui.sk.onclick=()=>{S.nx=Math.min(S.nx,S.t);S.lineEnd=S.t;};
-      addEventListener('keydown',e=>{if(e.code==='Enter'&&!S.on) start();});
+      addEventListener('keydown',e=>{
+        if(S.on||G.story2&&G.story2.on||ui.ov.style.display==='none') return;
+        if(e.code==='Enter') begin(sel);
+        if(e.code==='ArrowUp'||e.code==='Digit1') pick(1);
+        if(e.code==='ArrowDown'||e.code==='Digit2') pick(2);
+     });
       G.canvas.addEventListener('click',()=>{S.on&&S.beat!=='end'&&G.canvas.requestPointerLock&&G.canvas.requestPointerLock();});
       addEventListener('mousemove',e=>{
         if(!S.on||S.cm==='fps'||!(document.pointerLockElement===G.canvas||e.buttons)) return;
