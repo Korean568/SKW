@@ -271,7 +271,7 @@
  }
   function drawKnives(){
     if(!G.draw||!G.meshes||!G.meshes.s3knife) return;
-    for(const k of kn.fly) G.draw('s3knife',M4.trs(k.p,k.yaw,-k.s,0,1));
+    for(const k of kn.fly) G.draw('s3knife',M4.trs(k.p,k.yaw,-k.s,0,1.3));
     for(const k of kn.fl) G.draw('s3knife',M4.trs(k.p,k.yaw,0,k.r,1));
  }
   function knifeMesh(){// 투척단검: 마름모 단면 칼날 · 가드 · 손잡이 (모델 +Z = 칼끝, 칼날 면은 XZ 평면)
@@ -353,11 +353,12 @@
     if(a==='raise'){const P=W.ok;P.gun='pistol';P.pose='aim';P.aim=eyeMe();P.look=eyeMe();sfx('click',{gain:.7,rate:.7});S.fix=P;S.fixF=S.t + 2;}
     if(a==='burst'){// 문이 벌컥: 고혁명
       S.dof=1;S.dofR=5;sfx('crash',{gain:.4,rate:1.8});const o=k.office.door,u=oIn(),P=W.ko;
-      P.vis=true;P.wp=null;P.p=offAt(o,u,-.8);P.yaw=atan2(u[0],u[2]);walk(P,[offAt(o,u,1)],3,Q=>{Q.pose='aim';Q.aim=eye(W.ok);Q.look=eye(W.ok);},'run');
-      S.fix=P;S.fixF=S.t + 4;S.fixR=5;
+      const f=fw(me.yaw),q=at([me.p[0] - f[2]*1.7 + f[0]*.5,0,me.p[2] + f[0]*1.7 + f[2]*.5]);// 문에서 리충성 옆으로 뛰어듦 (곁눈으로 보임)
+      P.vis=true;P.wp=null;P.p=offAt(o,u,-.8);P.yaw=atan2(u[0],u[2]);walk(P,[offAt(o,u,1.2),q],3.4,Q=>{Q.pose='aim';Q.aim=eye(W.ok);Q.look=eye(W.ok);},'run');
+      later(.6,()=>{S.fix=P;S.fixF=S.t + 3;S.fixR=3;S.lw=1.25;});
    }
     if(a==='fire'){// 이미 방아쇠를 당겼다 — 총성 순간 암전, 몸은 보여주지 않는다
-      S.fix=W.ok;S.fixF=S.t + 1;S.fixR=9;W.ok.pose='aim';
+      S.fix=W.ok;S.fixF=S.t + 1;S.fixR=9;S.lw=.6;W.ok.pose='aim';
       later(.4,()=>{S.bk=S.bkT=1;W.ok.pose='fire';sfx('gun',{gain:1.4,rate:1.1});sfx('pistol');showDl(0);later(.25,()=>sfx('ring',{gain:.25}));});
    }
     if(a==='end') end();
@@ -464,7 +465,7 @@
       const d=[tg[0] - ey[0],tg[1] - ey[1],tg[2] - ey[2]],r=S.t<S.fixF?S.fixR:S.lock?.9:1.6;
       me.yaw+=wrap(atan2(d[0],d[2]) - me.yaw)*mn(1,dt*r);me.pit+=(cl(atan2(d[1],H(d[0],d[2])),-1,1) - me.pit)*mn(1,dt*r);
    }
-    if(S.lock&&S.t>=S.fixF&&W.ok&&W.ok.vis){const y0=yawTo(me.p,W.ok.p);me.yaw=y0 + cl(wrap(me.yaw - y0),-.6,.6);me.pit=cl(me.pit,-.45,.4);}
+    if(S.lock&&W.ok&&W.ok.vis&&!W.ok.wp){const y0=yawTo(me.p,W.ok.p),w=S.lw||.6;me.yaw=y0 + cl(wrap(me.yaw - y0),-w,w);me.pit=cl(me.pit,-.45,.4);}
     S.mv-=dt;S.sh=mx(0,S.sh - dt*1.4);
     const sh=S.sh*S.sh,yw=me.yaw + sh*.05*sin(t*37),pt=me.pit + sh*.04*sin(t*29 + 1) + kn.sa*.012;
     T[0]=ey[0] + sin(yw)*cos(pt);T[1]=ey[1] + sin(pt);T[2]=ey[2] + cos(yw)*cos(pt);
@@ -550,7 +551,7 @@
     for(const e of [ui.cap,ui.ttl]) e&&(e.style.opacity=0);
     ui.end&&(ui.end.style.display='none');ui.h&&(ui.h.style.opacity=0);ui.t&&(ui.t.style.opacity=0);ui.f&&(ui.f.style.display='none');ui.fd&&(ui.fd.style.display='none');
     G.cabin&&(G.cabin.on=false);G.palace&&(G.palace.on=true);
-    S.on=1;S.t=0;S.lineEnd=0;S.spk=null;S.mv=0;S.bkR=2;S.fixR=1.8;S.dmR=.6;S.dofR=.8;S.kills=0;S.seg=0;S.hu=S.hm=0;S.k0=null;wait.length=0;gate(null);showDl(0);
+    S.on=1;S.t=0;S.lineEnd=0;S.spk=null;S.mv=0;S.bkR=2;S.fixR=1.8;S.dmR=.6;S.dofR=.8;S.kills=0;S.seg=0;S.hu=S.hm=0;S.k0=null;S.lw=.6;wait.length=0;gate(null);showDl(0);
     if(S.sea==null) S.sea=G.env.sea;
     G.setEnv({sunEl:-12,sunAz:210,cloud:.5,haze:.3,indoor:1,exposure:1.35,sea:0});
     G.sfx.init();G.sfx.loop('sea',0);G.sfx.loop('wind',1,{gain:.06,rate:.5});
