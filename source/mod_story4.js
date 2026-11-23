@@ -65,8 +65,11 @@
     const a=[l[0] + u[0]*420 + u[2]*160,gnd(l[0],l[2]) + 150,l[2] + u[2]*420 - u[0]*160],b=[l[0] + u[0]*60,gnd(l[0],l[2]) + 30,l[2] + u[2]*60],c=at(l,2);
     return mix(mix(a,b,e),mix(b,c,e),e);
  }
-  function door(){// 헬기 문 앞 (분대 쪽 1.8 m) · 내린 뒤 서는 곳
-    const k=K(),l=k.lz,m=k.meet,d=[m[0] - l[0],0,m[2] - l[2]],n=H(d[0],d[2])||1;
+  function door(){// 헬기 문 안쪽 · 내린 뒤 서는 곳 — 착륙한 헬기 행렬이 있으면 왼쪽 앞 문 (Mi-8)
+    const k=K(),l=k.lz,m=k.meet,M=RS().heli>=.999&&rc('heliM');
+    if(M&&M.length===16&&H(M[12] - l[0],M[14] - l[2])<1.5) return S.dr=[at(M4.point(M,[.8,0,4.25])),at(M4.point(M,[3.2,0,4.6]))];
+    if(S.dr) return S.dr;
+    const d=[m[0] - l[0],0,m[2] - l[2]],n=H(d[0],d[2])||1;
     return[at([l[0] + d[0]/n*1.8,0,l[2] + d[2]/n*1.8]),at([l[0] + d[0]/n*4.2,0,l[2] + d[2]/n*4.2])];
  }
 
@@ -109,14 +112,14 @@
     if(a==='door'){S.doorT=1;S.rotT=.45;S.fix=d0;S.fixF=S.t + 4;}
     if(a==='out'){// 고혁명이 내린다 · 부하들은 소총을 내린 채 헬기 옆으로
       const P=W.ko;P.vis=true;P.p=d0.slice();P.look=at(k.start,1.6);
-      walk(P,[d1],.9,Q=>{Q.pose='handsup';Q.yaw=yawTo(Q.p,k.start);});
+      walk(P,[d1],.9,Q=>{Q.pose='handsup';Q.yaw=yawTo(Q.p,k.start);});P.free=1;
       W.sq.forEach((Q,i)=>Q.tgt=i<2?W.ko:Q.tgt);
-      W.crew.forEach((C,i)=>later(.9 + i*.6,()=>{C.p=d0.slice();walk(C,[C.home],1.1,Q=>{Q.yaw=Q.home[3]!=null?Q.home[3]:yawTo(Q.p,k.meet);Q.look=at(k.meet,1.5);});}));
+      W.crew.forEach((C,i)=>later(.9 + i*.6,()=>{C.p=d0.slice();walk(C,[d1,C.home],1.1,Q=>{Q.yaw=Q.home[3]!=null?Q.home[3]:yawTo(Q.p,k.meet);Q.look=at(k.meet,1.5);});C.free=1;}));
       later(2.6,()=>W.sq.forEach((Q,i)=>{if(i>1&&W.crew.length) Q.tgt=Q.face=W.crew[i % W.crew.length];}));
    }
     if(a==='walk'){// (고혁명이 특전사들한테 다가온다) — 손을 보인 채 천천히
       const P=W.ko;P.look=at(k.start,1.6);S.fix=P;S.fixF=S.t + 3;
-      later(1.2,()=>walk(P,[at(k.meet)],1.05,Q=>{Q.pose='handsup';Q.yaw=yawTo(Q.p,k.start);}));
+      later(1.2,()=>walk(P,[at(k.meet)],1.15,Q=>{Q.pose='handsup';Q.yaw=yawTo(Q.p,k.start);}));
    }
     if(a==='aimko'){// (총을 겨누며) — 대령이 한 걸음 나서며 고혁명을 겨눈다
       const C=W.col,f=fw(yawTo(C.p,W.ko.p));low(C);
@@ -188,12 +191,12 @@
     if(S.cm==='est'){// 시작: 폐허 너머로 다가오는 헬기 (분대 뒤에서 망원으로)
       const u=U(),sd=[u[2],0,-u[0]],e=ss(0,18,S.ct),s=k.start,h=hp();
       let p=[s[0] - u[0]*(9 - 3*e) + sd[0]*(4.5 - 1.5*e),0,s[2] - u[2]*(9 - 3*e) + sd[2]*(4.5 - 1.5*e)];p=col(p,.4);p[1]+=2.4 - .6*e + .03*sin(t*.7);
-      const d=V3.dist(p,h),tg=mix(h,at(k.lz,5),.12 + .1*(1 - e));
-      c.pos=p;c.target=tg;c.up=[0,1,0];c.near=.2;c.fov=cl(2*Math.atan(55/d),.32,.95);return;
+      const d=V3.dist(p,h),tg=mix(h,at(k.lz,5),.05);
+      c.pos=p;c.target=tg;c.up=[0,1,0];c.near=.2;c.fov=cl(2*Math.atan(26/d),.17,.95);return;
    }
     if(S.cm==='cut'&&W.okc){// 집무실: 리옥선이 무전기를 내던진다
       const P=W.okc,f=fw(P.yaw),sd=[f[2],0,-f[0]],e=PP.eye(P),w=ss(0,1.9,S.ct);
-      c.pos=[P.p[0] + f[0]*2.5 + sd[0]*(.7 - .3*w),P.p[1] + 1.45,P.p[2] + f[2]*2.5 + sd[2]*(.7 - .3*w)];
+      c.pos=[P.p[0] + f[0]*2.9 + sd[0]*(.8 - .3*w),P.p[1] + 1.4,P.p[2] + f[2]*2.9 + sd[2]*(.8 - .3*w)];
       c.target=[e[0],e[1] - .25,e[2]];c.up=[0,1,0];c.near=.08;c.fov=.85;return;
    }
     // 1인칭
@@ -221,8 +224,8 @@
       if(P.face&&!P.wp){const y=yawTo(P.p,P.face);P.yaw+=wrap(y - P.yaw)*mn(1,dt*2.5);}// 몸을 겨눈 쪽으로 천천히
       if(!P.wp) continue;
       const w=P.wp[0],dx=w[0] - P.p[0],dz=w[2] - P.p[2],d=H(dx,dz);
-      if(d<.08||P.stk>3){if(d>=.08) P.p=at(w);P.wp.shift();P.stk=0;if(!P.wp.length){P.wp=null;P.pose='stand';P.done&&P.done(P);}continue;}// 3 s 막히면 경유점으로
-      const s=mn(d,P.sp*dt),q=col([P.p[0] + dx/d*s,P.p[1],P.p[2] + dz/d*s],.25);
+      if(d<.08||P.stk>3){if(d>=.08) P.p=at(w);P.wp.shift();P.stk=0;if(!P.wp.length){P.wp=null;P.free=0;P.pose='stand';P.done&&P.done(P);}continue;}// 3 s 막히면 경유점으로
+      const s=mn(d,P.sp*dt),q=P.free?at([P.p[0] + dx/d*s,0,P.p[2] + dz/d*s]):col([P.p[0] + dx/d*s,P.p[1],P.p[2] + dz/d*s],.25);
       P.stk=dxz(q,P.p)<s*.3?P.stk + dt:0;P.p=q;
       P.yaw+=wrap(Math.atan2(dx,dz) - P.yaw)*mn(1,dt*5);
    }
@@ -240,7 +243,7 @@
     if(S.cut) G.setEnv({indoor:.85});else G.setEnv({indoor:0});
     G.shadowFocus=S.cut&&W.okc?W.okc.p:mix(at(k.start),at(k.lz),.35);G.shadowRange=S.cut?12:30;
     // 먼 연기 기둥
-    if(G.fx&&G.fx.burst&&!S.cut&&(S.smT-=dt)<0){
+    if(!G.ruins&&G.fx&&G.fx.burst&&!S.cut&&(S.smT-=dt)<0){
       S.smT=.22;const u=U(),l=k.lz;
       for(const [a,b] of [[90,-55],[150,35],[120,95]]) G.fx.burst('smoke',[l[0] + u[0]*a + u[2]*b,gnd(l[0],l[2]) + 2,l[2] + u[2]*a - u[0]*b],{vel:[.9,4,.4],size:1.1});
    }
@@ -305,9 +308,9 @@
     for(const e of [ui.cap,ui.ttl]) e&&(e.style.opacity=0);
     ui.end&&(ui.end.style.display='none');ui.t.style.opacity=0;ui.h.style.opacity=0;
     G.cabin&&(G.cabin.on=false);G.village&&(G.village.on=false);G.palace&&(G.palace.on=false);G.ruins&&(G.ruins.on=true);
-    S.on=1;S.t=0;S.lineEnd=0;S.spk=null;S.line='';S.mv=0;S.wk=0;S.bkR=2;S.g=null;S.rb=0;S.radio=0;S.gunT=3;wait.length=0;showDl(0);
+    S.on=1;S.t=0;S.dr=null;S.lineEnd=0;S.spk=null;S.line='';S.mv=0;S.wk=0;S.bkR=2;S.g=null;S.rb=0;S.radio=0;S.gunT=3;wait.length=0;showDl(0);
     const u=U(),az=Math.atan2(u[0],u[2])*180/PI + 48;// 낮은 해: 헬기 쪽 비스듬히 뒤
-    G.setEnv({sunEl:8,sunAz:az,cloud:.8,haze:.6,cloudBase:1400,cloudTop:3200,indoor:0,exposure:1.1});
+    G.setEnv(Object.assign({sunEl:8,sunAz:az,cloud:.8,haze:.6,cloudBase:1400,cloudTop:3200,indoor:0,exposure:1.1},RU().ENV));// 폐허 모듈이 정한 새벽이 우선
     G.sfx.init();G.sfx.loop('wind',1,{gain:.35,rate:.55});G.sfx.music('calm');
  }
   function start(){const sc=!S.st&&G.params.get('story')==='4'&&G.params.get('scene');S.st=1;go(sc||'intro');}

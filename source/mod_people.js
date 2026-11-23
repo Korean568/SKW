@@ -169,7 +169,7 @@ var al=vec3f(.03);var gl=.5;var tc=vec3f(0.0);var sk=0.0;var ao=1.0;var hi=0.0;v
 let hc=vec3f(.022,.018,.016);
 if(m>16.5){if(m<17.5){ // 단검 날: 새틴 강철 (길이 방향 헤어라인 · 밝은 날 연마면 · 주변 반사)
  al=vec3f(.15,.155,.16)*(.94+.06*sin(b.y*1900.0)*clamp(1.0-px*900.0,0.0,1.0));gl=.62;al=mix(al,vec3f(.3,.31,.32),ss(.0016,.0006,abs(b.x)));
- tc=(ambAt(reflect(-E,N))*.55+pointLights(i.w,reflect(-E,N))*.1)*al*3.0;}
+ tc=(ambAt(reflect(-E,N))*.55+pointLights(i.w,reflect(-E,N))*.1)*al*1.5;}
 else{al=vec3f(.085,.095,.058)*(.85+.3*n3(b*300.0));gl=.32;cf=.15; // 무전기: 짙은 올리브 수지, 바깥 면에 스피커 홈
  if(b.x>.018&&b.y>.02&&b.y<.1&&abs(b.z)<.026&&fract(b.y*110.0)<.4){al*=.35;}}
 }else if(m<1.5){ // 피부
@@ -432,7 +432,7 @@ return vec4f(fogAt(c,i.w),1.0);
    const K=[[R*.1,.13,-.2],[0,.21,.3],[-R*.14,-.32,.36]];
    for(let i=0;i<3;i++){const v=L(L(L(a[o+i],K[0][i],k1),K[1][i],k2),K[2][i],k3);a[o+i]=L(a[o+i],v,w);a[p+i]=L(a[p+i],[-R*.03,-.14,.36][i],w*k1*(1-k3));}
    a[7]+=w*R*(.38*k1-.65*k2);a[6]+=w*(.22*k2-.05*k1);a[3]+=w*.08*k2;a[27]*=1-w;a[32]*=1-w;a[33]*=1-w;a[34]*=1-w;a[39]*=1-w;
-   S3(a,35,1.2,.8,-1);a[38]=L(a[38],1,w*(1-k3));
+   S3(a,35,1.2,.8,-1);a[38]=L(a[38],1,w*(1-k3));a[R>0?41:40]=w*(1-k3); // 팔꿈치 극은 던지는 팔에만
    if(kn){a[24]=L(a[24],0,w);a[25]=L(a[25],L(.8,-.1,k2),w);a[26]=L(a[26],L(-.5,1,k2),w);}
   }
   // 시선: 머리가 부드럽게 따라가고 눈이 먼저 감
@@ -457,11 +457,11 @@ return vec4f(fogAt(c,i.w),1.0);
   S3(a,24,sw[0]*.4+.22*rl,sw[1]*.4+.05*kk+.3*rl,1);a[27]=1-rl;S3(a,12,-.2,-.2,.3);
   if(F.gun==='knife'){ // 단검: 오른손 낮게 앞으로 (날이 보이게) · kick = 찌르기 · throw = 머리 위로 던짐(0.5 에서 놓음)
    const th=F.throw||0,st=kk>0?sin(PI*(1-kk))**.7:0,k1=ss(0,.34,th),k2=ss(.34,.5,th),k3=ss(.5,.85,th),w=th>0?1-ss(.85,1,th):0;
-   let h=[.03+cos(bb*.5)*.005+.05*st+sw[0]*.05,-.1+sin(bb)*.007+.06*st+sw[1]*.05,.27+.2*st],d=[.24-.1*st,.3-.2*st,1];
-   const K=[[-.07,.27,-.02],[.06,.14,.42],[.2,-.24,.3]],D=[[.05,.7,-.4],[.1,.05,1]];
+   let h=[.05+cos(bb*.5)*.005+.05*st+sw[0]*.05,-.045+sin(bb)*.007+.05*st+sw[1]*.05,.3+.2*st],d=[.2-.1*st,.36-.22*st,1];
+   const K=[[-.07,.27,-.02],[.06,.12,.42],[.2,-.24,.3]],D=[[.05,.7,-.4],[.1,.05,1]];
    if(w>0){for(let i=0;i<3;i++){h[i]=L(h[i],L(L(L(h[i],K[0][i],k1),K[1][i],k2),K[2][i],k3),w);d[i]=L(d[i],L(D[0][i],D[1][i],k2),w*(1-k3));}
     a[6]=.1*w*k2;}
-   S3(a,15,...h);S3(a,24,...d);a[27]=0;a[29]=-.15;S3(a,12,L(-.06,-.1,w*k1*(1-k3)),L(-.25,-.13,w*k1*(1-k3)),L(.25,.34,w*k1*(1-k3)));
+   S3(a,15,...h);S3(a,24,...d);a[27]=0;a[29]=-.15;a[43]=.9; // a[43] = 날 롤 (넓은 면이 보이게)S3(a,12,-.06,-.3,.25);
   }
  };
  const solve=(P,a,sl)=>{
@@ -481,7 +481,7 @@ return vec4f(fogAt(c,i.w),1.0);
     const x=a[o],y=a[o+1],z=a[o+2];fx*=1-wf;fy*=1-wf;fz*=1-wf;
     for(const[w,q]of[[wh,64],[a[34],32]])if(w>0){fx+=w*(B[q+12]+B[q]*x+B[q+4]*y+B[q+8]*z);fy+=w*(B[q+13]+B[q+1]*x+B[q+5]*y+B[q+9]*z);fz+=w*(B[q+14]+B[q+2]*x+B[q+6]*y+B[q+10]*z);}
    }
-   const pw=a[38],px0=a[35]*Math.sign(s),pz0=a[37];
+   const pw=a[38]*(1-a[40+k]),px0=a[35]*Math.sign(s),pz0=a[37];
    const PX=L(L(s*2.5*cy-.6*sy,s*2.5,ab),px0*cy+pz0*sy,pw),PY=L(L(-.75,-.6,ab),a[36],pw),PZ=L(L(-.6*cy-s*2.5*sy,0,ab),pz0*cy-px0*sy,pw);
    if(!k){const w=a[27],q=pst?.02:.24,e=pst?-.02:-.035;fx=L(fx,B[284]+B[280]*q+B[276]*e+.03*pst,w);fy=L(fy,B[285]+B[281]*q+B[277]*e,w);fz=L(fz,B[286]+B[282]*q+B[278]*e,w);}
    let tx=fx,ty=fy,tz=fz;
@@ -493,6 +493,7 @@ return vec4f(fogAt(c,i.w),1.0);
     let zx=a[24],zy=a[25],zz=a[26],l=H(zx,zy,zz)||1;zx/=l;zy/=l;zz/=l;l=H(zx,zz)||1;
     const xx=zz/l,xz=-zx/l;
     S3(B,272,xx,0,xz);S3(B,276,zy*xz,zz*xx-zx*xz,-zy*xx);S3(B,280,zx,zy,zz);
+    const r=a[43];if(r)for(let i=0;i<3;i++){const x=B[272+i],y=B[276+i];B[272+i]=cos(r)*x+sin(r)*y;B[276+i]=cos(r)*y-sin(r)*x;} // 무기 롤
     S3(B,284,B[n+12]-B[n+4]*.075,B[n+13]-B[n+5]*.075,B[n+14]-B[n+6]*.075);
     const q=pst?.16:P.gun==='knife'?.2:.6;S3(P._mz,0,B[284]+B[276]*.05+zx*q,B[285]+B[277]*.05+zy*q,B[286]+B[278]*.05+zz*q);S3(P._mz,3,zx,zy,zz);
    }

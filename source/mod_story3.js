@@ -56,8 +56,8 @@
 
   /* ── 주석궁 계약 (없으면 대체 배치: 회의실 → 복도 → 집무실) ── */
   const FK=(()=>{
-    const seats=[];for(let i=0;i<3;i++) for(const s of [1,-1]) seats.push([s*1.5,0,-2.2 + i*2.2,s>0?-PI/2:PI/2]);
-    return{meet:{centre:[0,0,0],seats,head:[0,0,-4.4,0],doors:[0,0,6,0]},
+    const seats=[];for(let i=0;i<3;i++) for(const s of [1,-1]) seats.push([s*1.5,.47,-2.2 + i*2.2,s>0?-PI/2:PI/2]);
+    return{meet:{centre:[0,0,0],seats,head:[0,.47,-4.4,0],doors:[0,0,6,0]},
       path:[[0,0,7.6],[0,0,12],[0,0,17],[0,0,22],[5,0,24],[11,0,24],[17,0,24],[22,0,26],[24,0,31],[24,0,36],[24,0,40]],
       ko:[3,0,21.5,-PI/2],spawns:[[-3,0,14,PI/2],[3,0,16,-PI/2],[-3,0,26,PI],[8,0,27,PI],[14,0,21,0],[20,0,21,0],[27,0,28,-PI/2],[21,0,33,PI/2],[27,0,37,-PI/2],[0,0,27,PI],[21,0,38,PI/2]],
       office:{door:[24,0,41.5,0],centre:[24,0,45],desk:[24,0,48,PI],kneel:[24,0,44.8,0],ok:[24,0,46.8,PI],ambush:[[21.6,0,43,PI/2],[26.4,0,43,-PI/2],[22.4,0,48,PI]]},
@@ -75,6 +75,7 @@
   const yawTo=(a,b)=>atan2(b[0] - a[0],b[2] - a[2]);
   const wrap=a=>atan2(sin(a),cos(a));
   const at=(q,dy=0)=>[q[0],gnd(q[0],q[2]) + dy,q[2]];
+  const seat=q=>at(q,q[1]>.2&&q[1]<.8?q[1]:.47);// 의자: 좌판 위 엉덩이 점
   const lerp3=(a,b,u)=>[a[0] + (b[0] - a[0])*u,a[1] + (b[1] - a[1])*u,a[2] + (b[2] - a[2])*u];
   const nrm=v=>{const l=H(v[0],v[1],v[2])||1;return[v[0]/l,v[1]/l,v[2]/l];};
   const los=(a,b)=>{const d=[b[0] - a[0],b[1] - a[1],b[2] - a[2]],l=H(...d)||1;return wray(a,[d[0]/l,d[1]/l,d[2]/l],l)>=l - .25;};
@@ -101,12 +102,12 @@
   function stage(n){// n = 장면 번호: 그 장면 시작 상태를 배치
     const k=K(),m=k.meet,c=m.centre;
     PP.clear();W.o=[];W.storm=[];W.amb=[];E.length=0;wait.length=0;kn.fly.length=0;kn.fl.length=0;kn.n=6;
-    S.dm=n===1?1:0;S.dof=n===6?1:0;const d=doors();if(d){d.meet=S.dm;d.office=S.dof;}
+    S.dm=n===1||n===2?1:0;S.dof=n===6?1:0;const d=doors();if(d){d.meet=S.dm;d.office=S.dof;}
     if(n<4) m.seats.slice(0,6).forEach((q,i)=>{// 고위간부: 다른 얼굴 · 회의 중엔 의자에 앉음
-      const P=add('suit',{p:at(q),yaw:q[3],pose:'sitchair',seed:11 + i*17,look:at(c,1.1)});
+      const P=add('suit',{p:seat(q),yaw:q[3],pose:'sitchair',seed:11 + i*17,look:at(c,1.1)});
       if(n>=3){P.vis=false;P.dead=true;}W.o.push(P);
    });
-    W.me=add('suit',{p:at(m.head),yaw:m.head[3],pose:'sitchair',seed:5,vis:false});// 시작 장면에서만 보이는 리충성
+    W.me=add('suit',{p:seat(m.head),yaw:m.head[3],pose:'sitchair',seed:5,vis:false});// 시작 장면에서만 보이는 리충성
     const kp=n>=5?k.path[S.mid=mid()]:k.ko;
     W.ko=add('nko',{p:at(kp),yaw:kp[3]||0,gun:'pistol',seed:23,vis:n>=4&&n<7});
     W.ok=add('nkf',{p:at(k.office.ok),yaw:k.office.ok[3],seed:71,vis:n>=8});
@@ -115,7 +116,7 @@
     const o=mOut(),path=k.path;let st,yw;
     if(n<=1){st=offAt(m.head,dir2(m.head,c),.15);yw=yawTo(m.head,c);}
     else if(n<=3){st=offAt(m.doors,o,1.6);yw=atan2(o[0],o[2]);}
-    else if(n===4){const q=k.ko;st=offAt(q,dir2(q,path[near(q)]),1.4);yw=yawTo(st,path[mn(near(q) + 1,path.length - 1)]);W.ko.p=at(q);W.ko.yaw=yawTo(q,st);}
+    else if(n===4){const q=k.ko,j=near(q);st=offAt(q,dir2(q,path[dxz(q,path[j])>1?j:mx(0,j - 1)]),1.4);yw=yawTo(st,path[mn(near(q) + 1,path.length - 1)]);W.ko.p=at(q);W.ko.yaw=yawTo(q,st);}
     else if(n===5){const a=path[S.mid],b=path[mx(0,S.mid - 1)];const u=dir2(a,b);st=offAt(a,u,2.6);yw=yawTo(st,a);W.ko.yaw=yawTo(b,a);}
     else if(n===6){const N=path.length - 1;W.ko.p=at(path[N - 1]);st=offAt(path[N - 1],dir2(path[N - 1],path[N - 2]),2.5);yw=yawTo(st,path[N]);}
     else if(n===7){st=at(k.office.centre);yw=yawTo(st,k.office.ok);}
@@ -126,11 +127,12 @@
     if(S.held) held(1);
     PP.fp.on=0;
  }
-  const mid=()=>{const k=K(),a=near(k.ko),N=k.path.length - 1;return a + mx(1,Math.round((N - a)*.5));};
+  const mid=()=>{const k=K(),a=near(k.ko),N=k.path.length - 2;return a + mx(1,Math.round((N - a)*.5));};
   function held(now){// 양팔을 잡은 두 부하: 무릎 꿇은 리충성 양옆
     const f=fw(me.yaw);
     W.amb.forEach((P,i)=>{const s=i?-1:1,q=at([me.p[0] - f[2]*s*.5 - f[0]*.18,0,me.p[2] + f[0]*s*.5 - f[2]*.18]);
-      if(now) P.p=q;else P.p=lerp3(P.p,q,mn(1,G.dt*6));P.yaw=me.yaw;P.vis=true;P.wp=null;P.pose='grip';P.gun='ak';P.look=W.ok&&W.ok.vis?eye(W.ok):null;});
+      if(now) P.p=q;else P.p=lerp3(P.p,q,mn(1,G.dt*6));P.yaw=me.yaw;P.vis=true;P.wp=null;P.pose='grip';P.gun='ak';
+      P.look=[me.p[0] - f[2]*s*.2,me.p[1] + me.eh - .3,me.p[2] + f[0]*s*.2];});
  }
 
   /* ── 적 · 고혁명 ── */
@@ -207,11 +209,12 @@
     if(S.ki>S.kend){P.pose='stand';P.look=eyeMe();if(!busy&&!E.some(e=>!e.P.dead)&&!far) S.segDone=1;return;}
     if(busy||far){P.pose='stand';P.look=busy?eye(busy.P):eyeMe();if(busy) P.yaw+=wrap(yawTo(P.p,busy.P.p) - P.yaw)*mn(1,dt*3);return;}
     const w=path[S.ki],dx=w[0] - P.p[0],dz=w[2] - P.p[2],d=H(dx,dz);
-    if(d<.35){wave(S.ki);S.ki++;return;}
+    S.kst=(S.kst||0) + dt;if(S.kst>7) P.p=at(w);
+    if(d<.35){wave(S.ki);S.ki++;S.kst=0;return;}
     const s=mn(d,1.9*dt);P.p=col([P.p[0] + dx/d*s,P.p[1],P.p[2] + dz/d*s],.28);P.yaw+=wrap(atan2(dx,dz) - P.yaw)*mn(1,dt*6);P.pose='walk';P.look=null;
  }
   function fight(n){
-    const k=K(),N=k.path.length - 1,a=n===1?near(k.ko):mid(),b=n===1?mid():N;
+    const k=K(),N=k.path.length - 2,a=n===1?near(k.ko):mid(),b=n===1?mid():N;
     S.fight=1;S.seg=n;S.arm=1;S.walk=1;S.segDone=0;S.ki=a;S.kend=b;S.waves={};
     const C=n===1?[[2,1],[1,1],[2,1]]:[[2,1],[2,1],[1,2]];
     [0,.45,.82].forEach((u,j)=>{let i=Math.round(a + (b - a)*u);while (S.waves[i]&&i<b) i++;S.waves[i]=C[j];});
@@ -229,14 +232,16 @@
     if(P.hp<=0) kill(b);else {P.pose='hit';b.t+=.7;b.st=1;}
  }
   function toss(){
-    if(kn.cd>0||kn.n<=0) return;kn.n--;kn.cd=.5;kn.ta=.01;
-    const e=eyeMe(),f=look(),r=[-cos(me.yaw),0,sin(me.yaw)];
+    if(kn.cd>0||kn.n<=0||kn.ta>0) return;kn.n--;kn.cd=.5;kn.ta=.01;kn.pend=1;
+ }
+  function release(){
+    kn.pend=0;const e=eyeMe(),f=look(),r=[-cos(me.yaw),0,sin(me.yaw)];
     kn.fly.push({p:[e[0] + f[0]*.4 + r[0]*.12,e[1] + f[1]*.4 - .04,e[2] + f[2]*.4 + r[2]*.12],v:[f[0]*24,f[1]*24 + .9,f[2]*24],s:0,yaw:me.yaw,t:0});
     sfx('click',{gain:.45,rate:.3});
  }
   function drop(p,y){kn.fl.push({p:at(p,.012),yaw:y??R()*6.3,r:(R() - .5)*.3});}
   function knives(dt){
-    kn.cd-=dt;kn.sa=mx(0,kn.sa - dt*3.4);if(kn.ta>0){kn.ta+=dt/.45;if(kn.ta>=1) kn.ta=0;}
+    kn.cd-=dt;kn.sa=mx(0,kn.sa - dt*3.4);if(kn.ta>0){kn.ta+=dt/.45;if(kn.pend&&kn.ta>=.5) release();if(kn.ta>=1) kn.ta=0;}
     for(let i=kn.fly.length - 1;i>=0;i--){
       const k=kn.fly[i];k.t+=dt;k.v[1]-=7*dt;
       const sp=H(...k.v),d=[k.v[0]/sp,k.v[1]/sp,k.v[2]/sp],l=sp*dt;
@@ -317,8 +322,8 @@
       later(1,()=>{for(const P of W.o){P.dead=true;P.vis=false;}for(const P of W.storm) P.vis=false;});
    }
     if(a==='danger'){// (리충성도 위험에 처한다): 복도에 부하 두셋
-      S.walk=1;S.fix=null;const P=k.path,i=near(me.p),sp=(k.spawns||[]).filter(q=>dxz(q,me.p)>5&&dxz(q,me.p)<16).sort((a,b)=>dxz(a,me.p) - dxz(b,me.p)).slice(0,3);
-      if(sp.length<2) for(let j=sp.length;j<2;j++){const q=P[mn(i + 2 + j,P.length - 1)];sp.push([q[0],0,q[2],yawTo(q,me.p)]);}
+      S.walk=1;S.fix=null;const P=k.path,i=near(me.p),ok=q=>dxz(q,me.p)>5&&dxz(q,k.ko)>3.5,sp=(k.spawns||[]).filter(q=>ok(q)&&dxz(q,me.p)<20).sort((a,b)=>dxz(a,me.p) - dxz(b,me.p)).slice(0,2);
+      for(let j=i + 1;j<P.length&&sp.length<2;j++) if(ok(P[j])&&dxz(P[j],me.p)<dxz(k.ko,me.p)) sp.push([P[j][0],0,P[j][2],yawTo(P[j],me.p)]);
       sp.forEach((q,j)=>{const e=spawnE(q,'th');e.t=1.6 + j*.4;});
       G.sfx.music('combat');
    }
@@ -566,12 +571,12 @@
       if(S.walk&&S.cm==='fp'&&!S.dead) stepMe(dt);
       if(S.arm&&!S.dead){if(S.ml){S.ml=0;stab();}if(S.mr){S.mr=0;toss();}}
       S.ml=S.mr=0;knives(dt);S.eq=0;drawKnives();
-      for(const e of E) if(e.P.dead&&!e.P._hid&&dxz(e.P.p,me.p)>30){e.P.vis=false;e.P._hid=1;}// 멀리 남은 시신은 숨김 (인원 예산)
+      for(const e of E) if(e.P.dead&&!e.hid&&dxz(e.P.p,me.p)>30){e.P.vis=false;e.hid=1;}// 멀리 남은 시신은 숨김 (인원 예산)
       camera(dt);marker();dress(dt);hud(dt);
       ui.sk&&(ui.sk.style.display=S.beat!=='end'&&!S.walk&&S.g!=='choice'?'block':'none');
    } catch (e){G.err('[story3] ' + (e.stack||e));}
  }
-  const api=G.story3={S,go,start,stop,me,kn,E,W,stab,toss,get on(){return !!S.on;},get bot(){return !!S.bot;},set bot(v){S.bot=!!v;}};
+  const api=G.story3={S,go,start,stop,me,kn,E,W,stab,toss,act,SC,get on(){return !!S.on;},get bot(){return !!S.bot;},set bot(v){S.bot=!!v;}};
   G.register('story3',{
     init(){
       try {G.addMesh&&G.addMesh('s3knife',knifeMesh());} catch (e){G.err('[story3] knife ' + e);}
