@@ -134,7 +134,7 @@
       G.sfx.loop('missile',0);S.cm='seat';S.yaw=.95;S.pit=0;S.mv=0;
       boomState();S.sh=1.4;S.fix=C.K.hole;P.vis=false;P.wp=null;
       const h=C.w(C.K.hole);G.fx.burst('explosion',h,{size:1.4});G.fx.burst('flash',h,{size:1});G.post.flash(4);
-      G.sfx.play('explosion',{gain:1.6});G.sfx.play('crash');G.sfx.loop('wind',1,{gain:.7});G.sfx.loop('alarm',1,{gain:.3});G.sfx.loop('siren',1,{gain:.2});
+      G.sfx.play('explosion',{gain:1.6});G.sfx.play('crash');G.sfx.loop('wind',1,{gain:.7});G.sfx.loop('siren',1,{gain:.2});
       for(const k of ['col','lee','shin']) W[k].pose='brace';
       S.fm=1;S.ft=0;S.boomT=S.t;
    }
@@ -148,10 +148,10 @@
    }
     if(a==='news'){S.cm='scr';C.S.tv=1;}
     if(a==='glance') S.fix=C.K.hole;
-    if(a==='approach'){S.cm='seat';S.fm=2;S.ft=0;S.yaw=1.05;S.pit=-.12;S.fix=[6,-1.5,5];S.spk=null;G.sfx.loop('alarm',1,{gain:.6});for(const k of ['col','lee','shin','park']) W[k].pose='brace';}
+    if(a==='approach'){S.cm='seat';S.fm=2;S.ft=0;S.yaw=1.05;S.pit=-.12;S.fix=[6,-1.5,5];S.spk=null;for(const k of ['col','lee','shin','park']) W[k].pose='brace';}
     if(a==='impact'){// 충돌 → 섬광 → 암전 · 이명
       G.post.flash(6);G.sfx.play('crash',{gain:1.5});G.sfx.play('explosion',{gain:1.5});G.sfx.play('ring');
-      for(const k of ['engine','wind','alarm','siren','cabin']) G.sfx.loop(k,0);
+      for(const k of ['engine','wind','siren','cabin']) G.sfx.loop(k,0);
       S.blk=1;S.sh=2;later(.35,()=>{crashState();S.cm='seat';S.yaw=.7;S.pit=-.05;});
    }
     if(a==='wake'){S.blkT=1;squadUp(0);G.sfx.music('off');}

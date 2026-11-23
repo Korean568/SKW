@@ -2,8 +2,7 @@
 
 브라우저에서 돌아가는 1인칭 스토리 게임입니다. 플레이어는 **김민철 하사**.
 휴가 중 탄 여객기가 북한 미사일에 맞아 추락하고, 비상착륙한 여객기 안팎에서 분대원들과 함께 북한군 50명과 싸웁니다.
-`index.html` **한 파일**로 동작합니다 — 외부 엔진·3D 모델·이미지 없이 JavaScript + WebGPU(WGSL) + Web Audio 로 만들었고,
-소리 파일은 사용자가 제공한 지상 접근 경보음(`source/snd_pullup.mp3`) 하나만 빌드 때 파일 안에 넣습니다.
+`index.html` 로 동작합니다 — 외부 엔진·3D 모델·이미지·소리 파일 없이 JavaScript + WebGPU(WGSL) + Web Audio 로 만들었습니다.
 
 ▶ **플레이: https://korean568.github.io/SKW/**  (PC · Chrome/Edge 최신 버전 권장)
 
@@ -36,7 +35,7 @@
 | `source/mod_gpu.js` | GPU 등급 감지(이름 판별 + 10프레임 벤치마크), 성능 표시 |
 | `source/mod_sky.js` · `mod_post.js` | 하늘·구름(구름 위에서 내려다보기 포함)·먼 지상 / 블룸·톤매핑 |
 | `source/mod_mesh.js` · `mod_fx.js` | 메시 렌더러·그림자 / GPU 파티클 (불·연기·폭발·예광탄) |
-| `source/mod_audio.js` · `snd_pullup.mp3` | Web Audio 합성 사운드 · 지상 접근 경보 녹음 |
+| `source/mod_audio.js` | Web Audio 합성 사운드 |
 | `source/mod_people.js` | 사람: 매끈한 스키닝 캐릭터(국군·마스크 대령·북한군·승객), 자세·애니메이션, 1인칭 팔·총 |
 | `source/mod_cabin.js` | 여객기 실내·외부, 피격 구멍·산소마스크·랜딩기어, 추락 현장 |
 | `source/mod_story.js` | 스토리 1 진행: 타이틀, 대본(`G.STORY`), 대사·해설 자막, 연출, 엔딩 — **대본은 이 파일 위쪽 표** |

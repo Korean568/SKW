@@ -51,9 +51,6 @@ for (const m of MODS) {
   const s = read(`mod_${m}.js`); code += '\n\n' + s; rep.push([m, Buffer.byteLength(s)]);
 }
 if (stubs) code += '\n\n' + read('stubs.js');
-// 녹음 파일 넣기: 소스의 /*__PULLUP__*/'' 자리를 base64 로 채움 (파일이 없으면 빈 문자열 → 합성음으로 대신)
-const snd = path.join(D, 'snd_pullup.mp3');
-if (fs.existsSync(snd)) code = code.replace("/*__PULLUP__*/''", () => `'${fs.readFileSync(snd).toString('base64')}'`);
 code += '\n\nG.boot();';
 let html = fs.readFileSync(path.join(D, 'template.html'), 'utf8');
 const srcKB = Buffer.byteLength(code) / 1024; let rawKB = 0;
