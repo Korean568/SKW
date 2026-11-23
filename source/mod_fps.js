@@ -9,14 +9,14 @@
     ak: { n: 'AK 소총', mag: 30, rate: .1, auto: 1, dmg: 44, sp: .016, kick: .022, rl: 2.2, max: 240, snd: 'rifle' }
   };
   const D = { ht: 0, mh: 100, pk: 0, sh: 0 }; // 검증용 통계
-  const S = { hp: 100, ammo: 0, mag: 0, kills: 0, total: 50, alive: 0 };
+  const S = { hp: 100, ammo: 0, mag: 0, kills: 0, total: 50, alive: 0, plate: 100, spare: 3, body: 0, dead: 0, scope: 0 }; // hp = 방탄판 HP
   // core 는 G.fps 를 프레임률 숫자로도 쓴다(G.fps += …, G.fps.toFixed) → 접근자로 두 역할을 함께 제공
-  const F = { on: false, bot: G.params.has('bot'), S, start, stop, rate: +G.fps || 60, D, valueOf() { return this.rate; }, toFixed(n) { return this.rate.toFixed(n); } };
+  const F = { on: false, bot: G.params.has('bot'), S, start, stop, revive, rate: +G.fps || 60, D, valueOf() { return this.rate; }, toFixed(n) { return this.rate.toFixed(n); } };
   Object.defineProperty(G, 'fps', { get: () => F, set: v => { if (typeof v === 'number' && v === v) F.rate = v; }, configurable: true });
-  const pl = { p: [0, 0, 0], yaw: 0, pit: 0, vy: 0, cr: 0, bob: 0, bobA: 0, ins: 1, w: 'pistol', inv: {}, cd: 0, rl: 0, spr: 0, kick: 0, ads: 0, hurt: 9, ex: 0, sw: [0, 0], dead: 0, end: 0, mv: 0 };
+  const pl = { p: [0, 0, 0], yaw: 0, pit: 0, vy: 0, cr: 0, bob: 0, bobA: 0, ins: 1, w: 'pistol', inv: {}, cd: 0, rl: 0, spr: 0, kick: 0, ads: 0, hurt: 9, ex: 0, sw: [0, 0], dead: 0, end: 0, mv: 0, rp: 0, iv: 0, sc: 0, so: 0, bn: 0, bt: 0 };
   F.pl = pl; F.E = () => E; // 테스트 훅: 플레이어 상태 · 적 목록
   const inp = { f: 0, s: 0, run: 0, cr: 0, fire: 0, ads: 0, rl: 0, use: 0 }, mouse = { l: 0, r: 0, dx: 0, dy: 0 };
-  let E = [], A = [], posts = [], routes = {}, occ = {}, dir = { t: 0, n: 0 }, o0 = {}, ui = {}, hud = { t: 0, hm: 0, dd: 0, dA: 0 }, T = 0;
+  let fires = [], kp = {}, E = [], A = [], posts = [], routes = {}, occ = {}, dir = { t: 0, n: 0 }, o0 = {}, ui = {}, hud = { t: 0, hm: 0, dd: 0, dA: 0 }, T = 0;
   const v3 = (a, b, s = 1) => [a[0] + b[0] * s, a[1] + b[1] * s, a[2] + b[2] * s], nrm = a => { const l = hypot(...a) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
   const fwd = (y, p) => [sin(y) * cos(p), sin(p), cos(y) * cos(p)];
   const wp = P => P.M ? C.w(P.p) : P.p; // 인물 발 위치 (월드)
@@ -94,11 +94,11 @@
   /* ── 시작 · 종료 ── */
   function start(o = {}) {
     stop(); o0 = o; T = 0;
-    Object.assign(D, { ht: 0, mh: 100, pk: 0, sh: 0 }); Object.assign(S, { hp: 100, kills: 0, total: o.total || 50, alive: 0 });
+    Object.assign(D, { ht: 0, mh: 100, pk: 0, sh: 0 }); Object.assign(S, { hp: 100, plate: 100, spare: 3, body: 0, dead: 0, scope: 0, kills: 0, total: o.total || 50, alive: 0 });
     const s = o.pos || C.w([0, 0, 2]);
-    Object.assign(pl, { p: [s[0], s[1], s[2]], yaw: o.yaw ?? -PI / 2, pit: -.04, vy: 0, cr: 0, w: 'pistol', inv: { pistol: [12, 48] }, cd: 0, rl: 0, spr: 0, kick: 0, ads: 0, hurt: 9, ex: 0, dead: 0, end: 0 });
+    Object.assign(pl, { p: [s[0], s[1], s[2]], yaw: o.yaw ?? -PI / 2, pit: -.04, vy: 0, cr: 0, w: 'pistol', inv: { pistol: [12, 48] }, cd: 0, rl: 0, spr: 0, kick: 0, ads: 0, hurt: 9, ex: 0, dead: 0, end: 0, rp: 0, iv: 0, sc: 0, so: 0, bn: 0, bt: 0 });
     pl.p[1] = floorAt(pl.p[0], pl.p[2], pl.p[1] + 1)[0];
-    dir = { t: 0, n: 0 }; occ = {}; E = [];
+    dir = { t: 0, n: 0 }; occ = {}; E = []; fires = []; ui.fd.style.display = 'none';
     // 아군 배치: 앞쪽 2명(웅크림·서서), 뒤쪽 2명 — 통로를 막지 않도록 플레이어가 밀면 비켜 줌
     posts = [[0, 4.9, 1, 0], [0, 3.55, 0, 0], [0, -.85, 1, PI], [0, .5, 0, PI]];
     A = (o.allies || []).slice(0, 4).map((P, i) => {
@@ -113,14 +113,31 @@
   }
   function stop() {
     if (!F.on) return;
-    F.on = false; PP.fp.on = 0; for (const e of E) PP.remove(e.P); E = []; A = [];
+    F.on = false; PP.fp.on = PP.fp.hide = PP.fp.scope = 0; for (const e of E) PP.remove(e.P); E = []; A = [];
     ui.fh && (ui.fh.style.display = 'none'); G.sfx.loop('wind', 0);
     try { document.exitPointerLock && document.pointerLockElement && document.exitPointerLock(); } catch (e) { }
   }
-  function finish(win) {
-    if (pl.end) return; pl.end = T + (win ? 3 : 3.2);
-    ui.fe.innerHTML = win ? '<b>북한군 제압 완료</b><small>추락 현장을 지켜냈다</small>' : '<b>김민철 하사 전사</b><small>북한군에게 쓰러졌다</small>';
-    ui.fe.className = win ? 'w' : ''; ui.fe.style.opacity = 1; pl.win = win;
+  function finish() { // 승리만 (전사는 부활로 이어진다)
+    if (pl.end) return; pl.end = T + 3;
+    ui.fe.innerHTML = '<b>북한군 제압 완료</b><small>추락 현장을 지켜냈다</small>'; ui.fe.style.opacity = 1;
+  }
+  /* ── 방탄판 · 피해 · 전사 · 부활 ── */
+  const safe = () => G.params.has('god') || pl.dead || T < pl.iv;
+  function bodyHit(head) { S.body++; hud.fl = 1; if (head || S.body >= 2) die(); }
+  function hurt(dm) { // 총탄: 방탄판이 받는다 → 0 이면 머리(즉사) 또는 몸(2발 사망)
+    if (safe()) return; D.ht++; hud.dd = hud.fl = 1; G.sfx.play('hit', { gain: .6 });
+    if (S.plate > 0) S.plate = max(0, S.plate - dm); else bodyHit(R() < (pl.cr > .5 ? .07 : .15));
+    D.mh = min(D.mh, S.plate);
+  }
+  function die() {
+    pl.dead = T; S.dead = 1; S.plate = 0; pl.rp = 0; G.sfx.play('hit', { gain: 1, rate: .5 });
+    try { document.pointerLockElement && document.exitPointerLock(); } catch (e) { }
+  }
+  function revive() { // 제자리(기내) 또는 시작 지점(아군 사이)에서 새 방탄판 · 3초 무적
+    if (!F.on || !pl.dead) return;
+    if (!pl.ins || pl.bn > .1) { const s = o0.pos || C.w([0, 0, 2]); pl.p = [s[0], floorAt(s[0], s[2], s[1] + 1)[0], s[2]]; pl.yaw = o0.yaw ?? -PI / 2; }
+    Object.assign(pl, { dead: 0, iv: T + 3, pit: -.04, vy: 0, bn: 0 }); Object.assign(S, { hp: 100, plate: 100, spare: 3, body: 0, dead: 0 });
+    ui.fd.style.display = 'none'; hud.msg = ['부활 · 3초간 무적', T + 3]; G.sfx.play('click');
   }
 
   /* ── 적 지휘: 살아 있는 적 6~9명 유지, 보이지 않는 곳에서 등장 ── */
@@ -199,7 +216,7 @@
     if (tg.pl) {
       const acc = cl(.035 + pl.ex * .045, .035, .26) * (pl.cr > .5 ? .6 : 1) * (pl.mv > 3 ? .65 : 1) * (d < 7 ? 1.3 : d > 22 ? .55 : 1);
       hit = R() < acc;
-      if (hit && !G.params.has('god') && !pl.dead) { S.hp -= 6 + R() * 6; D.ht++; D.mh = min(D.mh, S.hp); pl.hurt = 0; hud.dd = 1; hud.dA = atan2(o[0] - pl.p[0], o[2] - pl.p[2]); G.sfx.play('hit', { gain: .6 }); }
+      if (hit) { hurt(6 + R() * 6); hud.dA = atan2(o[0] - pl.p[0], o[2] - pl.p[2]); }
     } else if (R() < .12) { tg.a.P.pose = 'hit'; hit = 1; }
     const miss = hit ? .05 : .35 + d * .03, tp = [tg.p[0] + (R() - .5) * miss * 2, tg.p[1] + (R() - .6) * miss, tg.p[2] + (R() - .5) * miss * 2];
     const dd = nrm(V3.sub(tp, o));
@@ -208,11 +225,11 @@
     if (!hit) { const t = solid(o, dd, 60); if (t < 60) G.fx.burst('hit', v3(o, dd, t), { size: .12 }); }
   }
   function kill(e, head) {
-    const P = e.P; P.pose = 'dead'; P.dead = true; P.aim = null; e.ammo = 20 + (R() * 30 | 0); e.td = T;
+    const P = e.P; P.pose = 'dead'; P.dead = true; P.aim = null; e.ammo = 20 + (R() * 30 | 0); e.td = T; e.pl = R() < .15; // 15% 방탄판
     occ[e.key] && e.st === 'hold' && occ[e.key]--; S.kills++;
     const dead = E.filter(x => x.P.dead), cap = G.Q.level ? 22 : 9; // 시신 수 제한 (LOW 는 적게)
     if (dead.length > cap) { const o = dead[0]; PP.remove(o.P); E.splice(E.indexOf(o), 1); }
-    if (S.kills >= S.total) finish(true);
+    if (S.kills >= S.total) finish();
   }
   function damage(e, dmg, part) {
     if (e.P.dead) return;
@@ -249,18 +266,18 @@
   /* ── 플레이어 ── */
   function shootP() {
     const W = WEP[pl.w], inv = pl.inv[pl.w];
-    if (pl.cd > 0 || pl.rl > 0) return;
+    if (pl.cd > 0 || pl.rl > 0 || pl.rp > 0) return;
     if (inv[0] <= 0) { G.sfx.play('click'); pl.cd = .3; if (inv[1] > 0) reload(); return; }
     inv[0]--; pl.cd = W.rate; pl.kick = 1; D.sh++;
     const eye = G.cam.pos, f = fwd(pl.yaw, pl.pit), sp = spread(), a = R() * 2 * PI, r = sp * Math.sqrt(R());
     const rt = nrm(V3.cross(f, [0, 1, 0])), up = V3.cross(rt, f), d = nrm(v3(v3(f, rt, cos(a) * r), up, sin(a) * r));
     pl.spr = min(pl.spr + W.sp * 1.4, .07);
-    pl.pit = min(1.2, pl.pit + W.kick * (pl.ads > .5 ? .6 : 1)); pl.yaw += (R() - .5) * W.kick * .7;
+    pl.pit = min(1.2, pl.pit + W.kick * (pl.ads > .5 ? pl.so ? .4 : .6 : 1)); pl.yaw += (R() - .5) * W.kick * .7;
     const t = solid(eye, d, 150);
     for (const x of A) x.P.vis = false; // 아군 오사 없음
     const h = PP.ray(eye, d, t);
     for (const x of A) x.P.vis = true;
-    const m = PP.muzzle(PP.fp), mo = [m[0], m[1], m[2]];
+    const m = pl.so > .3 ? v3(v3(eye, f, .5), up, -.08) : PP.muzzle(PP.fp), mo = [m[0], m[1], m[2]]; // 스코프: 시점 아래
     G.fx.burst('muzzle', mo, { size: .02, dir: d }); G.addLight(v3(eye, f, .9), [1, .78, .45], 2.2, 4, .05);
     G.fx.tracer(mo, nrm(V3.sub(v3(eye, d, h ? h.t : t), mo)), 380, .01); G.sfx.play(W.snd, { gain: 1 });
     if (h) {
@@ -269,17 +286,17 @@
       if (e) { damage(e, W.dmg, h.part); hud.hm = e.P.dead ? 2 : 1; e.P.dead && D.pk++; }
     } else if (t < 150) { const hp = v3(eye, d, t); G.fx.burst('hit', hp, { size: .14 }); G.fx.burst('smoke', hp, { size: .04 }); }
   }
-  function spread() { const W = WEP[pl.w]; return (W.sp * (1 + pl.mv * .5 + inp.run * 2 + (pl.vy ? 2 : 0)) * (1 - pl.cr * .3) + pl.spr) * (1 - pl.ads * .7); }
+  function spread() { const W = WEP[pl.w]; return (W.sp * (1 + pl.mv * .5 + inp.run * 2 + (pl.vy ? 2 : 0)) * (1 - pl.cr * .3) + pl.spr) * (1 - pl.ads * (pl.sc && pl.w === 'ak' ? .92 : .7)); }
   function reload() { const W = WEP[pl.w], inv = pl.inv[pl.w]; if (pl.rl > 0 || inv[0] >= W.mag || inv[1] <= 0) return; pl.rl = W.rl; G.sfx.play('reload'); }
-  function pickups(use) { // 쓰러진 적의 AK·탄약 — 밟고 지나가거나 E
+  function pickups(use) { // 쓰러진 적의 AK·탄약·방탄판 — 밟고 지나가거나 E
     let near = null, nd = 2.4;
-    for (const e of E) if (e.P.dead && e.ammo > 0 && T - e.td > .6) { const d = hypot(e.P.p[0] - pl.p[0], e.P.p[2] - pl.p[2]); if (d < nd && abs(e.P.p[1] - pl.p[1]) < 1.3) { nd = d; near = e; } }
+    for (const e of E) if (e.P.dead && (e.ammo > 0 || e.pl && S.spare < 3) && T - e.td > .6) { const d = hypot(e.P.p[0] - pl.p[0], e.P.p[2] - pl.p[2]); if (d < nd && abs(e.P.p[1] - pl.p[1]) < 1.3) { nd = d; near = e; } }
     if (near && (use || nd < 1)) {
-      const ak = pl.inv.ak;
-      if (!ak) { pl.inv.ak = [30, near.ammo]; sw('ak'); }
-      else if (ak[1] < WEP.ak.max) ak[1] = min(WEP.ak.max, ak[1] + near.ammo);
-      else return near;
-      near.ammo = 0; near.P.gun = 0; G.sfx.play('click'); hud.pk = 1.2; return null;
+      const ak = pl.inv.ak, pt = near.pl && S.spare < 3, am = near.ammo > 0 && (!ak || ak[1] < WEP.ak.max);
+      if (!pt && !am) return near;
+      if (pt) { S.spare++; near.pl = 0; }
+      if (am) { if (!ak) { pl.inv.ak = [30, near.ammo]; sw('ak'); } else ak[1] = min(WEP.ak.max, ak[1] + near.ammo); near.ammo = 0; near.P.gun = 0; }
+      G.sfx.play('click'); hud.pk = 1.2; hud.pkT = pt ? '방탄판 +1' : '획득!'; return null;
     }
     return near;
   }
@@ -287,7 +304,8 @@
 
   function botThink(dt) { // 테스트용 자동 플레이어
     const b = pl.bot || (pl.bot = { t: 0, tg: null, idle: 0, sh: 0 }), eye = G.cam.pos;
-    Object.assign(inp, { f: 0, s: 0, run: 0, cr: 0, fire: 0, ads: 0, rl: 0, use: 0 });
+    Object.assign(inp, { f: 0, s: 0, run: 0, cr: 0, fire: 0, ads: 0, rl: 0, use: 0, pf: S.plate <= 10 && S.spare > 0, sc: pl.w === 'ak' && !pl.sc });
+    if (pl.dead) { T - pl.dead > 2 && revive(); return; }
     if ((b.t -= dt) <= 0) {
       b.t = .25; let best = null, bd = 60;
       for (const e of E) { if (e.P.dead) continue; const c = chest(e.P), d = hypot(...V3.sub(c, eye)); if (d < bd && los(eye, c)) { bd = d; best = e; } }
@@ -306,8 +324,8 @@
     } else {
       b.idle += dt; if (inv[0] < WEP[pl.w].mag * .5) inp.rl = 1;
       const lp = C.l(pl.p); let goal = null, pd = 9;
-      if (!pl.inv.ak || pl.inv.ak[1] < 90) for (const e of E) if (e.P.dead && e.ammo > 0 && abs(e.P.p[1] - pl.p[1]) < 1) { const d = hypot(e.P.p[0] - pl.p[0], e.P.p[2] - pl.p[2]); if (d < pd) { pd = d; goal = e.P.p; inp.use = 1; } }
-      else if (b.idle > 2.5) { // 가장 가까운 적 쪽으로 통로를 따라 이동
+      for (const e of E) if (e.P.dead && (e.ammo > 0 && (!pl.inv.ak || pl.inv.ak[1] < 90) || e.pl && S.spare < 3) && abs(e.P.p[1] - pl.p[1]) < 1) { const d = hypot(e.P.p[0] - pl.p[0], e.P.p[2] - pl.p[2]); if (d < pd) { pd = d; goal = e.P.p; inp.use = 1; } }
+      if (!goal && b.idle > 2.5) { // 가장 가까운 적 쪽으로 통로를 따라 이동
         let ne = null, nd = 1e9; for (const e of E) if (!e.P.dead) { const d = hypot(e.P.p[0] - pl.p[0], e.P.p[2] - pl.p[2]); if (d < nd) { nd = d; ne = e; } }
         if (ne) { const l = C.l(ne.P.p); goal = C.w([abs(lp[0]) > .4 ? 0 : cl(l[0], -.1, .1), 0, cl(l[2], -5, 13)]); if (abs(goal[2] - pl.p[2]) + abs(goal[0] - pl.p[0]) < .5) goal = null; }
       }
@@ -316,12 +334,14 @@
   }
 
   function player(dt) {
-    const W = WEP[pl.w], K = G.keys, lock = document.pointerLockElement === G.canvas;
+    const W = WEP[pl.w], K = G.keys, tap = c => { const v = K[c] && !kp[c]; kp[c] = K[c]; return v; }, tF = tap('KeyF'), tT = tap('KeyT'), tN = tap('Enter');
     if (F.bot) botThink(dt);
-    else Object.assign(inp, { f: (K.KeyW ? 1 : 0) - (K.KeyS ? 1 : 0), s: (K.KeyD ? 1 : 0) - (K.KeyA ? 1 : 0), run: K.ShiftLeft || K.ShiftRight ? 1 : 0, cr: K.KeyC || K.ControlLeft ? 1 : 0, fire: mouse.l, ads: mouse.r, rl: K.KeyR, use: K.KeyE });
+    else Object.assign(inp, { f: (K.KeyW ? 1 : 0) - (K.KeyS ? 1 : 0), s: (K.KeyD ? 1 : 0) - (K.KeyA ? 1 : 0), run: K.ShiftLeft || K.ShiftRight ? 1 : 0, cr: K.KeyC || K.ControlLeft ? 1 : 0, fire: mouse.l, ads: mouse.r, rl: K.KeyR, use: K.KeyE, pf: tF, sc: tT });
     if (!F.bot && (K.Digit1 || K.Digit2)) sw(K.Digit1 ? 'pistol' : 'ak');
-    // 시점
-    pl.yaw -= mouse.dx * .0022 * (1 - pl.ads * .4); pl.pit = cl(pl.pit - mouse.dy * .0022 * (1 - pl.ads * .4), -1.35, 1.35); pl.sw = [cl(pl.sw[0] * .85 - mouse.dx * .0015, -.12, .12), cl(pl.sw[1] * .85 + mouse.dy * .0015, -.12, .12)]; mouse.dx = mouse.dy = 0;
+    if (pl.dead && tN && !F.bot) revive();
+    // 시점 (스코프: 배율만큼 감도 ↓)
+    const sc = pl.sc && pl.w === 'ak', zm = sc ? 1 + 2.5 * pl.ads : 1, ms = .0022 * (sc ? 1 / zm : 1 - pl.ads * .4), sk = .0015 * (1 - pl.so * .7);
+    pl.yaw -= mouse.dx * ms; pl.pit = cl(pl.pit - mouse.dy * ms, -1.35, 1.35); pl.sw = [cl(pl.sw[0] * .85 - mouse.dx * sk, -.12, .12), cl(pl.sw[1] * .85 + mouse.dy * sk, -.12, .12)]; mouse.dx = mouse.dy = 0;
     // 이동
     pl.cr += ((inp.cr ? 1 : 0) - pl.cr) * min(1, dt * 10);
     const run = inp.run && inp.f > 0 && !inp.ads, spd = run ? 5.6 : 3.1 * (1 - pl.cr * .5) * (1 - pl.ads * .35), fx = sin(pl.yaw), fz = cos(pl.yaw);
@@ -336,7 +356,9 @@
     pl.bob += pl.mv * dt * (run ? 1.5 : 1.9); pl.bobA += ((pl.mv > .3 ? min(1, pl.mv / 4) : 0) - pl.bobA) * min(1, dt * 8);
     // 무기
     pl.cd -= dt; pl.spr = max(0, pl.spr - dt * .09); pl.kick = max(0, pl.kick - dt * 7); pl.sw0 = max(0, (pl.sw0 || 0) - dt);
-    pl.ads += ((inp.ads && !run && pl.rl <= 0 ? 1 : 0) - pl.ads) * min(1, dt * 11);
+    pl.ads += ((inp.ads && !run && pl.rl <= 0 && pl.rp <= 0 && !pl.dead ? 1 : 0) - pl.ads) * min(1, dt * (sc ? 8 : 11));
+    pl.so = sc ? cl((pl.ads - .6) * 4, 0, 1) : 0;
+    if (inp.sc && !pl.dead && pl.rp <= 0) { if (pl.w === 'ak') { pl.sc ^= 1; pl.cd = pl.sw0 = .45; G.sfx.play('click', { gain: 1.4 }); } else hud.msg = ['권총에는 스코프를 달 수 없다', T + 1.5]; } // T: 스코프 장착/해제
     const inv = pl.inv[pl.w];
     if (pl.rl > 0) { pl.rl -= dt; if (pl.rl <= 0) { const n = min(W.mag - inv[0], inv[1]); inv[0] += n; inv[1] -= n; pl.rl = 0; } }
     if (inp.rl) reload();
@@ -345,16 +367,25 @@
     const pk = pickups(inp.use && !pl.use0); pl.use0 = inp.use; hud.pkN = pk;
     if (inv[0] === 0 && inv[1] > 0 && pl.rl <= 0 && pl.cd < -.4) reload();
     if (pl.w === 'ak' && inv[0] + inv[1] === 0) sw('pistol');
-    // 체력 · 노출
-    pl.hurt += dt; if (pl.hurt > 4 && S.hp > 0) S.hp = min(100, S.hp + 14 * dt);
-    if (S.hp <= 0 && !pl.dead) { pl.dead = T; S.hp = 0; finish(false); }
+    // 방탄판: 재생 없음 · F 교체 2초 (사격 불가)
+    if (inp.pf && pl.rp <= 0 && !pl.dead && S.spare > 0 && S.plate < 100) { pl.rp = 2; pl.rl = 0; G.sfx.play('splash', { gain: .4, rate: 2 }); }
+    if (pl.rp > 0 && (pl.rp -= dt) <= 0) { pl.rp = 0; S.plate = 100; S.spare--; S.body = 0; G.sfx.play('click', { gain: 1.4 }); }
+    // 불: 1.25 m 안 → 방탄판 15/초, 방탄판 0 이면 1.2초마다 몸 피격
+    let bz = 0; for (const f of fires) if (f[3] > G.time && hypot(f[0] - pl.p[0], f[2] - pl.p[2]) < 1.25 && pl.p[1] < f[1] + 2 && pl.p[1] > f[1] - 1.6) bz = 1;
+    pl.bn += (bz - pl.bn) * min(1, dt * 6);
+    if (bz && !safe()) {
+      if (S.plate > 0) { S.plate = max(0, S.plate - 15 * dt); D.mh = min(D.mh, S.plate); } else if ((pl.bt += dt) > 1.2) { pl.bt = 0; bodyHit(0); }
+      if ((pl.bs = (pl.bs || 0) - dt) <= 0) { pl.bs = .5; G.sfx.play('hit', { gain: .4, rate: .45 }); }
+    }
+    S.hp = S.plate; S.scope = pl.sc;
     // 카메라
     const dk = pl.dead ? min(1, (T - pl.dead) / 1.1) : 0, eh = 1.62 - .62 * pl.cr - 1.1 * dk * dk, b = pl.bobA * (1 - pl.ads * .8);
     const eye = [pl.p[0] + cos(pl.yaw) * sin(pl.bob) * .025 * b, pl.p[1] + eh + abs(cos(pl.bob)) * .045 * b, pl.p[2] - sin(pl.yaw) * sin(pl.bob) * .025 * b];
     const f = fwd(pl.yaw + dk * .5, (pl.pit + pl.kick * .012) * (1 - dk) + dk * .25);
     G.cam.pos = eye; G.cam.target = v3(eye, f); G.cam.up = dk ? nrm([cos(pl.yaw) * dk * .9, 1, -sin(pl.yaw) * dk * .9]) : [0, 1, 0]; G.cam.near = .08;
-    G.cam.fov = 1.13 - pl.ads * (pl.w === 'ak' ? .28 : .2) + (run ? .06 : 0);
-    const fp = PP.fp; Object.assign(fp, { on: pl.dead ? 0 : 1, gun: pl.w, aim: pl.ads, kick: pl.kick, reload: pl.rl > 0 ? 1 - pl.rl / W.rl : pl.sw0 > 0 ? 1 - pl.sw0 / .45 : 0, bob: pl.bob, sway: pl.sw });
+    G.cam.fov = sc ? 2 * Math.atan(Math.tan(.565 + (run ? .03 : 0)) / zm) : 1.13 - pl.ads * (pl.w === 'ak' ? .28 : .2) + (run ? .06 : 0); // 스코프 3.5배
+    const fp = PP.fp, hide = pl.so > .3; // 스코프로 볼 때는 1인칭 모델을 숨긴다
+    Object.assign(fp, { on: pl.dead || hide ? 0 : 1, hide, scope: sc ? 1 : 0, gun: pl.w, aim: pl.ads, kick: pl.kick, reload: pl.rp > 0 ? 1 - pl.rp / 2 : pl.rl > 0 ? 1 - pl.rl / W.rl : pl.sw0 > 0 ? 1 - pl.sw0 / .45 : 0, bob: pl.bob, sway: pl.sw });
     S.mag = inv[0]; S.ammo = inv[1];
     // 노출 시간: 적에게 보일수록 명중률 상승
     let seen = 0; for (const e of E) if (e.st === 'hold' && e.tg && e.tg.pl) seen = 1;
@@ -377,27 +408,33 @@
 
   /* ── HUD (텍스트는 5Hz, 조준선·피격 표시는 매 프레임 스타일 한두 개만) ── */
   function hudUp(dt) {
-    hud.hm = max(0, hud.hm - dt * 4); hud.dd = max(0, hud.dd - dt * .9); hud.pk = max(0, (hud.pk || 0) - dt);
+    hud.hm = max(0, hud.hm - dt * 4); hud.dd = max(0, hud.dd - dt * .9); hud.pk = max(0, (hud.pk || 0) - dt); hud.fl = max(0, (hud.fl || 0) - dt * 2.5);
     const px = spread() / (G.cam.fov / 2) * innerHeight / 2 + 4, sp = Math.round(px * 2) / 2;
     if (sp !== hud.sp) { hud.sp = sp; ui.xh.style.setProperty('--s', sp + 'px'); }
     ui.xh.style.opacity = pl.ads > .6 || pl.dead ? 0 : 1;
-    ui.hm.style.opacity = min(1, hud.hm); ui.hm.style.borderColor = hud.hm > 1 ? '#f44' : '#fff';
+    ui.hm.style.opacity = min(1, hud.hm); ui.hm.style.transform = `rotate(45deg) scale(${hud.hm > 1 ? 1.5 : 1})`;
     ui.dd.style.opacity = hud.dd; ui.dd.style.transform = `rotate(${(pl.yaw - hud.dA) * 180 / PI}deg)`;
+    ui.sc.style.opacity = pl.so; ui.bv.style.opacity = pl.bn * (.8 + .2 * sin(T * 23)); ui.vg.style.opacity = max(hud.fl, S.plate > 0 || pl.dead ? 0 : .5);
     if ((hud.t -= dt) > 0) return; hud.t = .2;
     const W = WEP[pl.w], inv = pl.inv[pl.w];
-    ui.am.innerHTML = `<b>${inv[0]}</b> / ${inv[1]}<small>${W.n}</small>`;
-    ui.hp.innerHTML = `<i style="width:${S.hp | 0}%"></i><b>${S.hp | 0}</b>`;
+    ui.am.innerHTML = `<b>${inv[0]}</b> / ${inv[1]}<small>${W.n}${pl.w === 'ak' && pl.sc ? ' + 스코프' : ''}</small>`;
+    const lo = S.plate <= 10, z = S.plate <= 0; // 방탄판 HUD: 막대 · 숫자 · 예비 방탄판 · 무방비(몸 피격 n/2)
+    ui.hp.className = z ? 'z' : lo ? 'a' : '';
+    ui.hp.innerHTML = `<i style="width:${S.plate}%"></i><b>${S.plate + .99 | 0}</b><small>방탄판</small><u>${'<s></s>'.repeat(S.spare)}${'<s class=e></s>'.repeat(3 - S.spare)}</u>${z ? `<em>무방비 · 피격 ${S.body}/2</em>` : ''}`;
     ui.ct.innerHTML = `북한군 <b>${S.kills}</b> / ${S.total}<small>북한군을 제압하라</small>`;
-    ui.vg.style.opacity = cl(1 - S.hp / 70, 0, 1); ui.vg.className = S.hp < 35 && !pl.dead ? 'p' : '';
-    const pr = pl.dead ? '' : hud.pkN ? (pl.inv.ak ? '[E] 탄약 줍기' : '[E] AK 소총 줍기') : hud.pk > 0 ? '획득!' : pl.rl > 0 ? '재장전 중…' : inv[0] === 0 ? (inv[1] ? '[R] 재장전' : '탄약 없음') : inv[0] <= W.mag / 4 ? '[R] 재장전' : '';
+    const pa = pl.dead ? '' : pl.rp > 0 ? '방탄판 교체 중…' : lo ? (z ? '무방비 — ' : '') + (S.spare ? '방탄판 교체 [F]' : '예비 방탄판 없음') : '';
+    ui.pa.textContent = pa; ui.pa.style.display = pa ? 'block' : 'none'; ui.pa.className = pl.rp > 0 ? 'r' : S.spare ? '' : 'n';
+    ui.fd.style.display = pl.dead && T - pl.dead > 1 ? 'grid' : 'none';
+    const ms = hud.msg && T < hud.msg[1] ? hud.msg[0] : '', np = hud.pkN && hud.pkN.pl && S.spare < 3;
+    const pr = pl.dead ? '' : ms || (hud.pkN ? (np ? '[E] 방탄판 줍기' : pl.inv.ak ? '[E] 탄약 줍기' : '[E] AK 소총 줍기') : hud.pk > 0 ? hud.pkT : pl.rl > 0 ? '재장전 중…' : inv[0] === 0 ? (inv[1] ? '[R] 재장전' : '탄약 없음') : inv[0] <= W.mag / 4 ? '[R] 재장전' : '');
     ui.pr.textContent = pr;
-    ui.lk.style.display = F.bot || pl.end || document.pointerLockElement === G.canvas || G.params.has('step') ? 'none' : 'block';
+    ui.lk.style.display = F.bot || pl.end || pl.dead || document.pointerLockElement === G.canvas || G.params.has('step') ? 'none' : 'block';
   }
 
   function update(dt) {
     if (!F.on) return;
     try {
-      T += dt;
+      T += dt; fires = fires.filter(f => f[3] > G.time);
       if (!pl.end || T < pl.end) {
         player(dt); director(dt);
         for (const e of E) enemy(e, dt);
@@ -407,7 +444,7 @@
           if (d < .55 && d > 1e-4) { const k = (.55 - d) / d * .5; if (E[i].st === 'go') { a.p[0] += dx * k; a.p[2] += dz * k; } if (E[j].st === 'go') { b.p[0] -= dx * k; b.p[2] -= dz * k; } }
         }
         for (const a of A) ally(a, dt);
-      } else if (pl.end && !pl.ended) { pl.ended = 1; const cb = o0.onEnd; cb ? (cb(!!pl.win), F.on && stop()) : 0; return; }
+      } else if (pl.end && !pl.ended) { pl.ended = 1; const cb = o0.onEnd; cb ? (cb(true), F.on && stop()) : 0; return; }
       if (pl.end) { player(0.0001); }
       env(dt); hudUp(dt);
     } catch (e) { G.err('fps: ' + (e.stack || e)); }
@@ -421,17 +458,31 @@
 #xh i:nth-child(3),#xh i:nth-child(4){height:2px;width:7px;top:-1px}#xh i:nth-child(3){left:calc(-7px - var(--s))}#xh i:nth-child(4){left:var(--s)}
 #hm{position:absolute;left:50%;top:50%;width:16px;height:16px;margin:-8px;border:2px solid #fff;border-width:0 2px;transform:rotate(45deg) scaleY(1);opacity:0;clip-path:polygon(0 0,35% 0,35% 100%,0 100%,0 0,100% 0,100% 100%,65% 100%,65% 0)}
 #am{position:absolute;right:4vw;bottom:5vh;text-align:right;font-size:22px;color:#cde}#am b{font-size:46px;color:#fff;font-weight:700}#am small{display:block;font-size:14px;letter-spacing:.15em;color:#9bc}
-#hp{position:absolute;left:4vw;bottom:5vh;width:220px;height:8px;background:#0007;border-radius:4px}#hp i{position:absolute;inset:0 auto 0 0;background:linear-gradient(90deg,#e33,#fd8);border-radius:4px}#hp b{position:absolute;bottom:12px;left:0;font-size:30px}
+#hp{position:absolute;left:4vw;bottom:5vh;width:220px;height:8px;background:#0008;border-radius:4px;box-shadow:0 0 0 1px #fff4}#hp i{position:absolute;inset:0 auto 0 0;background:linear-gradient(90deg,#aab3bb,#fff);border-radius:4px}#hp b{position:absolute;bottom:12px;left:0;font-size:30px}
+#hp small{position:absolute;bottom:16px;left:62px;font-size:12px;letter-spacing:.2em;color:#ccd}#hp u{position:absolute;bottom:14px;right:0;display:flex;gap:5px}#hp s{width:12px;height:16px;border:2px solid #fff;border-radius:2px 2px 6px 6px;background:#fffc}#hp s.e{background:0;opacity:.3}
+#hp.a i{background:#fb3}#hp.a b{color:#fb3}#hp.z{box-shadow:0 0 0 2px #fff;animation:pu .5s infinite alternate}#hp em{position:absolute;top:14px;left:0;white-space:nowrap;font:700 16px system-ui;letter-spacing:.12em}
+#pa{position:absolute;left:50%;top:30%;transform:translateX(-50%);padding:.3em 1em;border:2px solid #fb3;border-radius:6px;background:#000a;color:#fb3;font:700 24px system-ui;letter-spacing:.12em;display:none;animation:pu .45s infinite alternate}#pa.n{border-color:#fff;color:#fff}#pa.r{animation:none;border-color:#fff8;color:#fff}@keyframes pu{to{opacity:.35}}
+#sc{position:absolute;inset:0;opacity:0;background:radial-gradient(circle,#38605010 0,#0000 22vmin,#0008 37vmin,#000 41vmin)}#sc svg{position:absolute;left:50%;top:50%;width:84vmin;height:84vmin;margin:-42vmin}
+#bv{position:absolute;inset:0;opacity:0;background:radial-gradient(#ff600000 35%,#ff6a0040 70%,#ff3c00b0);box-shadow:inset 0 0 20vmin 5vmin #ff5a00b0}
+#fd{position:absolute;inset:0;display:none;place-content:center;justify-items:center;background:radial-gradient(#0006,#000d);pointer-events:auto}#fd b{font-size:clamp(44px,8vw,100px);letter-spacing:.4em;margin-right:-.4em}#fd small{font-size:16px;color:#bbb}#fd button{margin:1.2em 0 .6em;padding:.35em 2.4em;font:800 clamp(24px,3.4vw,44px) system-ui;letter-spacing:.5em;color:#111;background:#fff;border:0;border-radius:8px;cursor:pointer;box-shadow:0 0 40px #fff6}
 #ct{position:absolute;left:50%;top:3.5vh;transform:translateX(-50%);text-align:center;font-size:19px;letter-spacing:.06em}#ct b{font-size:26px;color:#fc6}#ct small{display:block;font-size:14px;color:#bcd;letter-spacing:.2em}
 #pr{position:absolute;left:50%;top:62%;transform:translateX(-50%);font-size:18px;color:#fe9}
-#dd{position:absolute;inset:0;background:radial-gradient(ellipse 34% 22% at 50% 0,#e00a,#0000);opacity:0}
-#vg{position:absolute;inset:0;box-shadow:inset 0 0 18vmin 4vmin #a00c;opacity:0}#vg.p{animation:vp .9s infinite}@keyframes vp{50%{box-shadow:inset 0 0 26vmin 8vmin #c00e}}
+#dd{position:absolute;inset:0;background:radial-gradient(ellipse 34% 22% at 50% 0,#fffa,#fff0);opacity:0}
+#vg{position:absolute;inset:0;box-shadow:inset 0 0 18vmin 4vmin #fffa;opacity:0}
 #lk{position:absolute;left:50%;top:40%;transform:translate(-50%,-50%);padding:.6em 1.4em;background:#000a;border-radius:8px;font-size:17px;text-align:center}#lk small{display:block;color:#abc;font-size:13px;margin-top:.3em}
-#fe{position:absolute;left:50%;top:42%;transform:translate(-50%,-50%);text-align:center;opacity:0;transition:opacity 1.2s}#fe b{display:block;font-size:clamp(28px,4.5vw,56px);color:#f55;letter-spacing:.12em}#fe.w b{color:#fd7}#fe small{font-size:18px;color:#ddd}`);
+#fe{position:absolute;left:50%;top:42%;transform:translate(-50%,-50%);text-align:center;opacity:0;transition:opacity 1.2s}#fe b{display:block;font-size:clamp(28px,4.5vw,56px);color:#fd7;letter-spacing:.12em}#fe small{font-size:18px;color:#ddd}`);
       ui.fh = G.el('div', { id: 'fh' });
+      ui.sc = G.el('div', { id: 'sc', innerHTML: '<svg viewBox="-50 -50 100 100" stroke=#000 fill=none><path d="M-50 0H50M0-50V50" stroke-width=.22 /><path d="M-25 0H25M0-25V25" stroke-width=1.3 stroke-dasharray="0 5" stroke-linecap=round /><path d="M-50 0H-30M30 0H50M0 30V50" stroke-width=1.4 /><circle r=49.5 stroke-width=1.5 stroke=#0008 /></svg>' }, ui.fh); // 스코프: 원형 접안부 · 밀도트 조준선
       ui.xh = G.el('div', { id: 'xh', innerHTML: '<i></i><i></i><i></i><i></i>' }, ui.fh);
-      for (const k of ['hm', 'am', 'hp', 'ct', 'pr', 'dd', 'vg', 'lk', 'fe']) ui[k] = G.el('div', { id: k }, ui.fh);
-      ui.lk.innerHTML = '화면을 클릭하면 조준이 시작됩니다<small>WASD 이동 · Shift 달리기 · C 앉기 · 좌클릭 사격 · 우클릭 조준 · R 재장전 · E 줍기 · 1/2 무기</small>';
+      for (const k of ['bv', 'hm', 'am', 'hp', 'ct', 'pr', 'pa', 'dd', 'vg', 'lk', 'fe', 'fd']) ui[k] = G.el('div', { id: k }, ui.fh);
+      ui.fd.innerHTML = '<b>전사</b><small>김민철 하사가 쓰러졌다</small><button>부활</button><small>Enter</small>';
+      ui.fd.querySelector('button').onclick = () => { revive(); G.canvas.requestPointerLock && G.canvas.requestPointerLock(); };
+      if (G.fx) { // 불 위치 수집: trail('fire') 0.3초 · burst('explosion') 1.5초
+        const fx = G.fx, tr = fx.trail, bu = fx.burst, rec = (p, t) => { if (!F.on || !p) return; for (const f of fires) if (hypot(f[0] - p[0], f[1] - p[1], f[2] - p[2]) < .4) return f[3] = G.time + t; fires.push([p[0], p[1], p[2], G.time + t]); };
+        fx.trail = function (p, v, k) { k === 'fire' && rec(p, .3); return tr.apply(this, arguments); };
+        fx.burst = function (k, p) { k === 'explosion' && rec(p, 1.5); return bu.apply(this, arguments); };
+      }
+      ui.lk.innerHTML = '화면을 클릭하면 조준이 시작됩니다<small>WASD 이동 · Shift 달리기 · C 앉기 · 좌클릭 사격 · 우클릭 조준 · R 재장전 · E 줍기 · F 방탄판 교체 · T 스코프 · 1/2 무기</small>';
       G.canvas.addEventListener('click', () => { F.on && !F.bot && G.canvas.requestPointerLock && G.canvas.requestPointerLock(); });
       addEventListener('mousemove', e => { if (F.on && document.pointerLockElement === G.canvas) { mouse.dx += e.movementX; mouse.dy += e.movementY; } });
       addEventListener('mousedown', e => { if (!F.on) return; if (e.button === 0) mouse.l = 1; if (e.button === 2) mouse.r = 1; });
