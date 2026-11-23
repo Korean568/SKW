@@ -291,10 +291,10 @@
   }
   function spread(){const W=WEP[pl.w];return(W.sp*(1+pl.mv*.5+inp.run*2+(pl.vy?2:0))*(1-pl.cr*.3)+pl.spr)*(1-pl.ads*(pl.sc&&RF[pl.w]?.92:.7));}
   function reload(){const W=WEP[pl.w],inv=pl.inv[pl.w];if(pl.rl>0||inv[0]>W.mag||inv[1]<=0)return;pl.rc=inv[0]>0?1:0;pl.rl=W.rl;G.sfx.play('reload');} // 탄창에 남아 있으면 약실 1발 더 (30 → 31)
-  function pickups(use){ // 쓰러진 적의 AK·탄약·방탄판 — 밟고 지나가거나 E
+  function pickups(use){ // 쓰러진 적의 AK·탄창·방탄판 — E 로 줍기
     let near=null,nd=2.4;
     for(const e of E)if(e.P.dead&&(e.ammo>0||e.pl&&S.spare<3)&&T-e.td>.6){const d=hypot(e.P.p[0]-pl.p[0],e.P.p[2]-pl.p[2]);if(d<nd&&abs(e.P.p[1]-pl.p[1])<1.3){nd=d;near=e;}}
-    if(near&&(use||nd<1)){
+    if(near&&use){ // E 를 눌러야만 줍는다 (밟아서 줍지 않음)
       const ak=pl.inv.ak,k2=pl.inv.k2,ps=pl.inv.pistol,pt=near.pl&&S.spare<3,am=near.ammo>0&&(!ak||ak[1]<WEP.ak.max||k2&&k2[1]<WEP.k2.max||ps&&ps[1]<WEP.pistol.max);
       if(!pt&&!am)return near;
       if(pt){S.spare++;near.pl=0;}
