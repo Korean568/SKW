@@ -116,7 +116,7 @@
    }
     if(a==='walk'){// (고혁명이 특전사들한테 다가온다) — 손을 보인 채 천천히
       const P=W.ko;P.look=at(k.start,1.6);S.fix=P;S.fixF=S.t + 3;
-      later(1.2,()=>walk(P,[at(k.meet)],.85,Q=>{Q.pose='handsup';Q.yaw=yawTo(Q.p,k.start);}));
+      later(1.2,()=>walk(P,[at(k.meet)],1.05,Q=>{Q.pose='handsup';Q.yaw=yawTo(Q.p,k.start);}));
    }
     if(a==='aimko'){// (총을 겨누며) — 대령이 한 걸음 나서며 고혁명을 겨눈다
       const C=W.col,f=fw(yawTo(C.p,W.ko.p));low(C);
@@ -126,7 +126,7 @@
     if(a==='calm'){W.ko.pose='stand';W.ko.look=PP.eye(W.col);}
     if(a==='call'){// 무전: 잡음과 함께 고혁명이 무전기를 귀에 댄다
       S.radio=1;G.sfx.play('click',{gain:.8,rate:1.4});radioFx(.5,.35);
-      later(.7,()=>{W.ko.gun='radio';W.ko.look=at(W.ko.p,1.2);W.ko.pose='stand';});
+      later(.7,()=>{const P=W.ko,f=fw(P.yaw);P.gun='radio';P.pose='stand';P.look=at([P.p[0] + f[0]*3 + f[2]*1.5,0,P.p[2] + f[2]*3 - f[0]*1.5],.4);});// 고개를 숙이고 듣는다
       S.fix=W.ko;S.fixF=S.t + 3;W.sq.forEach(P=>P.look=PP.eye(W.ko));
    }
     if(a==='throw'){// (리옥선이 무전기를 집어던진다) — 주석궁 집무실 짧은 컷 · 아니면 고혁명의 무전기에서 잡음 폭발
@@ -199,7 +199,8 @@
     // 1인칭
     let tg=S.fix==='heli'?hp():S.fix&&(S.fix.p?S.fix.vis!==false&&PP.eye(S.fix):S.fix);
     if(!tg&&S.spk&&W[S.spk]&&W[S.spk].vis!==false) tg=PP.eye(W[S.spk]);
-    if(!tg&&S.beat==='land') tg=hp();
+    if(!tg&&S.beat==='land') tg=W.ko&&W.ko.vis?PP.eye(W.ko):hp();
+    if(!tg&&S.beat==='approach'&&W.ko) tg=PP.eye(W.ko);
     const ey=[me.p[0] - cos(me.yaw)*sin(me.bob)*.022*me.bA,me.p[1] + 1.6 + (ab(cos(me.bob)) - .7)*.04*me.bA,me.p[2] + sin(me.yaw)*sin(me.bob)*.022*me.bA];
     if(tg&&(S.bot||S.mv<0&&S.wk<0||S.t<S.fixF&&S.mv<0)){
       const d=[tg[0] - ey[0],tg[1] - ey[1],tg[2] - ey[2]],r=S.t<S.fixF?1.6:1.1;
@@ -220,9 +221,9 @@
       if(P.face&&!P.wp){const y=yawTo(P.p,P.face);P.yaw+=wrap(y - P.yaw)*mn(1,dt*2.5);}// 몸을 겨눈 쪽으로 천천히
       if(!P.wp) continue;
       const w=P.wp[0],dx=w[0] - P.p[0],dz=w[2] - P.p[2],d=H(dx,dz);
-      P.stk+=dt;
-      if(d<.08||P.stk>12){P.wp.shift();P.stk=0;if(!P.wp.length){P.wp=null;P.pose='stand';P.done&&P.done(P);}continue;}
-      const s=mn(d,P.sp*dt),q=col([P.p[0] + dx/d*s,P.p[1],P.p[2] + dz/d*s],.25);P.p=q;
+      if(d<.08||P.stk>3){if(d>=.08) P.p=at(w);P.wp.shift();P.stk=0;if(!P.wp.length){P.wp=null;P.pose='stand';P.done&&P.done(P);}continue;}// 3 s 막히면 경유점으로
+      const s=mn(d,P.sp*dt),q=col([P.p[0] + dx/d*s,P.p[1],P.p[2] + dz/d*s],.25);
+      P.stk=dxz(q,P.p)<s*.3?P.stk + dt:0;P.p=q;
       P.yaw+=wrap(Math.atan2(dx,dz) - P.yaw)*mn(1,dt*5);
    }
     const talking=S.t<S.lineEnd;
@@ -240,8 +241,8 @@
     G.shadowFocus=S.cut&&W.okc?W.okc.p:mix(at(k.start),at(k.lz),.35);G.shadowRange=S.cut?12:30;
     // 먼 연기 기둥
     if(G.fx&&G.fx.burst&&!S.cut&&(S.smT-=dt)<0){
-      S.smT=.35;const u=U(),l=k.lz;
-      for(const [a,b] of [[70,-45],[130,30],[95,80]]) G.fx.burst('smoke',[l[0] + u[0]*a + u[2]*b,gnd(l[0],l[2]) + 4,l[2] + u[2]*a - u[0]*b],{vel:[.8,2.2,.4],size:2.2});
+      S.smT=.22;const u=U(),l=k.lz;
+      for(const [a,b] of [[90,-55],[150,35],[120,95]]) G.fx.burst('smoke',[l[0] + u[0]*a + u[2]*b,gnd(l[0],l[2]) + 2,l[2] + u[2]*a - u[0]*b],{vel:[.9,4,.4],size:1.1});
    }
     // 소리
     if(G.frame % 2===0){
