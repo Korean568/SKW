@@ -285,7 +285,7 @@
       G.fx.trail(C.w([5,-.4,-2]),[0,1,0],'fire',dt*.6);
    }
     if(wr) L(C.w([0,1.5,-7.4]),dl,2.4,8);// 꼬리 절단부로 드는 주광
-    const u=t - S.bt;if(u>=0&&u<.35) L(C.w(C.K.hole),[1,.85,.7],12*(1 - u/.35)**2,7);// 피격 섬광 (짧게)
+    const u=t - S.bt;if(u>=0&&u<.25) L(C.w(C.K.hole),[1,.85,.7],8*(1 - u/.25)**2,7);// 피격 섬광 (짧게)
     if(S.cm!=='fps'||G.env.indoor>.5) G.lights=G.lights.filter(l=>l.radius<50);// fx 불 · 폭발 점광(반경 수백 m, 카메라 쪽으로 당김: 바다용)은 객실을 통째로 주황으로 물들임 → 객실에선 뺀다
  }
   function people(dt){

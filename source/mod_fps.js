@@ -371,7 +371,7 @@
     if (inp.pf && pl.rp <= 0 && !pl.dead && S.spare > 0 && S.plate < 100) { pl.rp = 2; pl.rl = 0; G.sfx.play('splash', { gain: .4, rate: 2 }); }
     if (pl.rp > 0 && (pl.rp -= dt) <= 0) { pl.rp = 0; S.plate = 100; S.spare--; S.body = 0; G.sfx.play('click', { gain: 1.4 }); }
     // 불: 1.25 m 안 → 방탄판 15/초, 방탄판 0 이면 1.2초마다 몸 피격
-    let bz = 0; for (const f of fires) if (f[3] > G.time && hypot(f[0] - pl.p[0], f[2] - pl.p[2]) < 1.25 && pl.p[1] < f[1] + 2 && pl.p[1] > f[1] - 1.6) bz = 1;
+    let bz = 0; if (!pl.dead) for (const f of fires) if (f[3] > G.time && hypot(f[0] - pl.p[0], f[2] - pl.p[2]) < 1.25 && pl.p[1] < f[1] + 2 && pl.p[1] > f[1] - 1.6) bz = 1;
     pl.bn += (bz - pl.bn) * min(1, dt * 6);
     if (bz && !safe()) {
       if (S.plate > 0) { S.plate = max(0, S.plate - 15 * dt); D.mh = min(D.mh, S.plate); } else if ((pl.bt += dt) > 1.2) { pl.bt = 0; bodyHit(0); }
@@ -420,7 +420,7 @@
     ui.am.innerHTML = `<b>${inv[0]}</b> / ${inv[1]}<small>${W.n}${pl.w === 'ak' && pl.sc ? ' + 스코프' : ''}</small>`;
     const lo = S.plate <= 10, z = S.plate <= 0; // 방탄판 HUD: 막대 · 숫자 · 예비 방탄판 · 무방비(몸 피격 n/2)
     ui.hp.className = z ? 'z' : lo ? 'a' : '';
-    ui.hp.innerHTML = `<i style="width:${S.plate}%"></i><b>${S.plate + .99 | 0}</b><small>방탄판</small><u>${'<s></s>'.repeat(S.spare)}${'<s class=e></s>'.repeat(3 - S.spare)}</u>${z ? `<em>무방비 · 피격 ${S.body}/2</em>` : ''}`;
+    ui.hp.innerHTML = `<i style="width:${S.plate}%"></i><b>${S.plate + .99 | 0}</b><u>${'<s></s>'.repeat(S.spare)}${'<s class=e></s>'.repeat(3 - S.spare)}</u>${z ? `<em>무방비 · 피격 ${S.body}/2</em>` : '<small>방탄판</small>'}`;
     ui.ct.innerHTML = `북한군 <b>${S.kills}</b> / ${S.total}<small>북한군을 제압하라</small>`;
     const pa = pl.dead ? '' : pl.rp > 0 ? '방탄판 교체 중…' : lo ? (z ? '무방비 — ' : '') + (S.spare ? '방탄판 교체 [F]' : '예비 방탄판 없음') : '';
     ui.pa.textContent = pa; ui.pa.style.display = pa ? 'block' : 'none'; ui.pa.className = pl.rp > 0 ? 'r' : S.spare ? '' : 'n';
@@ -458,10 +458,10 @@
 #xh i:nth-child(3),#xh i:nth-child(4){height:2px;width:7px;top:-1px}#xh i:nth-child(3){left:calc(-7px - var(--s))}#xh i:nth-child(4){left:var(--s)}
 #hm{position:absolute;left:50%;top:50%;width:16px;height:16px;margin:-8px;border:2px solid #fff;border-width:0 2px;transform:rotate(45deg) scaleY(1);opacity:0;clip-path:polygon(0 0,35% 0,35% 100%,0 100%,0 0,100% 0,100% 100%,65% 100%,65% 0)}
 #am{position:absolute;right:4vw;bottom:5vh;text-align:right;font-size:22px;color:#cde}#am b{font-size:46px;color:#fff;font-weight:700}#am small{display:block;font-size:14px;letter-spacing:.15em;color:#9bc}
-#hp{position:absolute;left:4vw;bottom:5vh;width:220px;height:8px;background:#0008;border-radius:4px;box-shadow:0 0 0 1px #fff4}#hp i{position:absolute;inset:0 auto 0 0;background:linear-gradient(90deg,#aab3bb,#fff);border-radius:4px}#hp b{position:absolute;bottom:12px;left:0;font-size:30px}
-#hp small{position:absolute;bottom:16px;left:62px;font-size:12px;letter-spacing:.2em;color:#ccd}#hp u{position:absolute;bottom:14px;right:0;display:flex;gap:5px}#hp s{width:12px;height:16px;border:2px solid #fff;border-radius:2px 2px 6px 6px;background:#fffc}#hp s.e{background:0;opacity:.3}
-#hp.a i{background:#fb3}#hp.a b{color:#fb3}#hp.z{box-shadow:0 0 0 2px #fff;animation:pu .5s infinite alternate}#hp em{position:absolute;top:14px;left:0;white-space:nowrap;font:700 16px system-ui;letter-spacing:.12em}
-#pa{position:absolute;left:50%;top:30%;transform:translateX(-50%);padding:.3em 1em;border:2px solid #fb3;border-radius:6px;background:#000a;color:#fb3;font:700 24px system-ui;letter-spacing:.12em;display:none;animation:pu .45s infinite alternate}#pa.n{border-color:#fff;color:#fff}#pa.r{animation:none;border-color:#fff8;color:#fff}@keyframes pu{to{opacity:.35}}
+#hp{position:absolute;left:4vw;bottom:6vh;width:150px;height:8px;background:#0008;border-radius:4px;box-shadow:0 0 0 1px #fff4}#hp i{position:absolute;inset:0 auto 0 0;background:linear-gradient(90deg,#aab3bb,#fff);border-radius:4px}#hp b{position:absolute;bottom:12px;left:0;font-size:30px}
+#hp small{position:absolute;top:13px;left:0;font-size:12px;letter-spacing:.3em;color:#ccd}#hp u{position:absolute;bottom:14px;right:0;display:flex;gap:5px}#hp s{width:12px;height:16px;border:2px solid #fff;border-radius:2px 2px 6px 6px;background:#fffc}#hp s.e{background:0;opacity:.3}
+#hp.a i{background:#fb3}#hp.a b{color:#fb3}#hp.z{box-shadow:0 0 0 2px #fff;animation:pu .5s infinite alternate}#hp em{position:absolute;top:13px;left:0;white-space:nowrap;font:700 15px system-ui;letter-spacing:.1em}
+#pa{position:absolute;left:50%;top:30%;transform:translateX(-50%);padding:.3em 1em;border:2px solid #fb3;border-radius:6px;background:#000a;color:#fb3;font:700 24px system-ui;letter-spacing:.12em;display:none;animation:pu .45s infinite alternate}#pa.n{border-color:#fff;color:#fff}#pa.r{animation:none;border-color:#fff8;color:#fff}@keyframes pu{to{opacity:.55}}
 #sc{position:absolute;inset:0;opacity:0;background:radial-gradient(circle,#38605010 0,#0000 22vmin,#0008 37vmin,#000 41vmin)}#sc svg{position:absolute;left:50%;top:50%;width:84vmin;height:84vmin;margin:-42vmin}
 #bv{position:absolute;inset:0;opacity:0;background:radial-gradient(#ff600000 35%,#ff6a0040 70%,#ff3c00b0);box-shadow:inset 0 0 20vmin 5vmin #ff5a00b0}
 #fd{position:absolute;inset:0;display:none;place-content:center;justify-items:center;background:radial-gradient(#0006,#000d);pointer-events:auto}#fd b{font-size:clamp(44px,8vw,100px);letter-spacing:.4em;margin-right:-.4em}#fd small{font-size:16px;color:#bbb}#fd button{margin:1.2em 0 .6em;padding:.35em 2.4em;font:800 clamp(24px,3.4vw,44px) system-ui;letter-spacing:.5em;color:#111;background:#fff;border:0;border-radius:8px;cursor:pointer;box-shadow:0 0 40px #fff6}
