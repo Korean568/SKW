@@ -331,6 +331,7 @@
       }
       if(goal){const d=[goal[0]-pl.p[0],goal[2]-pl.p[2]];pl.yaw+=cl(atan2(d[0],d[1])-pl.yaw,-3*dt,3*dt);pl.pit*=.9;inp.f=1;}
     }
+    if(pl.bn>.1)inp.f=-1; // 불에서 물러난다
   }
 
   function player(dt){
