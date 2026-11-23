@@ -295,11 +295,13 @@
     let near=null,nd=2.4;
     for(const e of E)if(e.P.dead&&(e.ammo>0||e.pl&&S.spare<3)&&T-e.td>.6){const d=hypot(e.P.p[0]-pl.p[0],e.P.p[2]-pl.p[2]);if(d<nd&&abs(e.P.p[1]-pl.p[1])<1.3){nd=d;near=e;}}
     if(near&&(use||nd<1)){
-      const ak=pl.inv.ak,pt=near.pl&&S.spare<3,am=near.ammo>0&&(!ak||ak[1]<WEP.ak.max);
+      const ak=pl.inv.ak,k2=pl.inv.k2,ps=pl.inv.pistol,pt=near.pl&&S.spare<3,am=near.ammo>0&&(!ak||ak[1]<WEP.ak.max||k2&&k2[1]<WEP.k2.max||ps&&ps[1]<WEP.pistol.max);
       if(!pt&&!am)return near;
       if(pt){S.spare++;near.pl=0;}
-      if(am){if(!ak){pl.inv.ak=[30,near.ammo];hud.msg=['AK 소총 획득 — [3] 으로 교체',T+2.5];}else ak[1]=min(WEP.ak.max,ak[1]+near.ammo);near.ammo=0;near.P.gun=0;}
-      G.sfx.play('click');hud.pk=1.2;hud.pkT=pt?'방탄판 +1':'획득!';return null;
+      if(am){ // 탄창: 가진 총 모두에 보충 (K2C1 +30 · K7 +12 · AK 는 처음이면 총째로)
+        if(!ak){pl.inv.ak=[30,near.ammo];hud.msg=['AK 소총 획득 — [3] 으로 교체',T+2.5];}else ak[1]=min(WEP.ak.max,ak[1]+near.ammo);
+        if(k2)k2[1]=min(WEP.k2.max,k2[1]+30);if(ps)ps[1]=min(WEP.pistol.max,ps[1]+12);near.ammo=0;near.P.gun=0;}
+      G.sfx.play('click');hud.pk=1.2;hud.pkT=pt?'방탄판 +1':'탄창 획득!';return null;
     }
     return near;
   }
@@ -430,7 +432,7 @@
     ui.pa.textContent=pa;ui.pa.style.display=pa?'block':'none';ui.pa.className=pl.rp>0?'r':S.spare?'':'n';
     ui.fd.style.display=pl.dead&&T-pl.dead>1?'grid':'none';
     const ms=hud.msg&&T<hud.msg[1]?hud.msg[0]:'',np=hud.pkN&&hud.pkN.pl&&S.spare<3;
-    const pr=pl.dead?'':ms||(hud.pkN?(np?'[E] 방탄판 줍기':pl.inv.ak?'[E] 탄약 줍기':'[E] AK 소총 줍기'):hud.pk>0?hud.pkT:pl.rl>0?'재장전 중…':inv[0]===0?(inv[1]?'[R] 재장전':'탄약 없음'):inv[0]<=W.mag/4?'[R] 재장전':'');
+    const pr=pl.dead?'':ms||(hud.pkN?(np?'[E] 방탄판 줍기':pl.inv.ak?'[E] 탄창 줍기':'[E] AK 소총·탄창 줍기'):hud.pk>0?hud.pkT:pl.rl>0?'재장전 중…':inv[0]===0?(inv[1]?'[R] 재장전':'탄약 없음'):inv[0]<=W.mag/4?'[R] 재장전':'');
     ui.pr.textContent=pr;
     ui.lk.style.display=F.bot||pl.end||pl.dead||document.pointerLockElement===G.canvas||G.params.has('step')?'none':'block';
   }
