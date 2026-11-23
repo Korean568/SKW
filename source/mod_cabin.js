@@ -1,7 +1,7 @@
 'use strict';
 /* CABIN — 여객기 안팎·추락 현장. 평면 공간: 원점 바닥 중앙,+Z 기수,+X 좌현 */
 {
- const C=G.cabin={ M: M4.ident(),S: { hole: 0,gear: 1,gearDown: 0,power: 1,masks: 0,crash: 0,tv: 0 } },S=C.S;
+ const C=G.cabin={ on: true, M: M4.ident(),S: { hole: 0,gear: 1,gearDown: 0,power: 1,masks: 0,crash: 0,tv: 0 } },S=C.S;
  const { sin,cos,abs,hypot,PI,min,max,exp }=Math,L=G.lerp,cl=G.clamp,sm=(a,b,x)=>{ x=cl((x-a)/(b-a),0,1); return x*x*(3-2*x); };
  const CY=.6,R=1.98,RI=1.8,PZ=.8,Z1=11.6,WP=8/15,ZW=26*WP,TZ=-6.45,AC=.24,WA=.19,AF=-.34,AB=.6;
  const SX={ A: 1.46,B: .98,C: .5,D: -.5,E: -.98,F: -1.46 };
@@ -395,8 +395,8 @@ return vec4f(select(vec3f(1.,.93,.82)*u.s.y*.5,skyBase(vec3f(R.x,abs(R.y),R.z)),
     S.tv,gt?4.9*gt*gt:S.gear&&S.gearDown?0:1e3,S.crash?TZ:-99,0,...C.K.hole,1.15],32);
   },
   prepare() { ub&&G.dev.queue.writeBuffer(ub,0,UB); },
-  shadow(p) { run(p,pipeS,1); },
-  opaque(p) { run(p,pipe,0); },
-  transparent(p) { run(p,pipeT,2); }
+  shadow(p) { C.on&&run(p,pipeS,1); }, // C.on = false: 다른 스토리 장면에서는 여객기·추락 현장을 그리지 않음
+  opaque(p) { C.on&&run(p,pipe,0); },
+  transparent(p) { C.on&&run(p,pipeT,2); }
  },'story');
 }
