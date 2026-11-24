@@ -390,7 +390,8 @@
 #s2c button:hover{background:#3a0e0ed8;border-color:#ff9a8a99}#s2c small{display:block;font:400 1.4vh system-ui;letter-spacing:.2em;color:#8f989f;margin-top:.4em}
 #s2t{inset:0;display:grid;place-content:center;text-align:center;color:#ebe4d8;opacity:0;transition:opacity 1.4s}
 #s2t small{font:400 1.9vh system-ui;letter-spacing:.55em;color:#a9a196}#s2t b{display:block;font:800 6.4vh system-ui;letter-spacing:.14em;margin:.4em 0;color:#fff}
-#s2v{inset:0;background:radial-gradient(ellipse at 50% 45%,#0000 40%,#000d);opacity:0;transition:opacity 2.5s}`);
+#s2v{inset:0;background:radial-gradient(ellipse at 50% 45%,#0000 40%,#000d);opacity:0;transition:opacity 2.5s}
+html[lang=en] #s2c button{letter-spacing:.18em;text-indent:.18em}html[lang=en] #s2t small{letter-spacing:.3em}`);
       ui.v=G.el('div',{id:'s2v'});ui.o=G.el('div',{id:'s2o'});ui.h=G.el('div',{id:'s2h',textContent:'WASD 이동 · 마우스 둘러보기 · Shift 달리기 · E 상호작용'});
       ui.p=G.el('div',{id:'s2p'});ui.m=G.el('div',{id:'s2m',innerHTML:'<i></i><span></span>'});
       ui.c=G.el('div',{id:'s2c',innerHTML:'<button>처형<small>1</small></button><button>거절<small>2</small></button>'});
