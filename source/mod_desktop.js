@@ -89,7 +89,7 @@
     /* ── 설정 화면 갱신 ── */
     function sync() {
       const r = ui.s, seg = (k, v) => r.querySelectorAll(`[data-k=${k}] button`).forEach(b => b.classList.toggle('on', b.dataset.v === String(v)));
-      seg('q', G.qManual ? G.Q.name : 'auto'); seg('sub', cfg.sub); seg('sc', cfg.scale ? '' : 'auto');
+      seg('q', G.qManual ? G.Q.name : 'auto'); seg('sub', cfg.sub); G.i18n && seg('lang', G.lang); seg('sc', cfg.scale ? '' : 'auto');
       const sc = r.querySelector('[data-k=sc] input'); sc.value = cfg.scale || Math.round(G.dyn * 100);
       r.querySelector('[data-k=sc] output').textContent = (cfg.scale ? cfg.scale : Math.round(G.dyn * 100)) + ' %' + (cfg.scale ? '' : ' (자동)');
       r.querySelector('[data-k=vol] input').value = Math.round(cfg.vol * 100); r.querySelector('[data-k=vol] output').textContent = Math.round(cfg.vol * 100) + ' %';
@@ -103,6 +103,7 @@
       if (k === 'vol') { cfg.vol = v / 100; vol(); }
       if (k === 'sens') cfg.sens = +v;
       if (k === 'sub') { cfg.sub = v; sub(); }
+      if (k === 'lang') G.i18n && G.i18n.set(v); // 언어 (mod_i18n): 화면 글자는 사전이 바로 바꿈
       save(); if (!input || k !== 'sc') sync(); else ui.s.querySelector('[data-k=sc] output').textContent = v + ' %';
     }
 
@@ -161,8 +162,10 @@
 <span>소리 크기</span><div data-k=vol><input type=range min=0 max=100 step=5><output></output></div>
 <span>마우스 감도</span><div data-k=sens><input type=range min=.3 max=3 step=.1><output></output></div>
 <span>자막 크기</span><div data-k=sub><button data-v=s>작게</button><button data-v=m>보통</button><button data-v=l>크게</button></div>
+${G.i18n ? '<span>언어</span><div data-k=lang><button data-v=ko data-i18n-skip>한국어</button><button data-v=en data-i18n-skip>English</button></div>' : ''}
 </div><button class=bk data-a=back>돌아가기</button><div class=h><b>Esc</b> 돌아가기 · <b>F11</b> 전체 화면</div></div>`;
         ui = { root, p: root.querySelector('.p'), s: root.querySelector('.s'), st: root.querySelector('.st'), sub: G.el('style', {}, document.head) };
+        G.i18n && G.i18n.onChange(() => { menu === 'set' && sync(); }); // 처음 화면 버튼 등 다른 곳에서 바꿔도 설정 표시 맞춤
         root.addEventListener('click', e => { const a = e.target.closest('[data-a]'); if (a) return ACT[a.dataset.a](); const b = e.target.closest('[data-k] button'); b && onSet(b.parentNode.dataset.k, b.dataset.v); });
         root.addEventListener('input', e => { const k = e.target.parentNode.dataset.k; k && onSet(k, e.target.value, 1); });
         root.addEventListener('mouseover', e => { const a = e.target.closest('[data-a]'), i = items().indexOf(a); if (i >= 0) { sel = i; hi(); } });

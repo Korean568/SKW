@@ -46,6 +46,7 @@
   /* ── 뉴스 화면 (512×288 캔버스 → 좌석 모니터) ── */
   const cv=document.createElement('canvas');cv.width=512;cv.height=288;const x=cv.getContext('2d',{willReadFrequently:true});// CPU 캔버스: 좌석 화면 업로드가 어느 경로든 안정적
   const F=(c,a,b,w,h)=>{x.fillStyle=c;x.fillRect(a,b,w,h)};
+  const fit=(s,w)=>{const v=G.tr(s);if(v!==s){const m=x.measureText(v).width;if(m>w) x.font=x.font.replace(/\d+px/,p=>Math.floor(parseFloat(p)*w/m) + 'px');}return v;};// 번역된 글자만 폭에 맞춰 줄임 (한국어는 그대로)
   function news(){
     const t=S.t,g=x.createLinearGradient(0,0,512,288);
     g.addColorStop(0,'#0a1a36');g.addColorStop(1,'#173a6a');x.fillStyle=g;x.fillRect(0,0,512,288);
@@ -57,12 +58,13 @@
     x.fillStyle='#e9e9ee';x.beginPath();x.moveTo(135,182);x.lineTo(165,182);x.lineTo(150,230);x.fill();F('#a01c1c',146,186,8,34);
     F('#c99a7c',138,150,24,36);x.beginPath();x.ellipse(150,128,30,38,0,0,7);x.fill();
     x.fillStyle='#1b1414';x.beginPath();x.ellipse(150,104,32,22,0,PI*.95,PI*2.05);x.fill();
-    F('#c4161c',0,196,98,44);x.fillStyle='#fff';x.font='900 30px sans-serif';x.fillText('속보',14,229);
-    F('#f4f4f4',98,196,414,44);x.fillStyle='#111';x.font='800 21px sans-serif';x.fillText('인민군 리충성, 김준호 국무위원장 살해',110,226);
+    F('#c4161c',0,196,98,44);x.fillStyle='#fff';x.font='900 30px sans-serif';x.fillText(fit('속보',78),14,229);
+    F('#f4f4f4',98,196,414,44);x.fillStyle='#111';x.font='800 21px sans-serif';x.fillText(fit('인민군 리충성, 김준호 국무위원장 살해',394),110,226);
     F('#081226',0,240,512,48);x.fillStyle='#ffd34a';x.font='700 17px sans-serif';
-    x.fillText('대한민국 공격 우려 · 대북 경계태세 격상 · 국방부 긴급회의 · ',512 - (t*60 % 1100),270);
+    const tk='대한민국 공격 우려 · 대북 경계태세 격상 · 국방부 긴급회의 · ',tt=G.tr(tk);
+    x.fillText(tt,512 - (t*60 % (tt===tk?1100:Math.max(1100,x.measureText(tt).width + 530))),270);
     F('#c4161c',14,14,58,24);x.fillStyle='#fff';x.font='800 15px sans-serif';x.fillText('LIVE',24,32);
-    x.fillStyle='#cfe0ff';x.fillText('SKW 뉴스',82,32);
+    x.fillStyle='#cfe0ff';x.fillText(G.tr('SKW 뉴스'),82,32);
     C.screen(cv);
  }
 

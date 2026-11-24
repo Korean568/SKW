@@ -5,7 +5,7 @@
   G.i18n.add({
     // 해설 · 장소
     '고혁명은 리충성이 죽는 것을 지켜본 후, 리옥선을 죽여야된다고 생각하고 자신을 진심으로 존경하는 부하들과 함께 항복하려고 헬리콥터를 타고 대한민국 서강으로 간다.':
-      'Having watched Ri Chung-seong die, Ko Hyeok-myeong resolves that Ri Ok-seon must be killed. With the few men who truly respect him, he takes a helicopter south to Seogang, Republic of Korea — to surrender.',
+      'Having watched Ri Chung-seong die, Ko Hyeok-myeong knows Ri Ok-seon must be killed. With the men who truly respect him, he flies to Seogang in South Korea — to surrender.',
     '서강시 · 폐허 — 새벽':'Seogang City · Ruins — Dawn',
     '서강시':'Seogang City','폐허 — 새벽':'Ruins — Dawn',
     // 조작 안내

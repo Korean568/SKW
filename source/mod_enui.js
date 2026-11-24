@@ -25,7 +25,7 @@
       '이 게임은': 'This game requires',
       '로 동작합니다. 아래를 확인해 주세요.': 'to run. Please check the following:',
       'Chrome / Edge 113 이상': 'Chrome / Edge 113 or later',
-      '최신 버전 (Windows · macOS · ChromeOS)': '(latest version, on Windows · macOS · ChromeOS)',
+      '최신 버전 (Windows · macOS · ChromeOS)': '— latest version (Windows · macOS · ChromeOS)',
       'Safari 26 이상, Firefox 141 이상(Windows), Android Chrome 121 이상': 'Safari 26+, Firefox 141+ (Windows), Android Chrome 121+',
       '브라우저 설정에서': 'Turn on',
       '하드웨어 가속': 'hardware acceleration',
