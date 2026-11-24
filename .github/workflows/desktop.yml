@@ -1,0 +1,104 @@
+# PC 다운로드판 (Electron) 빌드 — 수동 실행 전용 (Actions 탭 → "Desktop builds" → Run workflow)
+#
+# 1) Windows · macOS · Linux 러너에서 desktop/ 을 빌드해 zip 등을 워크플로 아티팩트로 올린다.
+# 2) 저장소 시크릿 BUTLER_API_KEY 가 있을 때만 itch.io 에 butler 로 올린다.
+#    올릴 곳은 저장소 변수 ITCH_USER (itch.io 사용자 이름), ITCH_GAME (기본 second-korean-wars).
+#    자세한 설명: desktop/README-itch.md
+name: Desktop builds
+
+on:
+  workflow_dispatch:
+    inputs:
+      push_to_itch:
+        description: "BUTLER_API_KEY 시크릿이 있으면 itch.io 에도 올리기"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: win
+          - os: macos-latest
+            target: mac
+          - os: ubuntu-latest
+            target: linux
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Build (${{ matrix.target }})
+        run: npm run dist:${{ matrix.target }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: second-korean-wars-${{ matrix.target }}
+          if-no-files-found: error
+          path: |
+            desktop/dist/*.zip
+            desktop/dist/*.exe
+            desktop/dist/*.AppImage
+            desktop/dist/*.tar.gz
+
+  itch:
+    needs: build
+    if: ${{ inputs.push_to_itch }}
+    runs-on: ubuntu-latest
+    env:
+      BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
+      ITCH_TARGET: ${{ vars.ITCH_USER }}/${{ vars.ITCH_GAME || 'second-korean-wars' }}
+    steps:
+      - name: Check settings
+        run: |
+          if [ -z "$BUTLER_API_KEY" ]; then echo "BUTLER_API_KEY 시크릿이 없어 itch.io 업로드를 건너뜁니다."; fi
+          if [ -n "$BUTLER_API_KEY" ] && [ "${ITCH_TARGET%%/*}" = "" ]; then echo "::error::저장소 변수 ITCH_USER 를 설정하세요"; exit 1; fi
+
+      - uses: actions/checkout@v4
+        if: env.BUTLER_API_KEY != ''
+        with:
+          sparse-checkout: desktop/package.json
+          sparse-checkout-cone-mode: false
+
+      - uses: actions/download-artifact@v4
+        if: env.BUTLER_API_KEY != ''
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Install butler
+        if: env.BUTLER_API_KEY != ''
+        run: |
+          curl -fsSL -o butler.zip https://broth.itch.zone/butler/linux-amd64/LATEST/archive/default
+          unzip -q butler.zip -d butler && chmod +x butler/butler && butler/butler -V
+
+      - name: Push to itch.io
+        if: env.BUTLER_API_KEY != ''
+        run: |
+          set -e
+          V=$(node -p "require('./desktop/package.json').version")
+          B=butler/butler
+          $B push artifacts/SecondKoreanWars-$V-win-x64.zip      "$ITCH_TARGET:windows"   --userversion "$V"
+          $B push artifacts/SecondKoreanWars-$V-mac-arm64.zip    "$ITCH_TARGET:mac-arm64" --userversion "$V"
+          $B push artifacts/SecondKoreanWars-$V-mac-x64.zip      "$ITCH_TARGET:mac-x64"   --userversion "$V"
+          # Linux: tar.gz 를 풀어 실행 권한과 .itch.toml 이 맨 위에 있는 폴더째로 올린다
+          mkdir -p linux && tar -xzf artifacts/SecondKoreanWars-$V-linux-x64.tar.gz -C linux
+          $B push "linux/$(ls linux | head -n1)" "$ITCH_TARGET:linux" --userversion "$V"
+          $B status "$ITCH_TARGET"
