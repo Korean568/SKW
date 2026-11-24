@@ -471,7 +471,7 @@
 #sc{position:absolute;inset:0;opacity:0;background:radial-gradient(circle,#38605010 0,#0000 22vmin,#0008 37vmin,#000 41vmin)}#sc svg{position:absolute;left:50%;top:50%;width:84vmin;height:84vmin;margin:-42vmin}
 #pm{position:absolute;left:-30px;top:-34px;width:60px;text-align:center;font:700 12px system-ui;display:none}#pm:after{content:'▼';display:block;font-size:14px}
 #bv{position:absolute;inset:0;opacity:0;background:radial-gradient(#ff600000 35%,#ff6a0040 70%,#ff3c00b0);box-shadow:inset 0 0 20vmin 5vmin #ff5a00b0}
-#fd{position:absolute;inset:0;display:none;place-content:center;justify-items:center;background:radial-gradient(#0006,#000d);pointer-events:auto}#fd b{font-size:clamp(44px,8vw,100px);letter-spacing:.4em;margin-right:-.4em}#fd small{font-size:16px;color:#bbb}#fd button{margin:1.2em 0 .6em;padding:.35em 2.4em;font:800 clamp(24px,3.4vw,44px) system-ui;letter-spacing:.5em;color:#111;background:#fff;border:0;border-radius:8px;cursor:pointer;box-shadow:0 0 40px #fff6}
+#fd{position:absolute;inset:0;display:none;place-content:center;justify-items:center;background:radial-gradient(#0006,#000d);pointer-events:auto}#fd b{font-size:clamp(44px,8vw,100px);letter-spacing:.4em;margin-right:-.4em}#fd small{font-size:16px;color:#bbb}#fd button.t{font-size:15px;padding:.4em 1.6em;margin-top:1.6em;background:#0000;color:#ddd;border:1px solid #fff6;box-shadow:none}#fd button{margin:1.2em 0 .6em;padding:.35em 2.4em;font:800 clamp(24px,3.4vw,44px) system-ui;letter-spacing:.5em;color:#111;background:#fff;border:0;border-radius:8px;cursor:pointer;box-shadow:0 0 40px #fff6}
 #ct{position:absolute;left:50%;top:3.5vh;transform:translateX(-50%);text-align:center;font-size:19px;letter-spacing:.06em}#ct b{font-size:26px;color:#fc6}#ct small{display:block;font-size:14px;color:#bcd;letter-spacing:.2em}
 #pr{position:absolute;left:50%;top:62%;transform:translateX(-50%);font-size:18px;color:#fe9}
 #dd{position:absolute;inset:0;background:radial-gradient(ellipse 34% 22% at 50% 0,#fffa,#fff0);opacity:0}
@@ -482,8 +482,9 @@
       ui.sc=G.el('div',{id:'sc',innerHTML:'<svg viewBox="-50 -50 100 100" stroke=#000 fill=none><path d="M-50 0H50M0-50V50" stroke-width=.22 /><path d="M-25 0H25M0-25V25" stroke-width=1.3 stroke-dasharray="0 5" stroke-linecap=round /><path d="M-50 0H-30M30 0H50M0 30V50" stroke-width=1.4 /><circle r=49.5 stroke-width=1.5 stroke=#0008 /></svg>'},ui.fh); // 스코프: 원형 접안부 · 밀도트 조준선
       ui.xh=G.el('div',{id:'xh',innerHTML:'<i></i><i></i><i></i><i></i>'},ui.fh);
       for(const k of['bv','pm','hm','am','hp','ct','pr','pa','dd','vg','lk','fe','fd'])ui[k]=G.el('div',{id:k},ui.fh);
-      ui.pm.textContent='방탄판';ui.fd.innerHTML='<b>전사</b><small>김민철 하사가 쓰러졌다</small><button>부활</button><small>Enter</small>';
+      ui.pm.textContent='방탄판';ui.fd.innerHTML='<b>전사</b><small>김민철 하사가 쓰러졌다</small><button>부활</button><small>Enter</small><button class=t>처음 화면</button>';
       ui.fd.querySelector('button').onclick=()=>{revive();G.canvas.requestPointerLock&&G.canvas.requestPointerLock();};
+      ui.fd.querySelector('.t').onclick=()=>{ui.fd.style.display='none';G.story&&G.story.title&&G.story.title();}; // 처음 화면으로
       if(G.fx){ // 불 위치 수집: trail('fire') 0.3초 · burst('explosion') 1.5초
         const fx=G.fx,tr=fx.trail,bu=fx.burst,rec=(p,t)=>{if(!F.on||!p)return;for(const f of fires)if(hypot(f[0]-p[0],f[1]-p[1],f[2]-p[2])<.4)return f[3]=G.time+t;fires.push([p[0],p[1],p[2],G.time+t]);};
         fx.trail=function(p,v,k){k==='fire'&&rec(p,.3);return tr.apply(this,arguments);};

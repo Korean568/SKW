@@ -182,9 +182,9 @@
     try {fpsOK()&&G.fps.on&&G.fps.stop&&G.fps.stop();} catch (e){G.err('[story] fps.stop ' + e);}
     const k=(fpsOK()&&G.fps.S&&G.fps.S.kills)||S.kills;
     document.pointerLockElement&&document.exitPointerLock();
-    ui.end.innerHTML=win?`<h2>스토리 1 — 끝</h2><p>사살한 북한군 <b>${k}</b> / 50</p><p class=c>다음 이야기에서 계속…</p><button>처음부터</button>`
-     :`<h2 class=r>전사</h2><p>사살한 북한군 <b>${k}</b> / 50</p><button>다시 싸우기</button>`;
-    ui.end.querySelector('button').onclick=()=>{ui.end.style.display='none';win?go('cruise'):go('board');};
+    ui.end.innerHTML=win?`<h2>스토리 1 — 끝</h2><p>사살한 북한군 <b>${k}</b> / 50</p><p class=c>다음 이야기에서 계속…</p><button>처음부터</button><button>처음 화면</button>`
+     :`<h2 class=r>전사</h2><p>사살한 북한군 <b>${k}</b> / 50</p><button>다시 싸우기</button><button>처음 화면</button>`;
+    const bs=ui.end.querySelectorAll('button');bs[0].onclick=()=>{ui.end.style.display='none';win?go('cruise'):go('board');};bs[1].onclick=title;// 처음 화면
     ui.end.style.display='grid';G.sfx.music(win?'calm':'off');
  }
 
@@ -217,7 +217,9 @@
     ui.ov.style.display='none';ui.end.style.display='none';C.on=false;for(const k in SCN) G[SCN[k]]&&(G[SCN[k]].on=+k===n);PP.clear();
     st.start();
  }
-  function title(){// 스토리 2 → 처음 화면
+  function title(){// 처음 화면으로 (스토리 1~4 어디서든)
+    try {fpsOK()&&G.fps.on&&G.fps.stop&&G.fps.stop();} catch (e){G.err('[story] ' + e);}
+    for(const k of ['engine','cabin','wind','siren','missile']) G.sfx.loop(k,0);document.pointerLockElement&&document.exitPointerLock();
     for(const n of [2,3,4]) try {const st=G['story' + n];st&&st.on&&st.stop&&st.stop();} catch (e){G.err('[story] ' + e);}
     C.on=true;for(const k in SCN) G[SCN[k]]&&(G[SCN[k]].on=false);S.on=0;S.beat='title';S.cm='title';S.blk=0;wait.length=0;stage();
     G.setEnv({sunEl:34,sunAz:65,indoor:0,exposure:1});ui.end.style.display='none';ui.ov.style.display='grid';G.sfx.music('calm');
