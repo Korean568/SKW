@@ -9,7 +9,7 @@ const fs = require('fs'), path = require('path'), zlib = require('zlib'), D = __
 const out = process.argv[2] && !process.argv[2].startsWith('--') ? process.argv[2] : path.join(D, '..', 'index.html'), stubs = process.argv.includes('--stubs'), readable = process.argv.includes('--readable'), raw = process.argv.includes('--raw');
 // 기본 빌드 = 스토리 1 (여객기). 예전 해상 반격 임무(ocean·models·game)는 --naval 을 붙일 때만 함께 넣음 (그때는 ?mode=naval 로 실행)
 const naval = process.argv.includes('--naval');
-const MODS = ['gpu', 'sky', 'post', 'ocean', 'mesh', 'models', 'fx', 'audio', 'game', 'people', 'cabin', 'fps', 'village', 'story2', 'palace', 'story3', 'ruins', 'story4', 'story', 'desktop'].filter(m => naval || !['ocean', 'models', 'game'].includes(m));
+const MODS = ['gpu', 'sky', 'post', 'ocean', 'mesh', 'models', 'fx', 'audio', 'i18n', 'game', 'people', 'cabin', 'fps', 'village', 'story2', 'palace', 'story3', 'ruins', 'story4', 'story', 'desktop', 'en1', 'en2', 'en3', 'en4', 'enui'].filter(m => naval || !['ocean', 'models', 'game'].includes(m));
 const strip = s => s.replace(/^'use strict';\s*/, '').trimEnd();
 const read = f => strip(fs.readFileSync(path.join(D, f), 'utf8'));
 

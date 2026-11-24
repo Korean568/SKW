@@ -8,7 +8,7 @@ const STEP = `const dt=.05;G.time+=dt;G.dt=dt;G.frame++;G.lights.length=0;for(co
   let bad = 0; const say = (ok, m) => { if (!ok) bad++; console.log((ok ? 'PASS ' : 'FAIL ') + m); };
   const b = await chromium.launch({ args: FLAGS });
   const open = async (q, vp = { width: 960, height: 540 }) => { const p = await b.newPage({ viewport: vp }), logs = []; p.on('console', m => (m.type() === 'error' || m.type() === 'warning') && !/CONTEXT_LOST/.test(m.text()) && logs.push(m.text().slice(0, 200))); p.on('pageerror', e => logs.push('pageerror ' + e.message));
-    await p.goto(U + q); await p.waitForFunction(() => window.G && (G.ready || G.dead), null, { timeout: 180000 }); return [p, logs]; };
+    await p.goto(U + q + (/lang=/.test(q) ? '' : '&lang=ko')); await p.waitForFunction(() => window.G && (G.ready || G.dead), null, { timeout: 180000 }); return [p, logs]; };
   { const [p, logs] = await open('?step&q=HIGH');
     const r = await p.evaluate(async () => { for (const q of ['HIGH', 'LOW', 'MEDIUM', 'HIGH']) { G.setQuality(q, 1); await G.test.run(2); } G.dyn = .7; G.resize(); await G.test.run(2); G.dyn = 1; G.resize(); await G.test.run(2); return G.errors; });
     say(!r.length && !logs.length, 'preset switch + resize: ' + JSON.stringify(r) + ' ' + JSON.stringify(logs)); await p.close(); }

@@ -73,6 +73,7 @@ G.register = (name, mod, mode) => { if (mode && mode !== G.mode) return mod; G.m
 G.ui = document.getElementById('ui');
 G.el = (tag, props = {}, parent = G.ui) => { const e = document.createElement(tag); Object.assign(e, props); parent.appendChild(e); return e; };
 G.css = t => { G.el('style', { textContent: t }, document.head); };
+G.tr = s => s; // 언어 모듈(mod_i18n.js)이 있으면 영어로 바꿔 준다
 G.fatal = (title, html) => {
   G.dead = true; console.error('[SKW fatal]', title);
   (document.getElementById('fatal') || G.el('div', { id: 'fatal' }, document.body)).innerHTML = `<div><h1>${title}</h1>${html}</div>`;
