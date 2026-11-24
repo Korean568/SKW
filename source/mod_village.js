@@ -37,7 +37,7 @@
   fires: []
  };
  for (const z of [4,5.6]) for (let i=0; i<6; i++) VL.K.crowd.push([...gy(-4+i*1.6+(z>5?.8:0)-.4,z),0]);
- const FL=[[-2,3.45,.4],[2.3,3.25,-.8]];
+ const FL=[[-1.1,3.75,0],[1.3,3.75,0]];
  H.forEach((h,k)=>FL.forEach(p=>VL.K.fires.push(hw(h,p))));
  for (let i=0; i<NH; i++) S.doors[i]=0;
   /* 충돌 상자 (집 공간 [x0,x1,z0,z1,y0,y1]) */
@@ -133,6 +133,7 @@
  const wob=(k=.015)=>p=>{ p[0]+=k*sin(p[1]*3.1+p[2]*2.3); p[2]+=k*sin(p[1]*2.7+p[0]*1.9); return p; };
  // 색
  const PL=[.78,.75,.68],WD=[.2,.14,.09],ST2=[.42,.4,.37],JAR=[.32,.17,.08],IRON=[.07,.065,.06];
+ const RX=4.95,RZ=3.35,ry=(x,z)=>{ const a=abs(z)/RZ,b=max(0,(abs(x)-1.6)/(RX-1.6)),q=(a**8+b**8)**.125; return 2.42+(1-q)*1.33-.1*cos(x/RX*PI/2)*(1-q)+.13*q**7-.05*sin(abs(x)/RX*PI)*q**4; };
  const build=()=>{
     /* 집 본체 (10 인스턴스): 기단·벽·창·문틀·지붕·실내 */
   const HI=H.map((h,k)=>ins(h.c,h.yaw,1,k,0,h.s));
@@ -174,7 +175,6 @@
    };
    win(-3.2,-2.4,1.12,1.78,HD); win(2.2,3,1.12,1.78,HD); win(-.6,.2,1.22,1.8,-HD); win(-3.1,-2.4,1.22,1.8,-HD);
    // 우진각 지붕: 위·아래 면 + 테두리 (처짐·처마 들림)
-   const RX=4.95,RZ=3.35,ry=(x,z)=>{ const a=abs(z)/RZ,b=max(0,(abs(x)-1.6)/(RX-1.6)),q=(a**8+b**8)**.125; return 2.42+(1-q)*1.33-.1*cos(x/RX*PI/2)*(1-q)+.13*q**7-.05*sin(abs(x)/RX*PI)*q**4; };
    const rp=(u,v,d)=>{ const x=L(-RX,RX,u),z=L(-RZ,RZ,v); return [x,ry(x,z)-d,z]; };
    surf(36,20,(u,v)=>rp(u,v,0),[.35,.35,.34],3);
    surf(18,10,(u,v)=>rp(u,v,.13),[.3,.24,.18],2,1);
@@ -210,6 +210,15 @@
    // 작은 방: 개킨 이불 · 궤
    for (let i=0; i<3; i++) pill([-3.55,FY+.07+i*.12,-2.05],[.5,.06,.33],5,bed[(i+1)%3],13,0,10,6);
    blk(-2.6,-1.8,FY,.78,-2.47,-1.95,[.36,.2,.1],2,0,8);
+   /* 생활 소품: 걸린 솜외투·털모자 · 신발 · 라디오 · 달력 · 방석 */
+   tube(v=>[L(-1.05,-.15,v),2.02,HD-.16],.018,WD,2,4,2);
+   pill([-.62,1.52,HD-.25],[.23,.42,.075],3,[.19,.21,.16],13,p=>{ p[0]+=.12*(1.9-p[1])*(p[0]+.62); return p; },12,8);
+   pill([-.62,1.95,HD-.23],[.13,.06,.06],3,[.17,.19,.14],13,0,8,5);
+   pill([-.28,1.86,HD-.22],[.12,.08,.11],2,[.33,.26,.19],13,0,8,6);
+   for (const [x,y,z,c] of [[.36,.21,3.2,IRON],[.8,.21,3.18,[.72,.7,.66]],[.42,FY+.035,2.2,[.12,.1,.08]]]) for (const d of [-.065,.065]) pill([x+d,y,z],[.045,.035,.12],2.2,c,12,0,8,5);
+   blk(-2.42,-1.98,.78,1.04,-2.38,-2.12,[.3,.19,.1],2,0,8); blk(-2.36,-2.16,.83,1,-2.13,-2.1,[.13,.12,.1],12,0,6); pill([-2.07,.9,-2.1],[.028,.028,.02],2,[.8,.74,.55],12,0,6,4);
+   surf(1,1,(u,v)=>[L(.78,1.12,u),L(1.25,1.75,v),-HD+.136],[.86,.84,.8],17);
+   for (const [x,c] of [[-.02,[.5,.14,.09]],[1.22,[.2,.25,.38]]]) pill([x,FY+.035,.3],[.27,.035,.27],4,c,13,0,10,6);
   },HI);
     /* 문 (문틀 왼쪽 경첩 기준, 열림 = 안쪽으로 회전) */
   bat(()=>{
@@ -329,6 +338,8 @@ return V(vp*vec4f(w,1.),w,normalize((M*vec4f(n,0.)).xyz),i.c,i.m,i.p,i.n,i.t);
 }
 @vertex fn vs(i:I)->V{return tf(i,g.viewProj);}
 @vertex fn vsS(i:I)->@builtin(position)vec4f{return tf(i,g.shadowVP).p;}
+var<private> HS:array<vec4f,10>=array<vec4f,10>(${H.map(h=>`vec4f(${h.c[0].toFixed(3)},${h.c[2].toFixed(3)},${(h.cs/h.s).toFixed(4)},${(h.sn/h.s).toFixed(4)})`).join(',')}); // 집 중심 xz · cos/s · sin/s
+fn sdb(p:vec2f,b:vec2f)->f32{let d=abs(p)-b;return length(max(d,vec2f(0.)))+min(max(d.x,d.y),0.);}
 fn nz(p:vec2f)->f32{return textureSampleLevel(noiseTex,linSamp,p*.0039,0.).x;} // 인자 = 칸/m
 fn fd(s:f32,px:f32)->f32{return clamp(s/px*.35-.5,0.,1.);}
 fn ln(x:f32,w:f32,px:f32)->f32{return 1.-smoothstep(w,w+px,abs(x));}
@@ -338,7 +349,7 @@ for(var k=0;k<12;k++){let f=u.f[k];if(f.w<=0.){continue;}
 let v=f.xyz-P;let d2=dot(v,v);c+=f.w*(max(dot(N,v*inverseSqrt(d2)),0.)*.75+.25)/(1.+d2*.09);}
 return c*vec3f(1.,.4,.12);
 }
-fn ground(P:vec3f,N:vec3f,px:f32,ao:ptr<function,f32>)->vec3f{
+fn ground(P:vec3f,N:vec3f,px:f32,ao:ptr<function,f32>,wt:ptr<function,f32>,fq:ptr<function,f32>)->vec3f{
 let r=length(P.xz);let a=nz(P.xz*.011);let b=nz(P.xz*.043+a*.3)*.6+nz(P.xz*.13)*.4;let c=nz(P.xz*.41)*.6+nz(P.xz*1.1)*.4;let e=nz(P.xz*2.3)*.5+nz(P.xz*5.7)*.5;
 let hf=mix(.5,c,fd(1.,px))*.6+mix(.5,e,fd(.12,px))*.4;
 // 흙 광장: 다져진 회갈색 흙 + 바퀴 자국
@@ -347,9 +358,35 @@ dirt=mix(dirt,vec3f(.25,.21,.17),smoothstep(.62,.8,nz(P.xz*.09+4.))*.7); // 젖�
 dirt*=1.-.18*smoothstep(.7,.9,nz(P.xz*.8+2.))*fd(.3,px); // 발자국·패임
 let rx=P.x-3.*sin(P.z*.02);let rd=smoothstep(3.2,2.2,abs(rx))*smoothstep(-10.,-15.,P.z);
 let rut=ln(abs(rx)-.8,.18,px*2.)*rd;dirt*=1.-.25*rut;
+var wet=0.;var fr=0.;
+if(r<36.){ // 광장·마당 세부: 오솔길 · 바퀴 자국 · 웅덩이 · 짚 · 자갈 · 우물가 · 낙수선 · 응달 서리
+let sq=1.-smoothstep(19.,27.,r);let wv=vec2f(-9.6,9.4);
+var pa=0.;var dr=0.;var sh=0.;
+for(var k=0;k<10;k++){let h=HS[k];let Lh=length(h.xy);let d=h.xy/Lh;let al2=dot(P.xz,d);let pp=abs(P.x*d.y-P.z*d.x)+.4*(nz(P.xz*.6+f32(k)*3.)-.5);
+pa=max(pa,smoothstep(.8,.3,pp)*smoothstep(2.,5.,al2)*smoothstep(Lh-1.5,Lh-4.,al2));
+let v=P.xz-h.xy;let q=vec2f(v.x*h.z-v.y*h.w,v.x*h.w+v.y*h.z);let e=max(abs(q.x)-4.95,abs(q.y)-3.35);
+dr=max(dr,ln(e-.1,.06+.05*nz(q*2.5),px*2.));sh=max(sh,smoothstep(-3.,-4.,q.y)*smoothstep(-9.,-5.5,q.y)*smoothstep(6.5,4.5,abs(q.x)));}
+{let d=normalize(wv);let al2=dot(P.xz,d);let pp=abs(P.x*d.y-P.z*d.x)+.3*(nz(P.xz*.7+9.)-.5);pa=max(pa,smoothstep(.6,.25,pp)*smoothstep(1.,3.,al2)*smoothstep(length(wv)-.6,length(wv)-2.,al2));}
+dirt=mix(dirt,vec3f(.47,.42,.35)*(.9+.2*hf),pa*.7*sq); // 다져진 오솔길
+let tx=P.x-3.*sin(P.z*.02)-1.8*sin(P.z*.09+.6);let tr=smoothstep(-18.,-9.,P.z)*smoothstep(21.5,16.,P.z)*smoothstep(3.,2.,abs(tx))*sq;
+let rt=ln(abs(tx)-.8,.16,px*2.)*tr;
+dirt*=1.-.14*ln(abs(tx)-.8,.45,px*2.)*tr;dirt=mix(dirt,dirt*.6*(.85+.3*sin(P.z*26.)*fd(.04,px)),rt); // 바퀴 자국 + 무늬
+let dw=smoothstep(3.6,1.,length(P.xz-wv));
+let pn=nz(P.xz*.21+11.)*.7+nz(P.xz*.8+3.)*.3;
+wet=max(smoothstep(.75,.78,pn)*sq*(1.-.6*pa),max(rt*smoothstep(.62,.68,nz(P.xz*.35+5.)),dw*smoothstep(.6,.66,nz(P.xz*.9+2.))));
+let dm=max(max(smoothstep(.68,.75,pn)*sq,dw*.8),dr*.9);
+dirt*=1.-.4*dm;dirt=mix(dirt,vec3f(.07,.065,.06),wet); // 젖은 흙 · 웅덩이
+let sc=floor(P.xz/.4);let hs=hash21(sc+.5); // 흩어진 짚
+if(hs>.5-.25*smoothstep(10.,20.,r)){let an=hs*40.;let dv=vec2f(cos(an),sin(an));let v=P.xz-sc*.4-vec2f(hash21(sc+7.1),hash21(sc+3.3))*.3-.05;let t=clamp(dot(v,dv),-.13,.13);
+dirt=mix(dirt,vec3f(.64,.54,.3)*(.8+.4*hash21(sc+1.)),ln(length(v-dv*t),.007,px)*fd(.02,px)*(1.-wet)*.9);}
+let gc=floor(P.xz/.09);let gh=hash21(gc);let gd=length(P.xz-gc*.09-vec2f(hash21(gc+1.7),hash21(gc+4.2))*.05-.02); // 자갈
+dirt=mix(dirt,vec3f(.5,.49,.46)*(.6+.6*hash21(gc+9.)),step(.6-.15*pa,gh)*ln(gd,.011+.012*gh,px)*fd(.03,px)*(1.-wet)*.85);
+fr=sh*smoothstep(.3,.6,nz(P.xz*1.1+6.));
+}
+*wt=wet;*fq=fr;
 // 마른 풀 (마당·둑)
 let grass=mix(vec3f(.3,.25,.13),vec3f(.4,.33,.18),c)*(.75+.5*hf);
-var al=mix(dirt,grass,smoothstep(.45,.75,b*.6+smoothstep(14.,24.,r)*.6)*(1.-rd));
+var al=mix(dirt,grass,smoothstep(.45,.75,b*.6+smoothstep(14.,24.,r)*.6)*(1.-rd)*(1.-wet));
 // 논: 그루터기 줄 + 논둑 격자 (남쪽)
 let fz=smoothstep(42.,60.,r)*(1.-smoothstep(260.,420.,r))*(1.-rd);
 if(fz>0.){
@@ -371,15 +408,20 @@ return al;
 let P=i.w;let o=i.o;let m=i.m;let px=length(fwidth(P))+1e-4;let pt=i.t.x;
 let E=normalize(g.cam.xyz-P);var N=normalize(i.n);let bk=dot(N,E)<0.;if(bk){N=-N;}
 let hk=i32(i.t.z);let burn=select(0.,u.d[hk].y,pt==1.);
-var al=i.c;var gl=.03;var em=vec3f(0.);var ao=1.;
+var al=i.c;var gl=.03;var em=vec3f(0.);var ao=1.;var wt=0.;var fz=0.;
 // 실내 판정 (집 공간): 벽 중심선 안쪽 · 천장 아래
 let inn=pt==1.&&abs(o.x)<${HW-.07}&&abs(o.z)<${HD-.07}&&o.y<2.41&&o.y>.25;
 let tq=vec2f(o.x+o.z*.83,o.y);
-if(m==0.){al=ground(P,N,px,&ao);}
+if(m==0.){al=ground(P,N,px,&ao,&wt,&fz);}
 else if(m==1.){ // 회벽 / 실내 벽지
 let n=nz(tq*.37)*.45+nz(tq*1.3)*.35+nz(tq*4.1)*.2*fd(.25,px);
-if(inn){al=vec3f(.66,.6,.47)*(.88+.2*n);al*=1.-.18*smoothstep(.9,.35,o.y);
-if(o.y>2.39){al=vec3f(.5,.45,.36);}}
+if(inn){ // 도배지: 이음매 · 잔무늬 · 얼룩 · 걸레받이
+let pq=fract(vec2f(tq.x+tq.y,tq.x-tq.y)/.16);
+al=vec3f(.76,.69,.54)*(.86+.24*n);al=mix(al,al*vec3f(.8,.76,.66),ln(length(pq-.5),.11,px/.16)*fd(.05,px)*.7);
+al*=1.-.14*(1.-ln(fract(tq.x/.9)-.5,.493,px/.9))*fd(.1,px);
+al*=1.-.22*smoothstep(.6,.85,nz(tq*.5+5.))*smoothstep(1.5,2.4,o.y);al*=1.-.2*smoothstep(.9,.35,o.y);
+if(o.y<${FY+.13}){al=vec3f(.3,.22,.14)*(.8+.3*n);}
+if(o.y>2.39){al=vec3f(.64,.58,.46)*(.85+.2*n)*(1.-.15*(1.-ln(fract(o.x/.9)-.5,.49,px/.9)));}}
 else{
 al*=.82+.3*n;
 let st=nz(vec2f(tq.x*2.3,tq.y*.1+.3));al*=1.-.3*smoothstep(.45,.9,st)*smoothstep(1.,2.4,o.y);
@@ -414,7 +456,12 @@ else if(m==4.){al*=.7+.45*nz(o.xz*1.7+o.y)*nz(o.xy*.9+o.z);al=mix(al,vec3f(.26,.
 else if(m==5.){ // 장판: 노란 니스 종이 + 이음매, 광택
 let q=o.xz/.9;let c=fract(q+vec2f(.5,0.));
 al*=.82+.25*nz(o.xz*1.3);al*=1.-.35*max(ln(c.x-.5,.465,px/.9),ln(c.y-.5,.465,px/.9))*fd(.2,px);
-let b=min(${HW}-abs(o.x),${HD}-abs(o.z));al*=.75+.25*smoothstep(0.,.5,b);gl=.35;
+gl=.35; // 접촉 그림자: 벽 · 가구 밑
+var cd=min(${HW-.13}-abs(o.x),${HD-.13}-abs(o.z));
+cd=min(cd,abs(o.x+1.4)-.13+select(0.,9.,o.z>.2&&o.z<1.1));cd=min(cd,select(9.,abs(o.x-1.8)-.13,o.z<-.6));cd=min(cd,select(9.,abs(o.z+.6)-.13,o.x>1.8&&(o.x<2.3||o.x>3.1)));
+cd=min(cd,sdb(o.xz-vec2f(-.55,-2.22),vec2f(.75,.25)));cd=min(cd,sdb(o.xz-vec2f(3.4,1.95),vec2f(.72,.52)));cd=min(cd,sdb(o.xz-vec2f(-3.55,-2.05),vec2f(.5,.33)));
+cd=min(cd,sdb(o.xz-vec2f(-2.2,-2.21),vec2f(.4,.26)));cd=min(cd,length(o.xz-vec2f(2.55,2.1))-.3);
+ao=mix(.4,1.,smoothstep(-.05,.5,cd))*(1.-.4*smoothstep(.46,.2,length(o.xz-vec2f(.6,.3))));
 if(o.x>1.8&&o.z<-.6){al=vec3f(.24,.19,.14)*(.7+.5*nz(o.xz*3.));gl=.02;}
 }
 else if(m==7.){ // 창호지 + 살
@@ -448,29 +495,41 @@ al*=1.-.35*smoothstep(.5,.85,nz(vec2f(q.x*1.5,q.y*.12)))*smoothstep(.0,.8,o.y);
 }
 else if(m==15.){al*=.85+.3*nz(o.yz*2.);}
 else if(m==16.){gl=.1;}
+else if(m==17.){ // 달력
+let uv=vec2f((o.x-.78)/.34,(o.y-1.25)/.5);
+if(uv.y>.7){al=mix(vec3f(.62,.1,.07),vec3f(.85,.7,.3),step(.5,nz(o.xy*18.)))*(.8+.2*nz(o.xy*9.));}
+else{let gc=fract(uv*vec2f(7.,8.6));al*=1.-.55*ln(length(gc-.5)-.1,.09,.2)*step(.05,uv.y);}
+}
 // 접지 AO: 벽 바닥·처마 밑
 if(pt==1.&&!inn){ao=mix(.55,1.,smoothstep(.15,.9,o.y))*select(1.,.6,o.y>2.45&&N.y<-.3);}
 if(pt==3.||pt==4.){ao=mix(.6,1.,smoothstep(0.,.5,o.y));}
+if(inn&&m==1.){ // 벽 아래 · 천장 모서리 · 벽 모서리 접촉 그림자
+ao=mix(.5,1.,smoothstep(${FY},${FY+.5},o.y))*mix(.72,1.,smoothstep(2.4,2.1,o.y));
+let cd=select(min(${HD-.13}-abs(o.z),abs(o.z+.6)-.13),min(min(${HW-.13}-abs(o.x),abs(o.x+1.4)-.13),abs(o.x-1.8)-.13),abs(i.q.z)>.5);
+ao*=mix(.7,1.,smoothstep(0.,.55,cd));}
 let Ls=g.sun.xyz;let nl=max(dot(N,Ls),0.);let nv=max(dot(N,E),0.);
-let sv=shadowAt(P,N)*mix(.35,1.,cloudVis(P));
+let sh0=shadowAt(P,N);let sv=sh0*mix(.35,1.,cloudVis(P));
+if(m==0.){let fr=clamp(fz+(1.-sh0)*.3*smoothstep(.55,.7,nz(P.xz*.9+2.))*step(length(P.xz),34.),0.,1.)*(1.-wt);al=mix(al,vec3f(.58,.6,.62),fr*.5);gl=max(gl,max(wt,fr*.25));} // 응달 서리 · 웅덩이 광택
 var c:vec3f;
 if(inn){ // 실내: 창·문으로 드는 낮빛 (집 공간에서 계산)
-let Nl=normalize(select(i.q,-i.q,bk));let sb=skyBase(vec3f(0.,.35,1.));let day=mix(sb,vec3f(1.,.82,.6)*dot(sb,vec3f(.33)),.6)*1.5+g.sunCol.rgb*.12;
-var e=vec3f(.02)+day*.06;
+let Nl=normalize(select(i.q,-i.q,bk));let sb=skyBase(vec3f(0.,.35,1.));let day=mix(sb,vec3f(1.,.8,.56)*dot(sb,vec3f(.33)),.7)*1.8+g.sunCol.rgb*.15;
+var e=vec3f(.03)+day*.09;
 let dor=.3+.7*u.d[hk].x;
 for(var j=0;j<5;j++){
-var O=vec3f(.6,1.2,2.75);var A=3.2*dor;
-if(j==1){O=vec3f(-2.8,1.45,2.7);A=.9;}if(j==2){O=vec3f(2.6,1.45,2.7);A=.9;}if(j==3){O=vec3f(-.2,1.5,-2.7);A=.9;}if(j==4){O=vec3f(-2.75,1.5,-2.7);A=.9;}
+var O=vec3f(.6,1.2,2.75);var A=4.6*dor;
+if(j==1){O=vec3f(-2.8,1.45,2.7);A=1.4;}if(j==2){O=vec3f(2.6,1.45,2.7);A=1.4;}if(j==3){O=vec3f(-.2,1.5,-2.7);A=1.2;}if(j==4){O=vec3f(-2.75,1.5,-2.7);A=1.2;}
 let v=O-o;let d=length(v);let fz=max(sign(O.z)*v.z/d,0.);
-e+=day*A*(max(dot(Nl,v/d),0.)*.8+.2)*fz/(d*d+.4);
+e+=day*A*(max(dot(Nl,v/d),0.)*.8+.2)*fz/(d*d*.7+.5);
 }
+if(o.y<.4){e+=day*(smoothstep(.6,.3,abs(o.x-.6))*smoothstep(.6,2.3,o.z)*dor*1.3+(smoothstep(.55,.3,abs(o.x+2.8))+smoothstep(.55,.3,abs(o.x-2.6)))*smoothstep(.45,.2,abs(o.z-1.55))*.45);} // 문·창으로 드는 빛 자국
 let sI=sv*step(.5,g.sunCol.w);
 c=al*(e*ao+g.sunCol.rgb*nl*sI+ambAt(N)/mix(1.,.12,g.wind.w)*.05+pointLights(P,N)+fireL(P,N)*.25)+gl*e*pow(1.-nv,4.)*.6;
 }else{
 let R=reflect(-E,N);let sp=10.+250.*gl*gl;
-c=al*(g.sunCol.rgb*nl*sv+ambAt(N)/mix(1.,.12,g.wind.w)*ao+pointLights(P,N)+fireL(P,N));
+let am=ambAt(N);c=al*(g.sunCol.rgb*nl*sv+mix(am,vec3f(dot(am,vec3f(.3,.5,.2)))*vec3f(1.04,1.,.94),smoothstep(.6,.95,g.fog.y)*.75)/mix(1.,.12,g.wind.w)*ao+pointLights(P,N)+fireL(P,N)); // 흐린 날: 회색 하늘빛
 c+=g.sunCol.rgb*sv*pow(max(dot(N,normalize(Ls+E)),0.),sp)*gl*(sp+8.)*.03*min(nl*8.,1.);
 c=mix(c,skyBase(vec3f(R.x,abs(R.y),R.z))*ao*.7,gl*(.04+.96*pow(1.-nv,5.))*.6);
+if(wt>0.){let sk=skyBase(vec3f(R.x,abs(R.y),R.z));c=mix(c,mix(sk,vec3f(dot(sk,vec3f(.3,.5,.2))),g.fog.y*.8)*.62,wt*(.25+.5*pow(1.-nv,3.)));} // 웅덩이에 비친 하늘
 }
 // 연기 낀 대기 (마을이 탈 때)
 let sm=u.s.x*(1.-exp(-length(P-g.cam.xyz)*.012));c=mix(c,vec3f(.09,.06,.05),sm*.55);
@@ -500,7 +559,7 @@ return vec4f(fogAt(c+em,P),1.);
  };
  // 불: 지붕 위치별 fx 'fire' 궤적 (가까운 순 몇 개만) + 셰이더 주황빛 + 점광 1
  const burn=new Float32Array(16),TH=H.map((_,k)=>k<NH?.08+((k*5)%NH)/NH*.55:.5);
- let near=[],nt=0,smk=0;
+ let near=[],nt=0,smk=0;const FE=new Float32Array(16);
  G.register('village',{
   init() {
    const dev=G.dev,U=GPUBufferUsage,T=GPUTextureUsage,S2=GPUShaderStage,buf=(a,usage)=>{ const b=dev.createBuffer({ size: a.byteLength,usage: usage|U.COPY_DST }); dev.queue.writeBuffer(b,0,a); return b; };
@@ -538,11 +597,18 @@ return vec4f(fogAt(c+em,P),1.);
      UB[o+3]=burn[k]*(5+1.5*sin(t*11+k)+sin(t*23+k*3));
     }
     if (f>0) {
-     if ((nt-=dt)<=0) { nt=.5; const c=G.cam.pos; near=VL.K.fires.map((p,i)=>[i,V3.dist(p,c)]).filter(q=>burn[q[0]>>1]>0).sort((a,b)=>a[1]-b[1]).slice(0,[2,7,12][G.Q.level]).map(q=>q[0]); }
+     if ((nt-=dt)<=0) { nt=.5; const c=G.cam.pos; near=H.map((h,k)=>[k,V3.dist(h.c,c)]).filter(q=>burn[q[0]]>0).sort((a,b)=>a[1]-b[1]).slice(0,[4,7,10][G.Q.level]); }
      const n0=G.lights.length;
-     for (const i of near) { const b=burn[i>>1]; b>0&&G.fx.trail(VL.K.fires[i],[0,1,0],'fire',dt*b*.55); }
+     // 작은 불길 여러 개를 용마루·지붕면을 따라 흩뿌림 (카메라 가까운 집일수록 작게), 연기는 지붕 위로
+     for (const [k,d] of near) {
+      const b=burn[k],h=H[k],ds=cl(d/18,.75,2.2);if (!b||(FE[k]-=dt)>0) continue;
+      FE[k]=(.17+.1*rnd())/(.35+.65*b)*(G.Q.level?1:1.8);
+      const x=(rnd()*2-1)*(1.6+1.6*rnd()),z=(rnd()-.5)*2.6*rnd()**2;
+      G.fx.burst('fire',hw(h,[x,ry(x,z)+.04,z]),{ size: (.06+.06*b)*ds*h.s,vel: [0,.45,0] });
+      rnd()<.3&&G.fx.burst('smoke',hw(h,[x*.4,ry(0,0)+1.3,0]),{ size: .28*ds*b,vel: [.25,1.3,.1] });
+     }
      G.lights.length=n0; // fx 불 점광(반경 수백 m)은 빼고 아래 점광 하나만
-     if (near.length) { const p=VL.K.fires[near[0]]; G.addLight([p[0],p[1]+1,p[2]],[1,.45,.15],(4+1.5*sin(t*13))*burn[near[0]>>1],22,dt*1.5); }
+     if (near.length) { const k=near[0][0],p=hw(H[k],[0,3.9,0]); G.addLight(p,[1,.45,.15],(4+1.5*sin(t*13))*burn[k],22,dt*1.5); }
     } else if ((smk-=dt)<=0&&G.fx) { // 아침 굴뚝 연기
      smk=.9; const h=H[[1,4,8][(t*7|0)%3]],p=hw(h,[HW+.6,3.7,-1.6]); G.fx.burst('smoke',p,{ size: .16,vel: [.25,.5,.1] });
     }

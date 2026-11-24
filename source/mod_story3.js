@@ -165,7 +165,7 @@
     try {G.fx.tracer(o,d,320,0);G.fx.burst('muzzle',o,{size:.025,dir:d});
       if(!hit){const t=wray(o,d,60);if(t<60) G.fx.burst('hit',[o[0] + d[0]*t,o[1] + d[1]*t,o[2] + d[2]*t],{size:.1});}
    } catch (x){}
-    L(o,[1,.7,.35],2.4,5);sfx('rifle',{pos:o,gain:.6});
+    L(o,[1,.7,.35],1.1,3.5);sfx('rifle',{pos:o,gain:.6});// 총구 섬광: 쏘는 사람을 가리지 않게
     if(hit) hurt(9 + R()*5);
  }
   function foes(dt){
@@ -182,14 +182,14 @@
       P.yaw+=wrap(yawTo(P.p,T) - P.yaw)*mn(1,dt*6);P.aim=[T[0],T[1] - .3,T[2]];e.ft-=dt;P.pose=e.ft>0?'fire':'aim';
       if(e.k==='me'&&(!see||d>11)){e.st=0;continue;}
       e.t-=dt;
-      if(e.t<=0&&(see||e.k==='ko')){shoot(e,T);e.ft=.12;if(++e.fb>=3){e.fb=0;e.t=1.2 + R()*1.3;}else e.t=.13;}
+      if(e.t<=0&&(see||e.k==='ko')&&!(S.t<e.hold)){shoot(e,T);e.ft=.12;if(++e.fb>=3){e.fb=0;e.t=1.2 + R()*1.3;}else e.t=.13;}
    }
  }
   function koShoot(e){// 고혁명 권총: 2~3발이면 쓰러짐
     const P=W.ko;let m;try {m=PP.muzzle(P);} catch (x){m=[...eye(P),0,0,1];}
     const o=[m[0],m[1],m[2]],c=eye(e.P),d=nrm([c[0] - o[0],c[1] - .35 - o[1],c[2] - o[2]]);
     try {G.fx.tracer(o,d,380,0);G.fx.burst('muzzle',o,{size:.02,dir:d});} catch (x){}
-    L(o,[1,.78,.45],2.6,5);sfx('pistol',{pos:o,gain:.9});S.kfT=.14;
+    L(o,[1,.78,.45],1.2,3.5);sfx('pistol',{pos:o,gain:.9});S.kfT=.14;
     if(R()<.5||++e.shots>=3) kill(e);else e.P.pose='hit';
  }
   function koAI(dt){
@@ -344,10 +344,10 @@
     if(a==='danger'){// (리충성도 위험에 처한다): 복도에 부하 두셋
       S.walk=1;S.fix=null;const P=k.path,i=near(me.p),ok=q=>dxz(q,me.p)>5&&dxz(q,k.ko)>3.5,sp=(k.spawns||[]).filter(q=>ok(q)&&dxz(q,me.p)<20).sort((a,b)=>dxz(a,me.p) - dxz(b,me.p)).slice(0,2);
       for(let j=i + 1;j<P.length&&sp.length<2;j++) if(ok(P[j])&&dxz(P[j],me.p)<dxz(k.ko,me.p)) sp.push([P[j][0],0,P[j][2],yawTo(P[j],me.p)]);
-      sp.forEach((q,j)=>{const e=spawnE(q,'th');e.t=1.6 + j*.4;});
+      sp.forEach((q,j)=>{const e=spawnE(q,'th');e.t=1.6 + j*.4;e.hold=S.t + 3.4 + j*.5;});// 고혁명이 외치는 동안은 아직 쏘지 않음
       G.sfx.music('combat');
    }
-    if(a==='koin'){const P=W.ko;P.vis=true;P.p=at(k.ko);P.yaw=yawTo(k.ko,me.p);P.look=eyeMe();P.pose='stand';S.fix=P;S.fixF=S.t + 2.2;S.fixR=2.4;}
+    if(a==='koin'){const P=W.ko;P.vis=true;P.p=at(k.ko);P.yaw=yawTo(k.ko,me.p);P.look=eyeMe();P.pose='stand';S.fix=P;S.fixF=S.t + 3.6;S.fixR=2.4;}
     if(a==='run'){S.walk=1;}
     if(a==='fight1'){fight(1);}
     if(a==='fight2'){fight(2);}
@@ -357,8 +357,8 @@
    }
     if(a==='bye'){// (고혁명은 돌아간다)
       S.walk=0;const P=W.ko,N=k.path.length - 1;P.wp=null;P.look=eyeMe();P.yaw=yawTo(P.p,me.p);S.fix=P;S.fixF=S.t + 3;S.fixR=2;
-      P.pose='salute';// 경례 (인물 모듈에 없으면 'stand' 처럼 보임) → 1.6 초 뒤 돌아서 복도로
-      later(1.6,()=>{P.look=null;walk(P,[k.path[N - 1],k.path[mx(0,N - 3)]],1.6,Q=>Q.vis=false);});
+      P.pose='salute';P.gun=0;// 경례 (권총은 집어넣고. 인물 모듈에 없으면 'stand' 처럼 보임) → 1.6 초 뒤 돌아서 복도로
+      later(1.6,()=>{P.look=null;P.gun='pistol';walk(P,[k.path[N - 1],k.path[mx(0,N - 3)]],1.6,Q=>Q.vis=false);});
       later(2.4,()=>{S.dof=0;S.dofR=.5;});
    }
     if(a==='grab'){// 숨어 있던 부하 둘이 양팔을 잡고 무릎 꿇림

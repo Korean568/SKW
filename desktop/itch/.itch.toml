@@ -1,0 +1,19 @@
+# itch.io 앱(itch app)용 실행 설정 — 빌드할 때 Windows · Linux 앱 폴더의 맨 위에 .itch.toml 로 들어간다.
+# 업로드한 파일 안에 해당 OS 의 실행 파일만 있으므로, platform 이 맞는 action 하나만 쓰인다.
+# 문서: https://itch.io/docs/itch/integrating/manifest.html
+
+[[actions]]
+name = "play"
+path = "Second Korean Wars.exe"
+platform = "windows"
+
+[[actions]]
+name = "play"
+path = "Second Korean Wars.app"
+platform = "osx"
+
+[[actions]]
+name = "play"
+path = "second-korean-wars"
+platform = "linux"
+args = ["--no-sandbox"]

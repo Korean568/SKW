@@ -72,7 +72,7 @@
     const d=[m[0] - l[0],0,m[2] - l[2]],n=H(d[0],d[2])||1;
     return[at([l[0] + d[0]/n*1.3,0,l[2] + d[2]/n*1.3],1),at([l[0] + d[0]/n*2.4,0,l[2] + d[2]/n*2.4])];
  }
-  const MEET=()=>{const k=K(),[,g]=door(),m=k.meet,d=[g[0] - m[0],0,g[2] - m[2]],n=H(d[0],d[2])||1,r=mn(4.2,n*.4);return at([m[0] + d[0]/n*r,0,m[2] + d[2]/n*r]);};// 빠른 걸음이 끝나는 곳 (만남 지점 4 m 앞)
+  const MEET=()=>{const k=K(),[,g]=door(),m=k.meet,d=[g[0] - m[0],0,g[2] - m[2]],n=H(d[0],d[2])||1,r=mn(5.2,n*.4);return at([m[0] + d[0]/n*r,0,m[2] + d[2]/n*r]);};// 빠른 걸음이 끝나는 곳 (만남 지점 5 m 앞)
   function hop(P,a,b,then){// 문간 바닥에 나타나 웅크렸다가 땅으로 내려선 뒤 곧바로 걷는다
     P.vis=true;P.wp=null;P.dp=null;P.face=null;P.p=a.slice();P.yaw=yawTo(a,b);P.pose='stand';P.tgt=null;
     later(.4,()=>P.pose='crouch');
@@ -82,7 +82,7 @@
  }
   function koWalk(P){// 손을 보인 채 빠르게 다가오다가 만남 지점 앞에서 걸음을 늦춘다
     const k=K();S.tl.ground=S.t;P.look=at(k.start,1.6);
-    walk(P,[MEET()],1.62,Q=>{S.arr=1;S.tl.arrive=S.t;walk(Q,[at(k.meet)],.95,R=>{S.tl.stop=S.t;R.pose='handsup';R.yaw=yawTo(R.p,k.start);});});
+    walk(P,[MEET()],1.65,Q=>{S.arr=1;S.tl.arrive=S.t;walk(Q,[at(k.meet)],1.3,R=>{S.tl.stop=S.t;R.pose='handsup';R.yaw=yawTo(R.p,k.start);});});P.free=1;
  }
 
   /* ── 인물 ── */
@@ -96,7 +96,7 @@
     PP.clear();W.sq=[];W.crew=[];wait.length=0;S.fix=null;S.fixF=0;S.radio=0;S.cut=null;
     const nm=['col','park','lee','shin','jb'],kd=['mask','rok','rok','rok','rok'],sd=[3,5,9,11,7],lz=at(k.lz),u=U(),s0=k.start;
     // 분대: 플레이어 앞쪽 · 양옆 모래주머니 뒤 (대령은 왼쪽 앞에 서고, 둘은 무릎쏴) — 플레이어는 한 걸음 뒤
-    const LAY=[[-1.05,.4],[1.15,.75],[-2.25,.72],[2.7,.62],[-4.1,.58]];
+    const LAY=[[-1.05,.55],[1.05,.75],[-2.05,.72],[2.7,.62],[-4.1,.58]];
     k.squad.slice(0,5).forEach((q,i)=>{const o=LAY[i],w=col([s0[0] + u[2]*o[0] + u[0]*o[1],0,s0[2] - u[0]*o[0] + u[2]*o[1]],.3);w[3]=q[3]||0;
       const P=add(kd[i],{p:w,yaw:w[3],gun:'rifle',seed:sd[i],look:at(k.lz,3)});P.home=w;W[nm[i]]=P;W.sq.push(P);});
     W.ko=add('nko',{p:d0,yaw:yawTo(d0,k.meet),seed:23,vis:false});
@@ -111,7 +111,7 @@
     if(n>=3){W.ko.p=at(k.meet);W.ko.yaw=yawTo(k.meet,k.start);}
     if(n>=4){const C=W.col,f=fw(yawTo(C.p,W.ko.p));C.p=col([C.p[0] + f[0]*1.1,0,C.p[2] + f[2]*1.1],.3);aimAt(C,W.ko);W.ko.pose='stand';W.ko.look=PP.eye(C);}
     // 플레이어: 엄폐물 뒤
-    me.o=col([k.start[0] - U()[0]*1.1,0,k.start[2] - U()[2]*1.1],.3);me.p=me.o.slice();me.yaw=k.start[3]!=null?k.start[3]:yawTo(k.start,k.lz);me.pit=-.03;me.aim=me.aimT=0;
+    me.o=col([k.start[0] - U()[0]*1.5,0,k.start[2] - U()[2]*1.5],.3);me.p=me.o.slice();me.yaw=k.start[3]!=null?k.start[3]:yawTo(k.start,k.lz);me.pit=-.03;me.aim=me.aimT=0;
     G.people.fp.on=n>=1?1:0;
  }
 
@@ -145,7 +145,7 @@
       walk(C,[col([C.p[0] + f[0]*1.1,0,C.p[2] + f[2]*1.1],.3)],1,Q=>{aimAt(Q,W.ko);G.sfx.play('click',{gain:.5,rate:.55});});
       S.fix=W.ko;S.fixF=S.t + 3;
    }
-    if(a==='calm'){W.ko.pose='stand';W.ko.look=PP.eye(W.col);}
+    if(a==='calm'){const f=Q=>{S.tl.stop=S.tl.stop||S.t;Q.pose='stand';Q.yaw=yawTo(Q.p,k.start);Q.look=PP.eye(W.col);};W.ko.wp?W.ko.done=f:f(W.ko);}// 아직 걷는 중이면 멈춘 뒤에
     if(a==='call'){// 무전: 잡음과 함께 고혁명이 무전기를 귀에 댄다
       S.radio=1;G.sfx.play('click',{gain:.8,rate:1.4});radioFx(.5,.35);
       later(.7,()=>{const P=W.ko,f=fw(P.yaw);P.gun='radio';P.pose='stand';P.look=at([P.p[0] + f[0]*3 + f[2]*1.5,0,P.p[2] + f[2]*3 - f[0]*1.5],.4);});// 고개를 숙이고 듣는다
@@ -228,7 +228,7 @@
       let[ty,tp]=yp(ey,tg),r=S.t<S.fixF?1.6:1.1;
       const sp=S.t<S.lineEnd&&W[S.spk],fo=S.fix&&S.fix.p?S.fix:null,C=W.col;
       const A=sp&&sp!==fo&&sp.vis!==false&&W.sq.includes(sp)?sp:C&&C!==fo&&C.vis!==false?C:null;
-      if(A){const[ay,ap]=yp(ey,chest(A)),w=A===sp?.5:.32;ty+=cl(wrap(ay - ty)*w,-.5,.5);tp=mn(tp - .04,ap + .36);if(A===sp) r=mn(r,1.2);}
+      if(A){const[ay,ap]=yp(ey,chest(A)),w=A===sp?.5:.32;ty+=cl(wrap(ay - ty)*w,-.5,.5);tp=mn(tp - .04,ap + .26);if(A===sp) r=mn(r,1.2);}
       me.yaw+=wrap(ty - me.yaw)*mn(1,dt*r);me.pit+=(cl(tp,-1,1) - me.pit)*mn(1,dt*r);
    }
     S.mv-=dt;S.wk-=dt;me.aim+=(me.aimT - me.aim)*mn(1,dt*5);
@@ -336,7 +336,7 @@
     G.cabin&&(G.cabin.on=false);G.village&&(G.village.on=false);G.palace&&(G.palace.on=false);G.ruins&&(G.ruins.on=true);
     S.on=1;S.t=0;S.dr=null;S.lineEnd=0;S.spk=null;S.line='';S.mv=0;S.wk=0;S.bkR=2;S.g=null;S.rb=0;S.radio=0;S.gunT=3;wait.length=0;showDl(0);
     const u=U(),az=Math.atan2(u[0],u[2])*180/PI + 48;// 낮은 해: 헬기 쪽 비스듬히 뒤
-    S.env=Object.assign({fogDen:1/1100},RU().ENV,{sunEl:7,sunAz:az,cloud:.86,haze:.72,cloudBase:1000,cloudTop:2800,indoor:0,exposure:1.34});// 회색 새벽 · 얼굴이 읽히는 노출
+    S.env=Object.assign({fogDen:1/1100},RU().ENV,{sunEl:9,sunAz:az,cloud:.95,haze:.85,cloudBase:900,cloudTop:2800,indoor:0,exposure:1.34});// 회색 새벽 · 얼굴이 읽히는 노출
     G.setEnv(S.env);
     G.sfx.init();G.sfx.loop('wind',1,{gain:.35,rate:.55});G.sfx.music('calm');
  }

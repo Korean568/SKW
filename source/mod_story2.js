@@ -296,9 +296,9 @@
   function dress(dt){// 환경 · 조명 · 소리
     const t=G.time,fp=S.cm==='fp',wi=fp?inside(me.p):-1,vs=VL().S;
     S.ind+=((wi>=0?.8:0) - S.ind)*mn(1,dt*3);
-    G.setEnv({indoor:S.ind,exposure:1});
+    G.setEnv({indoor:S.ind,exposure:1.2 + .1*S.ind});for(let i=0;i<3;i++) G.sun.col[i]*=.42;// 흐린 날: 구름에 가린 해 (직사광 약하게, 하늘빛 위주)
     G.shadowFocus=fp?me.p:[0,0,0];G.shadowRange=fp?(wi>=0?14:32):45;
-    if(wi>=0){const e=G.cam.pos;L([e[0] + sin(me.yaw)*.6,e[1] + .5,e[2] + cos(me.yaw)*.6],[1,.84,.66],1.1,5);}// 실내: 창으로 드는 빛을 대신하는 약한 채움광
+    if(wi>=0){const e=G.cam.pos;L([e[0] + sin(me.yaw)*.6,e[1] + .5,e[2] + cos(me.yaw)*.6],[1,.84,.66],.45,4);}// 실내: 약한 채움광 (주광은 마을 셰이더의 문·창 낮빛)
     if(vs){
       if(S.fireT) vs.fire=mn(1,(vs.fire||0) + dt/7);
       const f=vs.fire||0;
@@ -351,7 +351,7 @@
     ui.end&&(ui.end.style.display='none');ui.c.style.display='none';ui.v.style.opacity=0;ui.h.style.opacity=0;
     G.cabin&&(G.cabin.on=false);G.village&&(G.village.on=true);
     S.on=1;S.t=0;S.lineEnd=0;S.spk=null;S.mv=0;S.choice=null;S.bkR=2;wait.length=0;gate(null);showDl(0);
-    G.setEnv({sunEl:14,sunAz:125,cloud:.65,haze:.45,cloudBase:1500,cloudTop:3500,indoor:0,exposure:1});
+    G.setEnv({sunEl:11,sunAz:125,cloud:1.6,haze:.7,cloudBase:800,cloudTop:3200,indoor:0,exposure:1.2});// 잿빛 흐린 늦가을 아침: 낮은 해는 구름에 거의 가림
     G.sfx.init();G.sfx.loop('sea',1,{gain:.22,rate:.45});G.sfx.loop('wind',1,{gain:.4});G.sfx.music('calm');
  }
   function start(){const sc=!S.st&&G.params.get('story')==='2'&&G.params.get('scene');S.st=1;go(sc||'square');}
