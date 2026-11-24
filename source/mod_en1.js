@@ -90,4 +90,7 @@ if(G.i18n){
   G.i18n.re([
     [/^무방비 · 피격 (\d)\/2$/,'Exposed · hits $1/2'],
   ]);
+  /* 영어일 때만: 긴 영어 글자가 넘치지 않게 (한국어 화면은 그대로) */
+  G.css(`html[lang=en] #fd b{font-size:clamp(30px,5.4vw,70px);letter-spacing:.16em;margin-right:-.16em}
+html[lang=en] #fd button{letter-spacing:.22em}html[lang=en] #fd button.t{letter-spacing:.12em}`);
 }
