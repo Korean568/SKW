@@ -529,7 +529,7 @@ let R=reflect(-E,N);let sp=10.+250.*gl*gl;
 let am=ambAt(N);c=al*(g.sunCol.rgb*nl*sv+mix(am,vec3f(dot(am,vec3f(.3,.5,.2)))*vec3f(1.04,1.,.94),smoothstep(.6,.95,g.fog.y)*.75)/mix(1.,.12,g.wind.w)*ao+pointLights(P,N)+fireL(P,N)); // 흐린 날: 회색 하늘빛
 c+=g.sunCol.rgb*sv*pow(max(dot(N,normalize(Ls+E)),0.),sp)*gl*(sp+8.)*.03*min(nl*8.,1.);
 c=mix(c,skyBase(vec3f(R.x,abs(R.y),R.z))*ao*.7,gl*(.04+.96*pow(1.-nv,5.))*.6);
-if(wt>0.){let sk=skyBase(vec3f(R.x,abs(R.y),R.z));c=mix(c,mix(sk,vec3f(dot(sk,vec3f(.3,.5,.2))),g.fog.y*.8)*.62,wt*(.45+.45*pow(1.-nv,3.)));} // 웅덩이에 비친 하늘
+if(wt>0.){let sk=skyBase(vec3f(R.x,abs(R.y),R.z));c=mix(c,mix(sk,vec3f(dot(sk,vec3f(.3,.5,.2))),min(g.fog.y,1.)*.8)*.62,wt*(.45+.45*pow(1.-nv,3.)));} // 웅덩이에 비친 하늘
 }
 // 연기 낀 대기 (마을이 탈 때)
 let sm=u.s.x*(1.-exp(-length(P-g.cam.xyz)*.012));c=mix(c,vec3f(.09,.06,.05),sm*.55);
@@ -604,8 +604,8 @@ return vec4f(fogAt(c+em,P),1.);
       const b=burn[k],h=H[k],ds=cl(d/18,.75,2.2);if (!b||(FE[k]-=dt)>0) continue;
       FE[k]=(.045+.04*rnd())/(.35+.65*b)*(G.Q.level?1:1.8); // 짧게 깜박이는 불혀 (muzzle 불길을 위로) → 줄지어 일렁이는 불
       const x=(rnd()*2-1)*(1.6+1.6*rnd()),z=(rnd()-.5)*2.6*rnd()**2;
-      G.fx.burst('muzzle',hw(h,[x,ry(x,z)+.03,z]),{ dir: [(rnd()-.5)*.3,1,(rnd()-.5)*.3],size: (.07+.08*b)*ds*h.s,vel: [0,.4,0] });
-      rnd()<.12&&G.fx.burst('smoke',hw(h,[x*.4,ry(0,0)+1.2,0]),{ size: .3*ds*b,vel: [.25,1.3,.1] });
+      G.fx.burst('muzzle',hw(h,[x,ry(x,z)+.03,z]),{ dir: [(rnd()-.5)*.3,1,(rnd()-.5)*.3],size: (.05+.06*b)*ds*h.s,vel: [0,.4,0] });
+      rnd()<.22&&G.fx.burst('smoke',hw(h,[x*.4,ry(0,0)+1.2,0]),{ size: .38*ds*b,vel: [.25,1.3,.1] });
      }
      G.lights.length=n0; // fx 불 점광(반경 수백 m)은 빼고 아래 점광 하나만
      if (near.length) { const k=near[0][0],p=hw(H[k],[0,3.9,0]); G.addLight(p,[1,.45,.15],(4+1.5*sin(t*13))*burn[k],22,dt*1.5); }

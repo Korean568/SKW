@@ -109,7 +109,7 @@
       W.ko.vis=true;W.ko.p=d1;W.ko.yaw=yawTo(d1,k.meet);W.ko.pose='handsup';W.ko.look=at(k.start,1.6);
     }
     if(n>=3){W.ko.p=at(k.meet);W.ko.yaw=yawTo(k.meet,k.start);}
-    if(n>=4){const C=W.col,f=fw(yawTo(C.p,W.ko.p));C.p=col([C.p[0] + f[0]*1.1,0,C.p[2] + f[2]*1.1],.3);aimAt(C,W.ko);W.ko.pose='stand';W.ko.look=PP.eye(C);}
+    if(n>=4){const C=W.col,f=fw(yawTo(C.p,W.ko.p));C.p=col([C.p[0] + f[0]*.35,0,C.p[2] + f[2]*.35],.3);aimAt(C,W.ko);W.ko.pose='stand';W.ko.look=PP.eye(C);}
     // 플레이어: 엄폐물 뒤
     me.o=col([k.start[0] - U()[0]*1.5,0,k.start[2] - U()[2]*1.5],.3);me.p=me.o.slice();me.yaw=k.start[3]!=null?k.start[3]:yawTo(k.start,k.lz);me.pit=-.03;me.aim=me.aimT=0;
     G.people.fp.on=n>=1?1:0;
@@ -141,9 +141,9 @@
       sq[2]&&later(4.4,()=>{G.sfx.play('click',{pos:PP.eye(sq[2]),gain:.9,rate:.5});later(.14,()=>G.sfx.play('click',{pos:PP.eye(sq[2]),gain:.8,rate:.7}));});
       sq[4]&&later(6.6,()=>G.sfx.play('reload',{pos:PP.eye(sq[4]),gain:.6,rate:.9}));
    }
-    if(a==='aimko'){// (총을 겨누며) — 대령이 한 걸음 나서며 고혁명을 겨눈다
+    if(a==='aimko'){// (총을 겨누며) — 대령이 모래주머니 앞으로 반 걸음 나서며 고혁명을 겨눈다 (벽 너머로 밀려나지 않게 짧게)
       const C=W.col,f=fw(yawTo(C.p,W.ko.p));low(C);
-      walk(C,[col([C.p[0] + f[0]*1.1,0,C.p[2] + f[2]*1.1],.3)],1,Q=>{aimAt(Q,W.ko);G.sfx.play('click',{gain:.5,rate:.55});});
+      walk(C,[col([C.p[0] + f[0]*.35,0,C.p[2] + f[2]*.35],.3)],1,Q=>{aimAt(Q,W.ko);G.sfx.play('click',{gain:.5,rate:.55});});
       S.fix=W.ko;S.fixF=S.t + 3;
    }
     if(a==='calm'){const f=Q=>{S.tl.stop=S.tl.stop||S.t;Q.pose='stand';Q.yaw=yawTo(Q.p,k.start);Q.look=PP.eye(W.col);};W.ko.wp?W.ko.done=f:f(W.ko);}// 아직 걷는 중이면 멈춘 뒤에
