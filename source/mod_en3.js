@@ -44,4 +44,7 @@
     // 전사 화면
     '리충성이 쓰러졌다':'Ri Chung-seong has fallen',
   });
+  // 영어일 때만: 긴 영어 제목이 넘치지 않게 (한국어 화면은 그대로)
+  G.css(`html[lang=en] #s3t b{font-size:4.8vh;letter-spacing:.06em}html[lang=en] #s3t small{letter-spacing:.3em}
+html[lang=en] #s3d b{font-size:clamp(34px,5.4vw,72px);letter-spacing:.16em;margin-right:-.16em}`);
 }
