@@ -619,15 +619,16 @@
 #s3k s{width:5px;height:26px;background:linear-gradient(#fff,#cfd6dc 62%,#333 64%,#222);clip-path:polygon(50% 0,100% 22%,100% 100%,0 100%,0 22%)}#s3k s.e{opacity:.2}
 #s3n{position:absolute;left:50%;bottom:3vh;transform:translateX(-50%);font-size:14px;letter-spacing:.1em;color:#dde3e8;transition:opacity 1s}
 #s3bv{position:absolute;inset:0;opacity:0;background:radial-gradient(#a0000000 40%,#a0000044 70%,#7a0000c0)}
-#s3d{inset:0;display:none;place-content:center;justify-items:center;background:radial-gradient(#0006,#000d);pointer-events:auto;color:#fff;font-family:system-ui}#s3d b{font-size:clamp(44px,8vw,100px);letter-spacing:.4em;margin-right:-.4em}#s3d small{font-size:16px;color:#bbb}#s3d button{margin:1.2em 0 .6em;padding:.35em 2.4em;font:800 clamp(22px,3vw,40px) system-ui;letter-spacing:.4em;color:#111;background:#fff;border:0;border-radius:8px;cursor:pointer}`);
+#s3d{inset:0;display:none;place-content:center;justify-items:center;background:radial-gradient(#0006,#000d);pointer-events:auto;color:#fff;font-family:system-ui}#s3d b{font-size:clamp(44px,8vw,100px);letter-spacing:.4em;margin-right:-.4em}#s3d small{font-size:16px;color:#bbb}#s3d button.t{font-size:15px;padding:.4em 1.6em;margin-top:1.6em;background:#0000;color:#ddd;border:1px solid #fff6;box-shadow:none}#s3d button{margin:1.2em 0 .6em;padding:.35em 2.4em;font:800 clamp(22px,3vw,40px) system-ui;letter-spacing:.4em;color:#111;background:#fff;border:0;border-radius:8px;cursor:pointer}`);
       ui.o=G.el('div',{id:'s3o'});ui.h=G.el('div',{id:'s3h',textContent:'WASD 이동 · 마우스 둘러보기 · Shift 달리기'});
       ui.p=G.el('div',{id:'s3p'});ui.km=[0,1,2,3,4,5].map(()=>G.el('div',{className:'s3km'}));ui.m=G.el('div',{id:'s3m',innerHTML:'<i></i><span></span>'});
       ui.t=G.el('div',{id:'s3t',innerHTML:'<small>스토리 3</small><b>북한 주석궁 : 다시 지금 북한으로</b><small>조선민주주의인민공화국편</small>'});
       ui.f=G.el('div',{id:'s3f',innerHTML:'<div id=s3bv></div><div id=s3x></div><div id=s3hm></div><div id=s3hp><i></i><b></b><small>체력</small></div><div id=s3k><u>' + '<s></s>'.repeat(6) + '</u><b></b><small>투척단검</small></div><div id=s3n>좌클릭 단검 · 우클릭/Q 투척단검 · E 줍기 · Shift 달리기</div>'});
       ui.hpi=ui.f.querySelector('#s3hp i');ui.hpb=ui.f.querySelector('#s3hp b');ui.bv=ui.f.querySelector('#s3bv');ui.hm=ui.f.querySelector('#s3hm');
       ui.ki=[...ui.f.querySelectorAll('#s3k s')];ui.kb=ui.f.querySelector('#s3k b');ui.n=ui.f.querySelector('#s3n');
-      ui.fd=G.el('div',{id:'s3d',innerHTML:'<b>전사</b><small>리충성이 쓰러졌다</small><button>다시 하기</button><small>Enter</small>'});
+      ui.fd=G.el('div',{id:'s3d',innerHTML:'<b>전사</b><small>리충성이 쓰러졌다</small><button>다시 하기</button><small>Enter</small><button class=t>처음 화면</button>'});
       ui.fd.querySelector('button').onclick=()=>{retry();G.canvas.requestPointerLock&&G.canvas.requestPointerLock();};
+      ui.fd.querySelector('.t').onclick=()=>{ui.fd.style.display='none';G.story&&G.story.title&&G.story.title();}; // 처음 화면으로
       if(G.params.has('nohud')){for(const k of ['o','h','p','m','f']) ui[k].style.visibility='hidden';ui.km.forEach(e=>e.style.visibility='hidden');}
       addEventListener('keydown',e=>{
         if(!S.on) return;
