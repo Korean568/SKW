@@ -35,7 +35,7 @@
   const COL={'김민철':'#8fd0ff','마스크 대령':'#ffb46e','박창원':'#9be38f','고혁명':'#ffc27a','리옥선':'#ff8b7a'};
   const who={'김민철':'me','마스크 대령':'col','박창원':'park','고혁명':'ko','리옥선':'ko'};
   const S={on:0,beat:'',i:0,t:0,nx:0,cm:'fp',ct:0,bk:0,bkT:0,bkR:2,g:null,gt:0,spk:null,lineEnd:0,mv:0,wk:0,fix:null,fixF:0,
-    hT:0,hR:0,rotT:1,doorT:0,radio:0,gunT:3,smT:0,cut:null};
+    hT:0,hR:0,rotT:1,doorT:0,radio:0,gunT:3,smT:0,cut:null,arr:0,tl:{},env:null};
   const me={p:[0,0,0],o:[0,0,0],yaw:0,pit:0,bob:0,bA:0,aim:0,aimT:0,sw:[0,0]};
   const W={sq:[],crew:[]},wait=[],ui={};
   const later=(s,f)=>wait.push([S.t + s,f]);
@@ -65,12 +65,24 @@
     const a=[l[0] + u[0]*420 + u[2]*160,gnd(l[0],l[2]) + 150,l[2] + u[2]*420 - u[0]*160],b=[l[0] + u[0]*60,gnd(l[0],l[2]) + 30,l[2] + u[2]*60],c=at(l,2);
     return mix(mix(a,b,e),mix(b,c,e),e);
  }
-  function door(){// 헬기 문 안쪽 · 내린 뒤 서는 곳 — 착륙한 헬기 행렬이 있으면 왼쪽 앞 문 (Mi-8)
+  function door(){// [문간 객실 바닥(지면 +1 m), 뛰어내려 딛는 땅] — 착륙한 헬기 행렬이 있으면 왼쪽 문 (Mi-8, 기체 +X = 바깥)
     const k=K(),l=k.lz,m=k.meet,M=RS().heli>=.999&&rc('heliM');
-    if(M&&M.length===16&&H(M[12] - l[0],M[14] - l[2])<1.5) return S.dr=[at(M4.point(M,[.8,0,4.25])),at(M4.point(M,[3.2,0,4.6]))];
+    if(M&&M.length===16&&H(M[12] - l[0],M[14] - l[2])<1.5){const a=M4.point(M,[.95,1,4.25]),g=at(M4.point(M,[2.05,0,4.25]));return S.dr=[[a[0],mx(a[1],g[1] + .9),a[2]],g];}
     if(S.dr) return S.dr;
     const d=[m[0] - l[0],0,m[2] - l[2]],n=H(d[0],d[2])||1;
-    return[at([l[0] + d[0]/n*1.8,0,l[2] + d[2]/n*1.8]),at([l[0] + d[0]/n*4.2,0,l[2] + d[2]/n*4.2])];
+    return[at([l[0] + d[0]/n*1.3,0,l[2] + d[2]/n*1.3],1),at([l[0] + d[0]/n*2.4,0,l[2] + d[2]/n*2.4])];
+ }
+  const MEET=()=>{const k=K(),[,g]=door(),m=k.meet,d=[g[0] - m[0],0,g[2] - m[2]],n=H(d[0],d[2])||1,r=mn(4.2,n*.4);return at([m[0] + d[0]/n*r,0,m[2] + d[2]/n*r]);};// 빠른 걸음이 끝나는 곳 (만남 지점 4 m 앞)
+  function hop(P,a,b,then){// 문간 바닥에 나타나 웅크렸다가 땅으로 내려선 뒤 곧바로 걷는다
+    P.vis=true;P.wp=null;P.dp=null;P.face=null;P.p=a.slice();P.yaw=yawTo(a,b);P.pose='stand';P.tgt=null;
+    later(.4,()=>P.pose='crouch');
+    later(.75,()=>P.dp={t:S.t,d:.4,a:P.p.slice(),b:b.slice()});
+    later(1.15,()=>{G.sfx.play('click',{pos:b,gain:.9,rate:.2});G.sfx.play('click',{pos:b,gain:.6,rate:.13});});
+    later(1.4,()=>{P.pose='stand';then(P);});
+ }
+  function koWalk(P){// 손을 보인 채 빠르게 다가오다가 만남 지점 앞에서 걸음을 늦춘다
+    const k=K();S.tl.ground=S.t;P.look=at(k.start,1.6);
+    walk(P,[MEET()],1.62,Q=>{S.arr=1;S.tl.arrive=S.t;walk(Q,[at(k.meet)],.95,R=>{S.tl.stop=S.t;R.pose='handsup';R.yaw=yawTo(R.p,k.start);});});
  }
 
   /* ── 인물 ── */
@@ -82,20 +94,24 @@
   function stage(n){// n = 장면 번호: 그 장면 시작 상태를 누적 배치
     const k=K(),rs=RS(),[d0,d1]=door();
     PP.clear();W.sq=[];W.crew=[];wait.length=0;S.fix=null;S.fixF=0;S.radio=0;S.cut=null;
-    const nm=['col','park','lee','shin','jb'],kd=['mask','rok','rok','rok','rok'],sd=[3,5,9,11,7],lz=at(k.lz);
-    k.squad.slice(0,5).forEach((q,i)=>{const P=add(kd[i],{p:at(q),yaw:q[3]||0,gun:'rifle',seed:sd[i],look:at(k.lz,3)});P.home=q;W[nm[i]]=P;W.sq.push(P);});
+    const nm=['col','park','lee','shin','jb'],kd=['mask','rok','rok','rok','rok'],sd=[3,5,9,11,7],lz=at(k.lz),u=U(),s0=k.start;
+    // 분대: 플레이어 앞쪽 · 양옆 모래주머니 뒤 (대령은 왼쪽 앞에 서고, 둘은 무릎쏴) — 플레이어는 한 걸음 뒤
+    const LAY=[[-1.05,.4],[1.15,.75],[-2.25,.72],[2.7,.62],[-4.1,.58]];
+    k.squad.slice(0,5).forEach((q,i)=>{const o=LAY[i],w=col([s0[0] + u[2]*o[0] + u[0]*o[1],0,s0[2] - u[0]*o[0] + u[2]*o[1]],.3);w[3]=q[3]||0;
+      const P=add(kd[i],{p:w,yaw:w[3],gun:'rifle',seed:sd[i],look:at(k.lz,3)});P.home=w;W[nm[i]]=P;W.sq.push(P);});
     W.ko=add('nko',{p:d0,yaw:yawTo(d0,k.meet),seed:23,vis:false});
     (k.crew||[]).slice(0,4).forEach((q,i)=>{const P=add('nk',{p:at(q),yaw:q[3]||yawTo(q,k.meet),gun:'ak',seed:41 + i*5,vis:n>=2,look:at(k.meet,1.5)});P.home=q;W.crew.push(P);});
     rs.heli=n<1?0:n<2?.3:1;rs.rotor=n<2?1:.45;rs.door=n<2?0:1;S.hT=rs.heli;S.hR=0;S.rotT=rs.rotor;S.doorT=rs.door;
     if(n>=1) W.sq.forEach((P,i)=>{P.look=null;});
+    S.arr=n>=3?1:0;S.tl={};
     if(n>=2){
-      W.sq.forEach((P,i)=>aimAt(P,i===0||i===1?W.ko:W.crew[i % mx(1,W.crew.length)]||W.ko,i===1||i===3));
+      W.sq.forEach((P,i)=>aimAt(P,i===0||i===1?W.ko:W.crew[i % mx(1,W.crew.length)]||W.ko,i===1||i===2));
       W.ko.vis=true;W.ko.p=d1;W.ko.yaw=yawTo(d1,k.meet);W.ko.pose='handsup';W.ko.look=at(k.start,1.6);
     }
     if(n>=3){W.ko.p=at(k.meet);W.ko.yaw=yawTo(k.meet,k.start);}
     if(n>=4){const C=W.col,f=fw(yawTo(C.p,W.ko.p));C.p=col([C.p[0] + f[0]*1.1,0,C.p[2] + f[2]*1.1],.3);aimAt(C,W.ko);W.ko.pose='stand';W.ko.look=PP.eye(C);}
     // 플레이어: 엄폐물 뒤
-    me.o=at(k.start);me.p=me.o.slice();me.yaw=k.start[3]!=null?k.start[3]:yawTo(k.start,k.lz);me.pit=-.03;me.aim=me.aimT=0;
+    me.o=col([k.start[0] - U()[0]*1.1,0,k.start[2] - U()[2]*1.1],.3);me.p=me.o.slice();me.yaw=k.start[3]!=null?k.start[3]:yawTo(k.start,k.lz);me.pit=-.03;me.aim=me.aimT=0;
     G.people.fp.on=n>=1?1:0;
  }
 
@@ -107,19 +123,22 @@
     if(a==='land'){S.hT=1;S.hR=.07;S.fix='heli';S.fixF=S.t + 5;W.sq.forEach(P=>P.look=hp());}
     if(a==='heli'){S.fix='heli';S.fixF=S.t + 4;}
     if(a==='raise'){// 경계하라! — 분대가 헬기를 겨눔 (둘은 무릎쏴)
-      W.sq.forEach((P,i)=>later(.15 + i*.22,()=>{aimAt(P,'heli',i===1||i===3);G.sfx.play('click',{gain:.35,rate:.6 + R()*.2});}));
+      W.sq.forEach((P,i)=>later(.15 + i*.22,()=>{aimAt(P,'heli',i===1||i===2);G.sfx.play('click',{gain:.35,rate:.6 + R()*.2});}));
    }
     if(a==='door'){S.doorT=1;S.rotT=.45;S.fix=d0;S.fixF=S.t + 4;}
-    if(a==='out'){// 고혁명이 내린다 · 부하들은 소총을 내린 채 헬기 옆으로
-      const P=W.ko;P.vis=true;P.p=d0.slice();P.look=at(k.start,1.6);
-      walk(P,[d1],.9,Q=>{Q.pose='handsup';Q.yaw=yawTo(Q.p,k.start);});P.free=1;
+    if(a==='out'){// 고혁명이 문간에 나타나 땅으로 내려서서 곧장 걷는다 · 부하들이 하나씩 뒤따라 내려 헬기 옆으로
+      const P=W.ko,n=[d1[0] - d0[0],0,d1[2] - d0[2]],nl=H(n[0],n[2])||1,o=[d1[0] + n[0]/nl*.7,d1[1],d1[2] + n[2]/nl*.7];P.look=at(k.start,1.6);
+      hop(P,d0,d1,koWalk);S.fix=P;S.fixF=S.t + 3.5;
       W.sq.forEach((Q,i)=>Q.tgt=i<2?W.ko:Q.tgt);
-      W.crew.forEach((C,i)=>later(.9 + i*.6,()=>{C.p=d0.slice();walk(C,[d1,C.home],1.1,Q=>{Q.yaw=Q.home[3]!=null?Q.home[3]:yawTo(Q.p,k.meet);Q.look=at(k.meet,1.5);});C.free=1;}));
-      later(2.6,()=>W.sq.forEach((Q,i)=>{if(i>1&&W.crew.length) Q.tgt=Q.face=W.crew[i % W.crew.length];}));
+      W.crew.forEach((C,i)=>{C.vis=false;later(1.5 + i*1.05,()=>hop(C,d0,d1,Q=>{walk(Q,[at(o),Q.home],1.25,R=>{R.yaw=R.home[3]!=null?R.home[3]:yawTo(R.p,k.meet);R.look=at(k.meet,1.5);});Q.free=1;}));});
+      later(3.2,()=>W.sq.forEach((Q,i)=>{if(i>1&&W.crew.length) Q.tgt=Q.face=W.crew[i % W.crew.length];}));
    }
-    if(a==='walk'){// (고혁명이 특전사들한테 다가온다) — 손을 보인 채 천천히
-      const P=W.ko;P.look=at(k.start,1.6);S.fix=P;S.fixF=S.t + 3;
-      later(1.2,()=>walk(P,[at(k.meet)],1.15,Q=>{Q.pose='handsup';Q.yaw=yawTo(Q.p,k.start);}));
+    if(a==='walk'){// (고혁명이 특전사들한테 다가온다) — 로터가 잦아들고, 분대가 소총을 다시 확인한다
+      const P=W.ko;S.fix=P;S.fixF=S.t + 3;S.rotT=.1;
+      if(!P.wp&&!P.dp&&!S.arr) koWalk(P);
+      const sq=W.sq;sq[3]&&later(1.8,()=>G.sfx.play('reload',{pos:PP.eye(sq[3]),gain:.8}));
+      sq[2]&&later(4.4,()=>{G.sfx.play('click',{pos:PP.eye(sq[2]),gain:.9,rate:.5});later(.14,()=>G.sfx.play('click',{pos:PP.eye(sq[2]),gain:.8,rate:.7}));});
+      sq[4]&&later(6.6,()=>G.sfx.play('reload',{pos:PP.eye(sq[4]),gain:.6,rate:.9}));
    }
     if(a==='aimko'){// (총을 겨누며) — 대령이 한 걸음 나서며 고혁명을 겨눈다
       const C=W.col,f=fw(yawTo(C.p,W.ko.p));low(C);
@@ -185,7 +204,7 @@
     me.bob+=v*dt*4.2;me.bA+=((v>.3?1:0) - me.bA)*mn(1,dt*7);
     if(Math.floor(me.bob/PI)!==b0&&me.bA>.3) G.sfx.play('click',{gain:.5,rate:.16 + R()*.05});// 발소리 (자갈)
  }
-  const E=[0,0,0],T=[0,0,0];
+  const E=[0,0,0],T=[0,0,0],yp=(e,q)=>{const d=[q[0] - e[0],q[1] - e[1],q[2] - e[2]];return[Math.atan2(d[0],d[2]),Math.atan2(d[1],H(d[0],d[2]))];};
   function camera(dt){
     const c=G.cam,t=G.time,k=K();S.ct+=dt;
     if(S.cm==='est'){// 시작: 폐허 너머로 다가오는 헬기 (분대 뒤에서 망원으로)
@@ -205,9 +224,12 @@
     if(!tg&&S.beat==='land') tg=W.ko&&W.ko.vis?PP.eye(W.ko):hp();
     if(!tg&&S.beat==='approach'&&W.ko) tg=PP.eye(W.ko);
     const ey=[me.p[0] - cos(me.yaw)*sin(me.bob)*.022*me.bA,me.p[1] + 1.6 + (ab(cos(me.bob)) - .7)*.04*me.bA,me.p[2] + sin(me.yaw)*sin(me.bob)*.022*me.bA];
-    if(tg&&(S.bot||S.mv<0&&S.wk<0||S.t<S.fixF&&S.mv<0)){
-      const d=[tg[0] - ey[0],tg[1] - ey[1],tg[2] - ey[2]],r=S.t<S.fixF?1.6:1.1;
-      me.yaw+=wrap(Math.atan2(d[0],d[2]) - me.yaw)*mn(1,dt*r);me.pit+=(cl(Math.atan2(d[1],H(d[0],d[2])),-1,1) - me.pit)*mn(1,dt*r);
+    if(tg&&(S.bot||S.mv<0&&S.wk<0||S.t<S.fixF&&S.mv<0)){// 자동 구도: 대상(헬기·고혁명)은 너머에, 대령과 분대는 앞쪽에 — 말하는 분대원 쪽으로 살짝
+      let[ty,tp]=yp(ey,tg),r=S.t<S.fixF?1.6:1.1;
+      const sp=S.t<S.lineEnd&&W[S.spk],fo=S.fix&&S.fix.p?S.fix:null,C=W.col;
+      const A=sp&&sp!==fo&&sp.vis!==false&&W.sq.includes(sp)?sp:C&&C!==fo&&C.vis!==false?C:null;
+      if(A){const[ay,ap]=yp(ey,chest(A)),w=A===sp?.5:.32;ty+=cl(wrap(ay - ty)*w,-.5,.5);tp=mn(tp - .04,ap + .36);if(A===sp) r=mn(r,1.2);}
+      me.yaw+=wrap(ty - me.yaw)*mn(1,dt*r);me.pit+=(cl(tp,-1,1) - me.pit)*mn(1,dt*r);
    }
     S.mv-=dt;S.wk-=dt;me.aim+=(me.aimT - me.aim)*mn(1,dt*5);
     const hv=RS().heli>.5&&RS().heli<1?(1 - ab(RS().heli - .9)*4)*.004:0,sh=mx(0,hv)*sin(t*37);// 하강풍 진동
@@ -221,8 +243,11 @@
     const h=hp();
     for(const P of PP.list){
       if(P.tgt){const q=P.tgt==='heli'?h:P.tgt.p?chest(P.tgt):P.tgt;P.aim=q;P.face=q;}
+      if(P.dp){const D=P.dp,k=cl((S.t - D.t)/D.d,0,1),a=D.a,b=D.b;// 문간에서 땅으로: 짧은 낙하 (살짝 앞으로 뜀)
+        P.p=[a[0] + (b[0] - a[0])*k,a[1] + (b[1] - a[1])*k*k + .12*sin(PI*k),a[2] + (b[2] - a[2])*k];if(k>=1) P.dp=null;continue;}
       if(P.face&&!P.wp){const y=yawTo(P.p,P.face);P.yaw+=wrap(y - P.yaw)*mn(1,dt*2.5);}// 몸을 겨눈 쪽으로 천천히
       if(!P.wp) continue;
+      if(P===W.ko&&(P.fs=(P.fs||0) + mn(P.sp*dt,.5))>.72){P.fs=0;G.sfx.play('click',{pos:P.p,gain:.45,rate:.15 + R()*.05});}// 자갈 위 발소리
       const w=P.wp[0],dx=w[0] - P.p[0],dz=w[2] - P.p[2],d=H(dx,dz);
       if(d<.08||P.stk>3){if(d>=.08) P.p=at(w);P.wp.shift();P.stk=0;if(!P.wp.length){P.wp=null;P.free=0;P.pose='stand';P.done&&P.done(P);}continue;}// 3 s 막히면 경유점으로
       const s=mn(d,P.sp*dt),q=P.free?at([P.p[0] + dx/d*s,0,P.p[2] + dz/d*s]):col([P.p[0] + dx/d*s,P.p[1],P.p[2] + dz/d*s],.25);
@@ -240,7 +265,8 @@
     if(S.hR>0&&rs.heli<S.hT) rs.heli=mn(S.hT,rs.heli + dt*S.hR*(1 - .65*ss(.8,1,rs.heli)));
     rs.rotor=(rs.rotor==null?1:rs.rotor) + cl(S.rotT - rs.rotor,-dt*.12,dt*.12);
     rs.door=(rs.door||0) + cl(S.doorT - (rs.door||0),-dt/1.3,dt/1.3);
-    if(S.cut) G.setEnv({indoor:.85});else G.setEnv({indoor:0});
+    if(S.cut) G.setEnv({indoor:.85});// 진행의 새벽이 이긴다: 폐허 모듈이 켜지는 프레임에 자기 환경을 적용하므로 그다음 프레임에 다시 적용
+    else if(S.env){const e=G.env,f=S.env;if(e.exposure!==f.exposure||e.sunAz!==f.sunAz||e.sunEl!==f.sunEl||e.cloud!==f.cloud||e.indoor!==0) G.setEnv(f);}
     G.shadowFocus=S.cut&&W.okc?W.okc.p:mix(at(k.start),at(k.lz),.35);G.shadowRange=S.cut?12:30;
     // 먼 연기 기둥
     if(!G.ruins&&G.fx&&G.fx.burst&&!S.cut&&(S.smT-=dt)<0){
@@ -279,7 +305,7 @@
   const idx=b=>SC.findIndex(l=>l[0]==='@'&&l[1]===b);
   const GT={
     landed:()=>RS().heli>=.999||S.t - S.gt>25,
-    arrived:()=>W.ko&&!W.ko.wp&&dxz(W.ko.p,K().meet)<.6&&S.t - S.gt>1.5||S.t - S.gt>40,
+    arrived:()=>S.arr||W.ko&&!W.ko.wp&&!W.ko.dp&&dxz(W.ko.p,K().meet)<.6&&S.t - S.gt>1.5||S.t - S.gt>40,
  };
   function run(dt){
     S.t+=dt;
@@ -310,7 +336,8 @@
     G.cabin&&(G.cabin.on=false);G.village&&(G.village.on=false);G.palace&&(G.palace.on=false);G.ruins&&(G.ruins.on=true);
     S.on=1;S.t=0;S.dr=null;S.lineEnd=0;S.spk=null;S.line='';S.mv=0;S.wk=0;S.bkR=2;S.g=null;S.rb=0;S.radio=0;S.gunT=3;wait.length=0;showDl(0);
     const u=U(),az=Math.atan2(u[0],u[2])*180/PI + 48;// 낮은 해: 헬기 쪽 비스듬히 뒤
-    G.setEnv(Object.assign({sunEl:8,sunAz:az,cloud:.8,haze:.6,cloudBase:1400,cloudTop:3200,indoor:0,exposure:1.1},RU().ENV));// 폐허 모듈이 정한 새벽이 우선
+    S.env=Object.assign({fogDen:1/1100},RU().ENV,{sunEl:7,sunAz:az,cloud:.86,haze:.72,cloudBase:1000,cloudTop:2800,indoor:0,exposure:1.34});// 회색 새벽 · 얼굴이 읽히는 노출
+    G.setEnv(S.env);
     G.sfx.init();G.sfx.loop('wind',1,{gain:.35,rate:.55});G.sfx.music('calm');
  }
   function start(){const sc=!S.st&&G.params.get('story')==='4'&&G.params.get('scene');S.st=1;go(sc||'intro');}

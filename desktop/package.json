@@ -1,0 +1,113 @@
+{
+  "name": "second-korean-wars",
+  "productName": "Second Korean Wars",
+  "version": "1.0.0",
+  "description": "Second Korean Wars (제 2차 한국전쟁) - PC 다운로드판 (itch.io)",
+  "author": "Second Korean Wars",
+  "license": "UNLICENSED",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "prepare-app": "node scripts/prepare-app.js",
+    "start": "npm run prepare-app && electron .",
+    "dist:win": "npm run prepare-app && electron-builder --win --publish never",
+    "dist:mac": "npm run prepare-app && electron-builder --mac --publish never",
+    "dist:linux": "npm run prepare-app && electron-builder --linux --publish never",
+    "icon": "node scripts/make-icon.js"
+  },
+  "devDependencies": {
+    "electron": "45.4.1",
+    "electron-builder": "26.18.0",
+    "three": "0.128.0"
+  },
+  "build": {
+    "appId": "com.secondkoreanwars.game",
+    "productName": "Second Korean Wars",
+    "copyright": "Second Korean Wars",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "app/**/*",
+      "package.json"
+    ],
+    "asar": true,
+    "electronLanguages": [
+      "en-US",
+      "ko"
+    ],
+    "artifactName": "SecondKoreanWars-${version}-${os}-${arch}.${ext}",
+    "win": {
+      "icon": "build/icon.png",
+      "target": [
+        {
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "extraFiles": [
+        {
+          "from": "itch/.itch.toml",
+          "to": ".itch.toml"
+        }
+      ]
+    },
+    "portable": {
+      "artifactName": "SecondKoreanWars-${version}-win-${arch}-portable.${ext}"
+    },
+    "mac": {
+      "icon": "build/icon.png",
+      "category": "public.app-category.action-games",
+      "target": [
+        {
+          "target": "zip",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "identity": "-",
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "notarize": false
+    },
+    "linux": {
+      "icon": "build/icon.png",
+      "category": "Game",
+      "executableName": "second-korean-wars",
+      "synopsis": "Second Korean Wars (제 2차 한국전쟁)",
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "tar.gz",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "extraFiles": [
+        {
+          "from": "itch/.itch.toml",
+          "to": ".itch.toml"
+        }
+      ]
+    }
+  }
+}

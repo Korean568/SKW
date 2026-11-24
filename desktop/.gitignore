@@ -1,0 +1,6 @@
+# 빌드 결과물과 내려받은 것들은 커밋하지 않는다
+node_modules/
+dist/
+app/
+.cache/
+*.log
