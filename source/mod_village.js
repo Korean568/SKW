@@ -372,10 +372,10 @@ let tx=P.x-3.*sin(P.z*.02)-1.8*sin(P.z*.09+.6);let tr=smoothstep(-18.,-9.,P.z)*s
 let rt=ln(abs(tx)-.8,.16,px*2.)*tr;
 dirt*=1.-.14*ln(abs(tx)-.8,.45,px*2.)*tr;dirt=mix(dirt,dirt*.6*(.85+.3*sin(P.z*26.)*fd(.04,px)),rt); // 바퀴 자국 + 무늬
 let dw=smoothstep(3.6,1.,length(P.xz-wv));
-let pn=nz(P.xz*.21+11.)*.7+nz(P.xz*.8+3.)*.3;
-wet=max(smoothstep(.75,.78,pn)*sq*(1.-.6*pa),max(rt*smoothstep(.62,.68,nz(P.xz*.35+5.)),dw*smoothstep(.6,.66,nz(P.xz*.9+2.))));
+let pn=nz(P.xz*.37+11.)*.65+nz(P.xz*1.3+3.)*.35;
+wet=max(smoothstep(.77,.8,pn)*sq*(1.-.6*pa),max(rt*smoothstep(.62,.68,nz(P.xz*.35+5.)),dw*smoothstep(.6,.66,nz(P.xz*.9+2.))));
 let dm=max(max(smoothstep(.68,.75,pn)*sq,dw*.8),dr*.9);
-dirt*=1.-.4*dm;dirt=mix(dirt,vec3f(.07,.065,.06),wet); // 젖은 흙 · 웅덩이
+dirt*=1.-.4*dm;dirt=mix(dirt,vec3f(.1,.095,.09),wet); // 젖은 흙 · 웅덩이
 let sc=floor(P.xz/.4);let hs=hash21(sc+.5); // 흩어진 짚
 if(hs>.5-.25*smoothstep(10.,20.,r)){let an=hs*40.;let dv=vec2f(cos(an),sin(an));let v=P.xz-sc*.4-vec2f(hash21(sc+7.1),hash21(sc+3.3))*.3-.05;let t=clamp(dot(v,dv),-.13,.13);
 dirt=mix(dirt,vec3f(.64,.54,.3)*(.8+.4*hash21(sc+1.)),ln(length(v-dv*t),.007,px)*fd(.02,px)*(1.-wet)*.9);}
@@ -417,7 +417,7 @@ else if(m==1.){ // 회벽 / 실내 벽지
 let n=nz(tq*.37)*.45+nz(tq*1.3)*.35+nz(tq*4.1)*.2*fd(.25,px);
 if(inn){ // 도배지: 이음매 · 잔무늬 · 얼룩 · 걸레받이
 let pq=fract(vec2f(tq.x+tq.y,tq.x-tq.y)/.16);
-al=vec3f(.76,.69,.54)*(.86+.24*n);al=mix(al,al*vec3f(.8,.76,.66),ln(length(pq-.5),.11,px/.16)*fd(.05,px)*.7);
+al=vec3f(.76,.69,.54)*(.86+.24*n);al=mix(al,al*vec3f(.86,.82,.74),ln(length(pq-.5),.07,px/.16)*fd(.05,px)*.45);
 al*=1.-.14*(1.-ln(fract(tq.x/.9)-.5,.493,px/.9))*fd(.1,px);
 al*=1.-.22*smoothstep(.6,.85,nz(tq*.5+5.))*smoothstep(1.5,2.4,o.y);al*=1.-.2*smoothstep(.9,.35,o.y);
 if(o.y<${FY+.13}){al=vec3f(.3,.22,.14)*(.8+.3*n);}
@@ -529,7 +529,7 @@ let R=reflect(-E,N);let sp=10.+250.*gl*gl;
 let am=ambAt(N);c=al*(g.sunCol.rgb*nl*sv+mix(am,vec3f(dot(am,vec3f(.3,.5,.2)))*vec3f(1.04,1.,.94),smoothstep(.6,.95,g.fog.y)*.75)/mix(1.,.12,g.wind.w)*ao+pointLights(P,N)+fireL(P,N)); // 흐린 날: 회색 하늘빛
 c+=g.sunCol.rgb*sv*pow(max(dot(N,normalize(Ls+E)),0.),sp)*gl*(sp+8.)*.03*min(nl*8.,1.);
 c=mix(c,skyBase(vec3f(R.x,abs(R.y),R.z))*ao*.7,gl*(.04+.96*pow(1.-nv,5.))*.6);
-if(wt>0.){let sk=skyBase(vec3f(R.x,abs(R.y),R.z));c=mix(c,mix(sk,vec3f(dot(sk,vec3f(.3,.5,.2))),g.fog.y*.8)*.62,wt*(.25+.5*pow(1.-nv,3.)));} // 웅덩이에 비친 하늘
+if(wt>0.){let sk=skyBase(vec3f(R.x,abs(R.y),R.z));c=mix(c,mix(sk,vec3f(dot(sk,vec3f(.3,.5,.2))),g.fog.y*.8)*.62,wt*(.45+.45*pow(1.-nv,3.)));} // 웅덩이에 비친 하늘
 }
 // 연기 낀 대기 (마을이 탈 때)
 let sm=u.s.x*(1.-exp(-length(P-g.cam.xyz)*.012));c=mix(c,vec3f(.09,.06,.05),sm*.55);
@@ -597,15 +597,15 @@ return vec4f(fogAt(c+em,P),1.);
      UB[o+3]=burn[k]*(5+1.5*sin(t*11+k)+sin(t*23+k*3));
     }
     if (f>0) {
-     if ((nt-=dt)<=0) { nt=.5; const c=G.cam.pos; near=H.map((h,k)=>[k,V3.dist(h.c,c)]).filter(q=>burn[q[0]]>0).sort((a,b)=>a[1]-b[1]).slice(0,[4,7,10][G.Q.level]); }
+     if ((nt-=dt)<=0) { nt=.5; const c=G.cam.pos; const f3=V3.norm(V3.sub(G.cam.target||c,c)); near=H.map((h,k)=>{ const v=V3.sub(h.c,c),d=V3.len(v); return [k,d,d*(V3.dot(v,f3)<-3?4:1)]; }).filter(q=>burn[q[0]]>0).sort((a,b)=>a[2]-b[2]).slice(0,[5,10,10][G.Q.level]); } // 화면 안의 가까운 집 먼저
      const n0=G.lights.length;
      // 작은 불길 여러 개를 용마루·지붕면을 따라 흩뿌림 (카메라 가까운 집일수록 작게), 연기는 지붕 위로
      for (const [k,d] of near) {
       const b=burn[k],h=H[k],ds=cl(d/18,.75,2.2);if (!b||(FE[k]-=dt)>0) continue;
-      FE[k]=(.17+.1*rnd())/(.35+.65*b)*(G.Q.level?1:1.8);
+      FE[k]=(.045+.04*rnd())/(.35+.65*b)*(G.Q.level?1:1.8); // 짧게 깜박이는 불혀 (muzzle 불길을 위로) → 줄지어 일렁이는 불
       const x=(rnd()*2-1)*(1.6+1.6*rnd()),z=(rnd()-.5)*2.6*rnd()**2;
-      G.fx.burst('fire',hw(h,[x,ry(x,z)+.04,z]),{ size: (.06+.06*b)*ds*h.s,vel: [0,.45,0] });
-      rnd()<.3&&G.fx.burst('smoke',hw(h,[x*.4,ry(0,0)+1.3,0]),{ size: .28*ds*b,vel: [.25,1.3,.1] });
+      G.fx.burst('muzzle',hw(h,[x,ry(x,z)+.03,z]),{ dir: [(rnd()-.5)*.3,1,(rnd()-.5)*.3],size: (.07+.08*b)*ds*h.s,vel: [0,.4,0] });
+      rnd()<.12&&G.fx.burst('smoke',hw(h,[x*.4,ry(0,0)+1.2,0]),{ size: .3*ds*b,vel: [.25,1.3,.1] });
      }
      G.lights.length=n0; // fx 불 점광(반경 수백 m)은 빼고 아래 점광 하나만
      if (near.length) { const k=near[0][0],p=hw(H[k],[0,3.9,0]); G.addLight(p,[1,.45,.15],(4+1.5*sin(t*13))*burn[k],22,dt*1.5); }

@@ -135,6 +135,9 @@
     G.register('desktop', {
       init() {
         document.title = TITLE;
+        // 스토리 2~4 의 안개·구름 설정이 타이틀에 남지 않게: 처음 화면으로 갈 때 시작 시점 환경으로 되돌림 (엔딩 카드 버튼 경로 포함)
+        const env0 = Object.assign({}, G.env), tt = G.story && G.story.title;
+        if (tt) G.story.title = (...a) => { const r = tt(...a); G.setEnv(env0); for (const k of ['cloudBase', 'cloudTop']) k in env0 || delete G.env[k]; return r; };
         const sInit = G.sfx && G.sfx.init; if (sInit) G.sfx.init = (...a) => { const r = sInit(...a); vol(); return r; };
         G.css(`#dk{position:absolute;inset:0;z-index:20;display:none;align-content:center;justify-items:start;padding:0 7vw;background:linear-gradient(90deg,#000e,#000c 45%,#0008);pointer-events:auto;color:#dfe8f2;font:clamp(13px,1.15vw,22px)/1.5 system-ui}#dk.on{display:grid}
 #dk .tb{display:inline-block;margin:0 0 1.1em;padding:.25em .9em .3em;font:600 max(11px,.95vw) system-ui;letter-spacing:.28em;border:1px solid #fff5;border-radius:999px;background:#0006}#dk .tb b{color:#fff}

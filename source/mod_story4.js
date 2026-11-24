@@ -67,7 +67,7 @@
  }
   function door(){// [문간 객실 바닥(지면 +1 m), 뛰어내려 딛는 땅] — 착륙한 헬기 행렬이 있으면 왼쪽 문 (Mi-8, 기체 +X = 바깥)
     const k=K(),l=k.lz,m=k.meet,M=RS().heli>=.999&&rc('heliM');
-    if(M&&M.length===16&&H(M[12] - l[0],M[14] - l[2])<1.5){const a=M4.point(M,[.95,1,4.25]),g=at(M4.point(M,[2.05,0,4.25]));return S.dr=[[a[0],mx(a[1],g[1] + .9),a[2]],g];}
+    if(M&&M.length===16&&H(M[12] - l[0],M[14] - l[2])<1.5){const a=M4.point(M,[1.15,1,4.25]),g=at(M4.point(M,[2.1,0,4.25]));return S.dr=[[a[0],mx(a[1],g[1] + .9),a[2]],g];}
     if(S.dr) return S.dr;
     const d=[m[0] - l[0],0,m[2] - l[2]],n=H(d[0],d[2])||1;
     return[at([l[0] + d[0]/n*1.3,0,l[2] + d[2]/n*1.3],1),at([l[0] + d[0]/n*2.4,0,l[2] + d[2]/n*2.4])];
@@ -135,6 +135,7 @@
    }
     if(a==='walk'){// (고혁명이 특전사들한테 다가온다) — 로터가 잦아들고, 분대가 소총을 다시 확인한다
       const P=W.ko;S.fix=P;S.fixF=S.t + 3;S.rotT=.1;
+      later(mx(0,S.lineEnd - S.t) + .6,()=>{S.beat==='approach'&&showDl(0);});// 지난 대사는 걷는 동안 치운다
       if(!P.wp&&!P.dp&&!S.arr) koWalk(P);
       const sq=W.sq;sq[3]&&later(1.8,()=>G.sfx.play('reload',{pos:PP.eye(sq[3]),gain:.8}));
       sq[2]&&later(4.4,()=>{G.sfx.play('click',{pos:PP.eye(sq[2]),gain:.9,rate:.5});later(.14,()=>G.sfx.play('click',{pos:PP.eye(sq[2]),gain:.8,rate:.7}));});
