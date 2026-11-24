@@ -325,8 +325,9 @@ G.gpuMs = 0; // GPU 프레임 시간(ms, 평활) — timestamp-query 지원 시�
 G.tick = dt => {
   if (G.dead) return;
   const dev = G.dev, T = G.targets, Q = G.Q, ms = Q.msaa > 1, ts = G.ts;
+  if (G.paused) dt = 0; // 일시정지 (스팀판 메뉴 등): 시간·게임 로직(update 훅)은 멈추고 화면만 그림
   G.dt = dt; G.time += dt; G.frame++;
-  hook('update', dt); writeGlobals(); hook('prepare');
+  if (!G.paused) hook('update', dt); writeGlobals(); hook('prepare');
   const enc = dev.createCommandEncoder();
   if (ts) enc.beginComputePass({ timestampWrites: { querySet: ts.qs, beginningOfPassWriteIndex: 0 } }).end();
   hook('compute', enc);

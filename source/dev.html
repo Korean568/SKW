@@ -19,7 +19,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#05080c;color:#cfe8f5;
 <script>
 // 개발용 하네스: ?mods=ocean,fx (또는 all) 로 실제 모듈을 고르고 나머지는 stubs.js 가 채움
 { const want = (G.params.get('mods') || '').split(',');
-  for (const m of ['gpu', 'sky', 'post', 'ocean', 'mesh', 'models', 'fx', 'audio', 'game', 'people', 'cabin', 'fps', 'village', 'story2', 'palace', 'story3', 'ruins', 'story4', 'story'])
+  for (const m of ['gpu', 'sky', 'post', 'ocean', 'mesh', 'models', 'fx', 'audio', 'game', 'people', 'cabin', 'fps', 'village', 'story2', 'palace', 'story3', 'ruins', 'story4', 'story', 'desktop'])
     if (want.includes(m) || want.includes('all')) document.write('<script src="mod_' + m + '.js"><\/script>');
   document.write('<script src="stubs.js"><\/script><script>G.boot()<\/script>'); }
 </script>

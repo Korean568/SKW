@@ -32,7 +32,7 @@
     ['고혁명','집무실까지 경호해드리겠습네다.'],
     [ME,'고맙소.'],
     ['!','fight2',0],['?','seg'],
-    ['@','office'],['!','arrive',0],['?','office'],['!','bye',3],// (집무실 도착, 고혁명은 돌아간다)
+    ['@','office'],['!','arrive',0],['?','office'],['!','bye',3.6],// (집무실 도착, 고혁명은 돌아간다)
     ['@','ambush'],['!','grab',3.4],['!','okin',2.6],// (양쪽 팔이 잡히고 무릎 꿇린다)
     [ME,'누이! 이게 무슨 정신나간 짓이오!'],
     ['리옥선','조선은 강한 독재자가 필요하오.'],
@@ -245,7 +245,9 @@
     for(let i=kn.fly.length - 1;i>=0;i--){
       const k=kn.fly[i];k.t+=dt;k.v[1]-=7*dt;
       const sp=H(...k.v),d=[k.v[0]/sp,k.v[1]/sp,k.v[2]/sp],l=sp*dt;
+      const al=[];for(const P of PP.list) if(P.vis!==false&&!P.dead&&!E.some(x=>x.P===P)){al.push([P,P.vis]);P.vis=false;}// 아군 (고혁명) 은 통과
       let h=null;try {h=PP.ray(k.p,d,l);} catch (x){}
+      for(const [P,v] of al) P.vis=v;
       const tw=wray(k.p,d,l);
       if(h&&h.t<=tw){
         const e=E.find(x=>x.P===h.P&&!x.P.dead);
@@ -267,35 +269,53 @@
       if(kn.n<6&&(d<1.05||d<2.2&&S.eq)){kn.fl.splice(i,1);kn.n++;sfx('click',{gain:.5,rate:1.2});S.eq=0;continue;}
       if(d<2.2&&kn.n<6) pr='[E] 투척단검 줍기';
    }
+    const km=ui.km;if(km){let j=0;// 4 m 안의 바닥 단검: 작은 줍기 표지
+      if(S.arm&&S.walk&&!S.dead&&S.bk<.5&&kn.n<6) for(const k of kn.fl){const d=dxz(k.p,me.p);if(d>4||j>=km.length) continue;
+        const q=G.project([k.p[0],k.p[1] + .22,k.p[2]]);if(!q||q[2]<=0) continue;const e=km[j++];e.style.display='block';e.style.left=q[0] + 'px';e.style.top=q[1] + 'px';e.style.opacity=d<2.2?1:.55;}
+      for(;j<km.length;j++) km[j].style.display='none';}
     ui.p&&(ui.p.style.display=pr&&!S.bot&&S.walk?'block':'none',pr&&(ui.p.textContent=pr));
  }
-  function drawKnives(){
+  function drawKnives(){// 날아가는 단검: 최소 화면 크기 · 기울어진 회전면 · 빛나는 날 · 잔상 · 반짝임. 바닥 단검: 날이 빛을 받음
     if(!G.draw||!G.meshes||!G.meshes.s3knife) return;
-    for(const k of kn.fly) G.draw('s3knife',M4.trs(k.p,k.yaw,-k.s,0,1.3));
-    for(const k of kn.fl) G.draw('s3knife',M4.trs(k.p,k.yaw,0,k.r,1));
+    const c=G.cam.pos,F=innerHeight*.5/Math.tan((G.cam.fov||1.1)*.5),ppm=p=>F/(H(p[0] - c[0],p[1] - c[1],p[2] - c[2])||1);
+    const star=(m,z,g,px)=>{if(g<.06) return;const p=M4.point(m,[.012,0,z]);G.draw('s3kglint',M4.trs(p,G.time*3,.4,0,mx(.02,px/ppm(p))),[g,g,g,0]);};
+    for(const k of kn.fly){
+      const s=mx(1.3,20/(.286*ppm(k.p))),m=M4.trs(k.p,k.yaw + .8,-k.s,0,s),g=cos(k.s)**16;
+      G.draw('s3knife',m);G.draw('s3kedge',m,[.8 + 3*g,.8 + 3*g,.8 + 3*g,0]);star(m,.09,2.5*g,7);
+      const sp=H(...k.v),u=[k.v[0]/sp,k.v[1]/sp,k.v[2]/sp],t=M4.fromDir(k.p,u,0,1),w=mx(.004,1.4/ppm(k.p)),ln=mn(k.t*sp*.8,.9);
+      if(ln>.05){for(let i=0;i<3;i++){t[i]*=w;t[4 + i]*=w;t[8 + i]*=ln;}G.draw('s3kstk',t,[.22,.22,.22,0]);}
+   }
+    for(const k of kn.fl){const m=M4.trs(k.p,k.yaw,0,k.r,1),g=mx(0,sin(G.time*1.9 + k.yaw*5))**20;
+      G.draw('s3knife',m);G.draw('s3kedge',m,[.55 + 2*g,.55 + 2*g,.55 + 2*g,0]);star(m,.11,1.8*g,5);}
  }
-  function knifeMesh(){// 투척단검: 마름모 단면 칼날 · 가드 · 손잡이 (모델 +Z = 칼끝, 칼날 면은 XZ 평면)
-    const V=[];
-    const tri=(a,b,c,col,ref)=>{
+  function knifeMesh(){// 투척단검: 마름모 단면 칼날 · 가드 · 손잡이 (모델 +Z = 칼끝, 칼날 면은 XZ 평면) + 발광 메시: 날 · 잔상 · 반짝임
+    let V=[];const O={};
+    const tri=(a,b,c,col,ref,mt=-2)=>{
       const e=[b[0] - a[0],b[1] - a[1],b[2] - a[2]],f=[c[0] - a[0],c[1] - a[1],c[2] - a[2]];let n=nrm([e[1]*f[2] - e[2]*f[1],e[2]*f[0] - e[0]*f[2],e[0]*f[1] - e[1]*f[0]]);
       if(n[0]*ref[0] + n[1]*ref[1] + n[2]*ref[2]<0){[b,c]=[c,b];n=n.map(x=>-x);}
-      for(const p of [a,b,c]) V.push(p[0],p[1],p[2],n[0],n[1],n[2],col[0],col[1],col[2],-2);
+      for(const p of [a,b,c]) V.push(p[0],p[1],p[2],n[0],n[1],n[2],col[0],col[1],col[2],mt);
    };
-    const loft=(sc,col)=>{
+    const loft=(sc,col,mt)=>{// 단면 [z, 점들, 중심 x]
       for(let s=0;s<sc.length - 1;s++){
-        const [z0,A]=sc[s],[z1,B]=sc[s + 1],n=A.length;
-        for(let i=0;i<n;i++){const j=(i + 1) % n,a=[...A[i],z0],b=[...A[j],z0],c=[...B[j],z1],d=[...B[i],z1],m=[(a[0] + b[0] + c[0] + d[0])/4,(a[1] + b[1] + c[1] + d[1])/4,0];tri(a,b,c,col,m);tri(a,c,d,col,m);}
+        const [z0,A,c0=0]=sc[s],[z1,B,c1=0]=sc[s + 1],n=A.length;
+        for(let i=0;i<n;i++){const j=(i + 1) % n,a=[...A[i],z0],b=[...A[j],z0],c=[...B[j],z1],d=[...B[i],z1],m=[(a[0] + b[0] + c[0] + d[0] - 2*c0 - 2*c1)/4,(a[1] + b[1] + c[1] + d[1])/4,0];tri(a,b,c,col,m,mt);tri(a,c,d,col,m,mt);}
      }
-      for(const [s,dz] of [[sc[0],-1],[sc[sc.length - 1],1]]){const [z,A]=s;for(let i=0;i<A.length;i++) tri([0,0,z],[...A[i],z],[...A[(i + 1) % A.length],z],col,[0,0,dz]);}
+      for(const [s,dz] of [[sc[0],-1],[sc[sc.length - 1],1]]){const [z,A,cx=0]=s;for(let i=0;i<A.length;i++) tri([cx,0,z],[...A[i],z],[...A[(i + 1) % A.length],z],col,[0,0,dz],mt);}
    };
-    const dia=(w,t)=>[[w,0],[0,t],[-w,0],[0,-t]];
+    const dia=(w,t,x=0)=>[[x + w,0],[x,t],[x - w,0],[x,-t]];
     const ring=(rx,ry,n=8)=>Array.from({length:n},(_,i)=>[cos(i/n*2*PI)*rx,sin(i/n*2*PI)*ry]);
-    loft([0,.03,.07,.1,.125,.145,.16,.17,.176].map(z=>{const w=z<.1?.0135 - z*.012:(.0123)*Math.sqrt(mx(0,1 - (z - .1)/.078)) + .0004;return[z,dia(w,.0006 + w*.2)];}),[.74,.76,.8]);// 칼날
+    const bw=z=>z<.1?.0135 - z*.012:(.0123)*Math.sqrt(mx(0,1 - (z - .1)/.078)) + .0004,BZ=[0,.03,.07,.1,.125,.145,.16,.17,.176];
+    loft(BZ.map(z=>{const w=bw(z);return[z,dia(w,.0006 + w*.2)];}),[.74,.76,.8]);// 칼날
     loft([[-.006,ring(.026,.007)],[.004,ring(.024,.006)]],[.16,.16,.17]);// 가드
     loft([-.11,-.1,-.07,-.04,-.012,-.006].map((z,i)=>[z,ring(i?.0108 + .001*sin(i*1.3):.008,i?.0078:.006)]),[.06,.052,.045]);// 손잡이
-    return new Float32Array(V);
+    O.k=new Float32Array(V);V=[];
+    for(const sg of [1,-1]) loft(BZ.slice(0,-1).map(z=>{const x=sg*(bw(z) + .0012);return[z,dia(.0022,.0011,x),x];}),[.85,.9,.95],2);// 벼린 날 (발광)
+    O.e=new Float32Array(V);V=[];
+    loft([[-1,dia(.05,.05)],[-.6,dia(.6,.6)],[0,dia(1,1)]],[.75,.82,.92],2);O.s=new Float32Array(V);V=[];// 잔상 (단위 길이)
+    for(const [a,b] of [[1,.12],[.12,1]]) loft([[-.12,dia(.0001,.0001)],[0,dia(a,b)],[.12,dia(.0001,.0001)]],[1,.97,.9],2);// 반짝임 (십자 별)
+    loft([[-1,dia(.0001,.0001)],[0,dia(.12,.12)],[1,dia(.0001,.0001)]],[1,.97,.9],2);O.g=new Float32Array(V);
+    return O;
  }
-
   /* ── 연출 ── */
   function act(a){
     const k=K(),m=k.meet,c=m.centre;
@@ -336,9 +356,10 @@
       const o=k.office.door,u=oIn();walk(W.ko,[offAt(o,u,-1.2,1.2)],1.8,P=>{P.yaw=yawTo(P.p,me.p);P.look=eyeMe();});
    }
     if(a==='bye'){// (고혁명은 돌아간다)
-      S.walk=0;const P=W.ko,N=k.path.length - 1;P.look=eyeMe();P.yaw=yawTo(P.p,me.p);S.fix=P;S.fixF=S.t + 2.6;S.fixR=2;
-      later(1.1,()=>walk(P,[k.path[N - 1],k.path[mx(0,N - 3)]],1.6,Q=>Q.vis=false));
-      later(1.8,()=>{S.dof=0;S.dofR=.5;});
+      S.walk=0;const P=W.ko,N=k.path.length - 1;P.wp=null;P.look=eyeMe();P.yaw=yawTo(P.p,me.p);S.fix=P;S.fixF=S.t + 3;S.fixR=2;
+      P.pose='salute';// 경례 (인물 모듈에 없으면 'stand' 처럼 보임) → 1.6 초 뒤 돌아서 복도로
+      later(1.6,()=>{P.look=null;walk(P,[k.path[N - 1],k.path[mx(0,N - 3)]],1.6,Q=>Q.vis=false);});
+      later(2.4,()=>{S.dof=0;S.dofR=.5;});
    }
     if(a==='grab'){// 숨어 있던 부하 둘이 양팔을 잡고 무릎 꿇림
       S.walk=0;S.lock=1;S.fix=at(k.office.ok,1.5);S.fixF=S.t + 3;S.fixR=2;
@@ -560,7 +581,7 @@
   function stop(){
     S.on=0;gate(null);showDl(0);wait.length=0;const F=PP.fp;F.on=0;F.kind='rok';F.gun='pistol';F.throw=0;F.kick=0;
     G.palace&&(G.palace.on=false);S.walk=0;S.fight=0;E.length=0;kn.fly.length=kn.fl.length=0;
-    for(const k of ['p','m','f','fd']) ui[k]&&(ui[k].style.display='none');for(const k of ['o','h','t']) ui[k]&&(ui[k].style.opacity=0);ui.bk&&(ui.bk.style.opacity=0);
+    for(const k of ['p','m','f','fd']) ui[k]&&(ui[k].style.display='none');ui.km&&ui.km.forEach(e=>e.style.display='none');for(const k of ['o','h','t']) ui[k]&&(ui[k].style.opacity=0);ui.bk&&(ui.bk.style.opacity=0);
     G.setEnv({indoor:0,exposure:1,sea:S.sea??.55});S.sea=null;G.sfx.loop('wind',0);G.sfx.music('calm');
  }
   function update(dt){
@@ -580,12 +601,13 @@
   const api=G.story3={S,go,start,stop,me,kn,E,W,stab,toss,act,SC,get on(){return !!S.on;},get bot(){return !!S.bot;},set bot(v){S.bot=!!v;}};
   G.register('story3',{
     init(){
-      try {G.addMesh&&G.addMesh('s3knife',knifeMesh());} catch (e){G.err('[story3] knife ' + e);}
+      try {const m=knifeMesh();if(G.addMesh){G.addMesh('s3knife',m.k);G.addMesh('s3kedge',m.e);G.addMesh('s3kstk',m.s);G.addMesh('s3kglint',m.g);}} catch (e){G.err('[story3] knife ' + e);}
       G.css(`#s3o,#s3h,#s3p,#s3m,#s3t,#s3f,#s3d{position:absolute}
 #s3o{left:5vw;top:13vh;font:600 2.1vh system-ui;letter-spacing:.06em;color:#f2e6c4;text-shadow:0 1px 5px #000;opacity:0;transition:opacity .6s}
 #s3h{left:5vw;top:17vh;font:400 1.6vh system-ui;color:#c8d0d8;text-shadow:0 1px 4px #000;opacity:0;transition:opacity 1s}
 #s3p{left:50%;top:60%;transform:translateX(-50%);padding:.35em 1.1em;font:600 2.1vh system-ui;letter-spacing:.08em;color:#fff;background:#000b;border:1px solid #fff5;border-radius:4px;display:none}
 #s3m{transform:translate(-50%,-100%);text-align:center;font:600 1.4vh system-ui;color:#f2e6c4cc;text-shadow:0 1px 3px #000;display:none}
+.s3km{position:absolute;display:none;width:9px;height:9px;margin:-6px;border:2px solid #f2e6c4;border-radius:2px;transform:rotate(45deg);box-shadow:0 0 4px #000,inset 0 0 3px #fff8;pointer-events:none}
 #s3m i{display:block;width:.8vh;height:.8vh;margin:0 auto .5vh;border:2px solid #f2e6c4aa;transform:rotate(45deg)}
 #s3t{inset:0;display:grid;place-content:center;text-align:center;color:#ebe4d8;opacity:0;transition:opacity 1.4s}
 #s3t small{font:400 1.9vh system-ui;letter-spacing:.55em;color:#a9a196}#s3t b{display:block;font:800 6.4vh system-ui;letter-spacing:.14em;margin:.4em 0;color:#fff}
@@ -599,14 +621,14 @@
 #s3bv{position:absolute;inset:0;opacity:0;background:radial-gradient(#a0000000 40%,#a0000044 70%,#7a0000c0)}
 #s3d{inset:0;display:none;place-content:center;justify-items:center;background:radial-gradient(#0006,#000d);pointer-events:auto;color:#fff;font-family:system-ui}#s3d b{font-size:clamp(44px,8vw,100px);letter-spacing:.4em;margin-right:-.4em}#s3d small{font-size:16px;color:#bbb}#s3d button{margin:1.2em 0 .6em;padding:.35em 2.4em;font:800 clamp(22px,3vw,40px) system-ui;letter-spacing:.4em;color:#111;background:#fff;border:0;border-radius:8px;cursor:pointer}`);
       ui.o=G.el('div',{id:'s3o'});ui.h=G.el('div',{id:'s3h',textContent:'WASD 이동 · 마우스 둘러보기 · Shift 달리기'});
-      ui.p=G.el('div',{id:'s3p'});ui.m=G.el('div',{id:'s3m',innerHTML:'<i></i><span></span>'});
+      ui.p=G.el('div',{id:'s3p'});ui.km=[0,1,2,3,4,5].map(()=>G.el('div',{className:'s3km'}));ui.m=G.el('div',{id:'s3m',innerHTML:'<i></i><span></span>'});
       ui.t=G.el('div',{id:'s3t',innerHTML:'<small>스토리 3</small><b>북한 주석궁 : 다시 지금 북한으로</b><small>조선민주주의인민공화국편</small>'});
       ui.f=G.el('div',{id:'s3f',innerHTML:'<div id=s3bv></div><div id=s3x></div><div id=s3hm></div><div id=s3hp><i></i><b></b><small>체력</small></div><div id=s3k><u>' + '<s></s>'.repeat(6) + '</u><b></b><small>투척단검</small></div><div id=s3n>좌클릭 단검 · 우클릭/Q 투척단검 · E 줍기 · Shift 달리기</div>'});
       ui.hpi=ui.f.querySelector('#s3hp i');ui.hpb=ui.f.querySelector('#s3hp b');ui.bv=ui.f.querySelector('#s3bv');ui.hm=ui.f.querySelector('#s3hm');
       ui.ki=[...ui.f.querySelectorAll('#s3k s')];ui.kb=ui.f.querySelector('#s3k b');ui.n=ui.f.querySelector('#s3n');
       ui.fd=G.el('div',{id:'s3d',innerHTML:'<b>전사</b><small>리충성이 쓰러졌다</small><button>다시 하기</button><small>Enter</small>'});
       ui.fd.querySelector('button').onclick=()=>{retry();G.canvas.requestPointerLock&&G.canvas.requestPointerLock();};
-      if(G.params.has('nohud')) for(const k of ['o','h','p','m','f']) ui[k].style.visibility='hidden';
+      if(G.params.has('nohud')){for(const k of ['o','h','p','m','f']) ui[k].style.visibility='hidden';ui.km.forEach(e=>e.style.visibility='hidden');}
       addEventListener('keydown',e=>{
         if(!S.on) return;
         if(e.code==='KeyE') S.eq=1;
