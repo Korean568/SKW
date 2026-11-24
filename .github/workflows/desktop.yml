@@ -144,6 +144,9 @@ jobs:
           V=$(node -p "require('./desktop/package.json').version")
           B=butler/butler
           $B push artifacts/SecondKoreanWars-$V-win-x64.zip      "$ITCH_TARGET:windows"   --userversion "$V"
+          # 압축 풀 필요 없는 exe 한 파일 (포터블). butler 가 파일 하나를 받지 않으면 exe 만 든 폴더로 올린다
+          EXE=artifacts/SecondKoreanWars-$V-win-x64-portable.exe
+          $B push "$EXE" "$ITCH_TARGET:windows-portable" --userversion "$V" || { mkdir -p portable && cp "$EXE" portable/ && $B push portable "$ITCH_TARGET:windows-portable" --userversion "$V"; }
           $B push artifacts/SecondKoreanWars-$V-mac-arm64.zip    "$ITCH_TARGET:mac-arm64" --userversion "$V"
           $B push artifacts/SecondKoreanWars-$V-mac-x64.zip      "$ITCH_TARGET:mac-x64"   --userversion "$V"
           # Linux: tar.gz 를 풀어 실행 권한과 .itch.toml 이 맨 위에 있는 폴더째로 올린다
