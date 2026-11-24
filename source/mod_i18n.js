@@ -93,7 +93,7 @@
 
   /* 처음 화면 오른쪽 위: 한국어 | English */
   G.register('i18n',{init(){
-    G.css(`#ov .lng{position:absolute;top:2.4vh;right:2vw;display:flex;gap:.35em;font:600 max(11px,.85vw) system-ui;letter-spacing:.12em}#ov .lng span{padding:.3em .9em .35em;border:1px solid #fff4;border-radius:999px;color:#9fb1c4;background:#0006;cursor:pointer;pointer-events:auto}#ov .lng span:hover{color:#fff;border-color:#fff}#ov .lng span.on{color:#0b0f14;background:#fff;border-color:#fff}`);
+    G.css(`#ov .lng{position:absolute;top:50px;right:12px;display:flex;gap:.35em;font:600 max(11px,.85vw) system-ui;letter-spacing:.12em}#ov .lng span{padding:.3em .9em .35em;border:1px solid #fff4;border-radius:999px;color:#9fb1c4;background:#0006;cursor:pointer;pointer-events:auto}#ov .lng span:hover{color:#fff;border-color:#fff}#ov .lng span.on{color:#0b0f14;background:#fff;border-color:#fff}`);
     const put=()=>{const ov=document.getElementById('ov');if(!ov) return setTimeout(put,80);if(ov.querySelector('.lng')) return;
       const b=G.el('div',{className:'lng',innerHTML:'<span data-l=ko>한국어</span><span data-l=en>English</span>'},ov);
       b.setAttribute('data-i18n-skip','');
