@@ -1,7 +1,7 @@
 # Second Korean Wars — PC 다운로드판 (itch.io)
 
 웹판(GitHub Pages)과 같은 게임을 **Electron** 으로 감싸 Windows · macOS · Linux 에서 내려받아 실행하는 판입니다.
-게임 파일(빌드된 `index.html` · `clkky-opening.js` · three.js r128)을 앱 안에 넣어 묶으므로 **인터넷 없이** 돌아갑니다.
+빌드된 `index.html` 을 앱 안에 넣어 묶으므로 **인터넷 없이** 돌아갑니다. PC판에는 스튜디오 오프닝을 넣지 않습니다 (웹판에만 있음).
 PC 판에서는 게임의 데스크톱 모드(일시정지 메뉴 · 게임 끄기 · 전체 화면 F11)가 자동으로 켜집니다.
 
 ## 폴더 구성
@@ -11,7 +11,7 @@ PC 판에서는 게임의 데스크톱 모드(일시정지 메뉴 · 게임 끄�
 | `package.json` | 앱 이름 · 버전 · 빌드 명령 · electron-builder 설정 |
 | `main.js` | Electron 메인 프로세스: 창, `app://skw/` 전용 주소, WebGPU 스위치, 외부 링크 → 시스템 브라우저 |
 | `preload.js` | 게임에 `window.skwDesktop` (quit · setFullscreen · isFullscreen · openExternal · version · platform) 제공 |
-| `scripts/prepare-app.js` | `../index.html`, `../clkky-opening.js` 를 `app/` 으로 복사하고, 오프닝의 three.js 주소를 복사본에서만 `vendor/three.min.js` 로 바꿈 |
+| `scripts/prepare-app.js` | `../index.html` 을 `app/` 으로 복사하고, 복사본에서만 오프닝(`clkky-opening.js`)을 부르는 줄을 뺌 |
 | `scripts/make-icon.js` | 게임 탭 아이콘(SVG)을 `build/icon.png` (512×512) 로 변환 (아이콘을 바꿀 때만) |
 | `build/icon.png` | 앱 아이콘 (Windows .ico · macOS .icns 는 빌드 때 자동 생성) |
 | `itch/.itch.toml` | itch 앱의 "Play" 실행 설정 (빌드 때 앱 폴더 맨 위에 들어감) |
@@ -35,7 +35,7 @@ npm run dist:linux     # Linux    → dist/SecondKoreanWars-1.0.0-linux-x86_64.A
 - 각 OS 판은 **그 OS 에서** 빌드하는 것이 가장 확실합니다. `dist:mac` 은 Mac 에서만 됩니다.
   Mac 이 없으면 아래 **GitHub Actions** 로 세 OS 를 한 번에 빌드하세요.
 - 게임 소스(`source/`)를 고쳤다면 먼저 저장소 루트에서 `cd source && node build.js` 로 `index.html` 을 다시 만든 뒤 빌드합니다.
-  `dist:*` 명령은 매번 `prepare-app` 을 먼저 돌려 최신 `index.html` · `clkky-opening.js` 를 `app/` 으로 복사합니다.
+  `dist:*` 명령은 매번 `prepare-app` 을 먼저 돌려 최신 `index.html` 을 `app/` 으로 복사합니다.
 - 버전을 올릴 때는 `package.json` 의 `"version"` 만 바꾸면 파일 이름 · 게임 안 버전 표시 · itch 버전이 같이 바뀝니다.
 - macOS 판은 Apple 개발자 서명 · 공증을 하지 않은(ad-hoc 서명) 빌드입니다. 처음 열 때
   "확인되지 않은 개발자" 경고가 나오면 앱을 **우클릭 → 열기**, 또는 "손상되었다" 고 나오면 터미널에서
@@ -88,7 +88,7 @@ butler status <사용자이름>/second-korean-wars
   (`second-korean-wars-win` / `-mac` / `-linux`, 내려받으면 zip 안에 위 파일들).
 - itch.io 자동 업로드도 원하면 저장소 **Settings → Secrets and variables → Actions** 에서
   - **Secrets** 에 `BUTLER_API_KEY` = https://itch.io/user/settings/api-keys 에서 만든 API 키
-  - **Variables** 에 `ITCH_USER` = itch.io 사용자 이름, (선택) `ITCH_GAME` = 프로젝트 주소 이름 (기본 `second-korean-wars`)
+  - (선택) **Variables** 에 `ITCH_USER` = itch.io 사용자 이름 (없으면 API 키로 알아냄), `ITCH_GAME` = 프로젝트 주소 이름 (기본 `second-korean-wars`)
 
   를 넣으면, 빌드가 끝난 뒤 `windows`, `mac-arm64`, `mac-x64`, `linux` 채널로 올립니다.
   시크릿이 없으면 업로드 단계는 건너뜁니다. itch.io 프로젝트 페이지(2번)는 먼저 만들어 두어야 합니다.

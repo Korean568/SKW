@@ -2,7 +2,7 @@
  * Second Korean Wars — PC 다운로드판 (Electron 메인 프로세스)
  *
  * 하는 일
- *  - app/ 폴더(빌드된 index.html · clkky-opening.js · vendor/three.min.js)를
+ *  - app/ 폴더(빌드된 index.html, 오프닝 없음)를
  *    app://skw/ 라는 전용 주소로 띄운다. 인터넷에서는 아무것도 받지 않는다(오프라인 동작).
  *    file:// 대신 표준·보안 스킴을 쓰는 까닭: WebGPU(보안 컨텍스트 필요), localStorage,
  *    오프닝 iframe(srcdoc) 이 모두 일반 웹사이트처럼 동작하게 하려고.
