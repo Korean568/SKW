@@ -13,6 +13,10 @@ on:
         description: "BUTLER_API_KEY 시크릿이 있으면 itch.io 에도 올리기"
         type: boolean
         default: true
+      release:
+        description: "GitHub Releases 에 올려 누구나 내려받을 수 있는 링크 만들기"
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -57,6 +61,44 @@ jobs:
             desktop/dist/*.exe
             desktop/dist/*.AppImage
             desktop/dist/*.tar.gz
+
+  # GitHub Releases 에 올리기: 저장소 Releases 페이지에 로그인 없이 내려받을 수 있는 링크가 생긴다
+  release:
+    needs: build
+    if: ${{ inputs.release }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: desktop/package.json
+          sparse-checkout-cone-mode: false
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Version
+        id: v
+        run: echo "v=$(node -p "require('./desktop/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: desktop-v${{ steps.v.outputs.v }}
+          name: Second Korean Wars PC ${{ steps.v.outputs.v }}
+          target_commitish: ${{ github.sha }}
+          make_latest: true
+          files: artifacts/*
+          body: |
+            Second Korean Wars (제 2차 한국전쟁) PC 다운로드판 ${{ steps.v.outputs.v }}
+
+            - Windows: SecondKoreanWars-${{ steps.v.outputs.v }}-win-x64.zip (압축을 풀고 Second Korean Wars.exe 실행) 또는 -portable.exe (바로 실행)
+            - macOS: -mac-arm64.zip (Apple 실리콘) / -mac-x64.zip (인텔). 처음 열 때 우클릭 → 열기
+            - Linux: .AppImage 또는 .tar.gz (안 켜지면 --no-sandbox)
+
+            WebGPU 를 지원하는 그래픽 카드와 최신 드라이버가 필요합니다 (Windows 10/11 DX12, macOS 13+, Linux Vulkan).
 
   itch:
     needs: build
