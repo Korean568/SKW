@@ -587,7 +587,7 @@
   function update(dt){
     if(!S.on) return;
     try {
-      const sd=dt*(G.keys.Tab&&!S.walk?4:1);// Tab: 컷신 빨리 감기
+      const sd=dt*((G.keys.Space||G.keys.Tab)&&!S.walk?4:1);// Space: 컷신 빨리 감기
       run(sd);npc(sd);
       if(S.fight||S.g==='toko'||S.beat==='call'){foes(dt);koAI(dt);}
       if(S.walk&&S.cm==='fp'&&!S.dead) stepMe(dt);

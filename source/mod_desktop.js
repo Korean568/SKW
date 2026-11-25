@@ -176,7 +176,7 @@ ${G.i18n ? '<span>언어</span><div data-k=lang><button data-v=ko data-i18n-skip
           start && start.after(bar);
           G.el('button', { textContent: '설정', onclick: () => settings('title') }, bar);
           G.el('button', { textContent: '게임 종료', onclick: quit }, bar);
-          G.el('div', { className: 'dkv', textContent: D ? 'v' + D.version : 'dev · browser' }, o);
+          G.el('div', { className: 'dkv', textContent: D ? 'v' + (D.gameVersion || D.version) : 'dev · browser' }, o);
           const a = o.querySelector('a.tb');
           if (a && D && D.openExternal) a.addEventListener('click', e => { e.preventDefault(); quiet(D.openExternal(a.href)); });
           marks();

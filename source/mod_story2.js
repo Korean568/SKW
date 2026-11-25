@@ -364,7 +364,7 @@
   function update(dt){
     if(!S.on) return;
     try {
-      const sd=dt*(G.keys.Tab&&!S.walk&&S.g!=='choice'?4:1);// Tab: 컷신 빨리 감기
+      const sd=dt*((G.keys.Space||G.keys.Tab)&&!S.walk&&S.g!=='choice'?4:1);// Space: 컷신 빨리 감기
       run(sd);npc(sd);
       if(S.walk&&S.cm==='fp') stepMe(dt);
       const it=S.cm==='fp'&&S.bk<.5?interact():null;

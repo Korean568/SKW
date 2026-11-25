@@ -8,7 +8,7 @@ if(G.i18n){
     '플레이어: 리충성 · 투척단검 · 단검':'Player: Ri Chung-seong · Throwing knives · Dagger',
     '플레이어: 김민철 하사 · K2C1 소총':'Player: Staff Sgt. Kim Min-cheol · K2C1 rifle',
     '컷신':'Cutscenes','전투':'Combat',
-    '마우스: 둘러보기 · Tab 누르기: 빨리 감기':'Mouse: look around · Hold Tab: fast-forward',
+    '마우스: 둘러보기 · Space: 건너뛰기 (누르고 있으면 빨리 감기)':'Mouse: look around · Space: skip (hold to fast-forward)',
     'WASD 이동 · 마우스 조준 · 왼쪽 클릭 사격 · 오른쪽 클릭 정조준 · R 재장전 · E 줍기 · Shift 달리기 · C 앉기':
       'WASD move · Mouse aim · Left click fire · Right click aim down sights · R reload · E pick up · Shift run · C crouch',
     '그래픽 설정 · Enter 시작':'Graphics settings · Enter to start',

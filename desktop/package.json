@@ -1,7 +1,7 @@
 {
   "name": "second-korean-wars",
   "productName": "Second Korean Wars",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "description": "Second Korean Wars (제 2차 한국전쟁) - PC 다운로드판 (itch.io)",
   "author": "Second Korean Wars",
   "license": "UNLICENSED",
@@ -13,7 +13,8 @@
     "dist:win": "npm run prepare-app && electron-builder --win --publish never",
     "dist:mac": "npm run prepare-app && electron-builder --mac --publish never",
     "dist:linux": "npm run prepare-app && electron-builder --linux --publish never",
-    "icon": "node scripts/make-icon.js"
+    "icon": "node scripts/make-icon.js",
+    "publish-update": "node scripts/publish-update.js"
   },
   "devDependencies": {
     "electron": "45.4.1",

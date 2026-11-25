@@ -12,6 +12,7 @@ PC 판에서는 게임의 데스크톱 모드(일시정지 메뉴 · 게임 끄�
 | `main.js` | Electron 메인 프로세스: 창, `app://skw/` 전용 주소, WebGPU 스위치, 외부 링크 → 시스템 브라우저 |
 | `preload.js` | 게임에 `window.skwDesktop` (quit · setFullscreen · isFullscreen · openExternal · version · platform) 제공 |
 | `scripts/prepare-app.js` | `../source/build.js --story` 로 스토리 게임을 `app/index.html` 에 빌드하고, 오프닝(`clkky-opening.js`)을 부르는 줄을 뺌 |
+| `scripts/publish-update.js` · `update/` | 자동 업데이트: `npm run publish-update` 가 `update/game.gz` · `update/latest.json` 을 만들고, 커밋하면 설치된 앱이 다음 실행 때 받아 감 |
 | `scripts/make-icon.js` | 게임 탭 아이콘(SVG)을 `build/icon.png` (512×512) 로 변환 (아이콘을 바꿀 때만) |
 | `build/icon.png` | 앱 아이콘 (Windows .ico · macOS .icns 는 빌드 때 자동 생성) |
 | `itch/.itch.toml` | itch 앱의 "Play" 실행 설정 (빌드 때 앱 폴더 맨 위에 들어감) |
@@ -41,6 +42,21 @@ npm run dist:linux     # Linux    → dist/SecondKoreanWars-1.0.0-linux-x86_64.A
   `xattr -cr "/Applications/Second Korean Wars.app"` 를 한 번 실행하도록 itch 페이지에 적어 두세요.
 - Linux 에서 `The SUID sandbox helper binary ...` 오류로 안 켜지면 `--no-sandbox` 를 붙여 실행합니다
   (예: `./SecondKoreanWars-1.0.0-linux-x86_64.AppImage --no-sandbox`). itch 앱으로 실행하면 `.itch.toml` 이 자동으로 붙입니다.
+
+## 자동 업데이트 (1.2.0 부터)
+
+앱은 켜질 때 저장소의 `desktop/update/latest.json` 을 보고, 게임 버전이 지금 것보다 새것이면 `game.gz`(스토리 게임 한 파일, 약 170 KB)를 받아
+SHA-256 을 확인한 뒤 사용자 폴더에 저장하고 그 게임을 띄웁니다. **exe 를 다시 내려받을 필요가 없습니다.** 인터넷이 없거나 받기에 실패하면 가진 게임으로 그대로 시작합니다.
+
+게임을 고쳤을 때 내보내는 순서:
+1. `package.json` 의 `"version"` 을 올린다 (예: 1.2.0 → 1.2.1).
+2. `npm run publish-update` → `update/game.gz` · `update/latest.json` 이 새로 만들어진다.
+3. 커밋해서 main 에 푸시한다. 몇 분 뒤부터 설치된 모든 앱(1.2.0 이상)이 다음 실행 때 새 게임을 받는다.
+4. (선택) 새로 받는 사람도 처음부터 최신이도록 GitHub Actions 의 Desktop builds 로 itch.io 파일도 갱신한다.
+
+- 1.1.1 이하에는 이 기능이 없어 1.2.0 을 한 번은 새로 받아야 합니다 (itch 앱은 자동).
+- `main.js` · `preload.js`(앱 껍데기)를 옛 앱과 안 맞게 바꿨다면 `scripts/publish-update.js` 의 `MIN_SHELL` 을 그 버전으로 올립니다 — 옛 앱은 그 게임을 받지 않고 가진 것으로 계속 돕니다.
+- 시험: `electron . --update-base=http://127.0.0.1:8799/` 로 다른 주소에서 받게 하거나 `--no-update` 로 확인을 끕니다.
 
 ## 2. itch.io 프로젝트 페이지 만들기 (직접 하셔야 합니다)
 

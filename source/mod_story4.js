@@ -351,7 +351,7 @@
   function update(dt){
     if(!S.on) return;
     try {
-      const sd=dt*(G.keys.Tab&&S.beat!=='end'?4:1);// Tab: 빨리 감기
+      const sd=dt*((G.keys.Space||G.keys.Tab)&&S.beat!=='end'?4:1);// Space: 빨리 감기
       run(sd);npc(sd);
       if(S.cm==='fp'&&S.bk<.6) stepMe(dt);
       camera(dt);dress(sd);
@@ -368,7 +368,7 @@
 #dl .s4r{display:inline-block;margin-left:.6em;padding:0 .45em;font:700 .8em system-ui;font-style:normal;letter-spacing:.1em;color:#0b0f14;background:#ff8b7acc;border-radius:3px;vertical-align:.1em}
 #dl .s4q{color:#ffe2db;letter-spacing:.02em;text-shadow:0 0 6px #ff8b7a55}`);
       ui.t=G.el('div',{id:'s4t',innerHTML:'<small>스토리 4</small><b>폐허가 된 서강 : 고혁명의 배신</b><small>대한민국편</small>'});
-      ui.h=G.el('div',{id:'s4h',textContent:'WASD 이동 · 마우스 둘러보기 · 오른쪽 클릭 조준 · Tab 빨리 감기'});
+      ui.h=G.el('div',{id:'s4h',textContent:'WASD 이동 · 마우스 둘러보기 · 오른쪽 클릭 조준 · Space 건너뛰기'});
       if(G.params.has('nohud')) ui.h.style.visibility='hidden';
       G.canvas.addEventListener('click',()=>{S.on&&S.beat!=='end'&&G.canvas.requestPointerLock&&G.canvas.requestPointerLock();});
       addEventListener('mousedown',e=>{if(S.on&&e.button===2) me.aimT=1;});

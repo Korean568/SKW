@@ -2,8 +2,11 @@
  * Second Korean Wars — PC 다운로드판 (Electron 메인 프로세스)
  *
  * 하는 일
- *  - app/ 폴더(빌드된 index.html, 오프닝 없음)를
- *    app://skw/ 라는 전용 주소로 띄운다. 인터넷에서는 아무것도 받지 않는다(오프라인 동작).
+ *  - app/ 폴더(빌드된 스토리 게임 index.html, 오프닝 없음)를
+ *    app://skw/ 라는 전용 주소로 띄운다. 인터넷이 없어도 앱에 든 게임으로 동작한다.
+ *  - 자동 업데이트: 켜질 때 저장소의 desktop/update/latest.json 을 보고 게임이 더 새것이면
+ *    game.gz 를 받아(sha256 확인) 사용자 폴더(userData/game/)에 두고 그 게임을 띄운다 → exe 를 다시 받을 필요 없음.
+ *    앱(껍데기)이 옛것이라 새 게임과 안 맞으면(minShell) 받지 않는다. 받기 실패·오프라인이면 가진 것으로 시작.
  *    file:// 대신 표준·보안 스킴을 쓰는 까닭: WebGPU(보안 컨텍스트 필요), localStorage,
  *    오프닝 iframe(srcdoc) 이 모두 일반 웹사이트처럼 동작하게 하려고.
  *  - 창 하나, 전체 화면으로 시작, 메뉴 막대 없음.
@@ -15,6 +18,9 @@
 'use strict';
 const { app, BrowserWindow, Menu, ipcMain, protocol, net, shell, session } = require('electron');
 const path = require('path');
+const fs = require('fs');
+const zlib = require('zlib');
+const crypto = require('crypto');
 const { pathToFileURL } = require('url');
 
 const SCHEME = 'app';
@@ -23,6 +29,55 @@ const ORIGIN = `${SCHEME}://${HOST}`;
 const START_URL = `${ORIGIN}/index.html`;
 const APP_DIR = path.join(__dirname, 'app');
 const DEVTOOLS = process.argv.includes('--devtools');
+
+// ── 게임 자동 업데이트 (게임 = index.html 한 파일, 앱 껍데기는 그대로) ──────────────────
+const UPDATE_ARG = process.argv.find((a) => a.startsWith('--update-base=')); // 시험용: 다른 주소에서 업데이트 받기
+const UPDATE_BASES = UPDATE_ARG ? [UPDATE_ARG.slice('--update-base='.length)] : [
+  'https://raw.githubusercontent.com/Korean568/SKW/main/desktop/update/',
+  'https://korean568.github.io/SKW/desktop/update/',
+];
+const vnum = (v) => String(v || '0').split('.').map((n) => parseInt(n, 10) || 0);
+const newer = (a, b) => { // a 가 b 보다 새 버전인가
+  const x = vnum(a), y = vnum(b);
+  for (let i = 0; i < Math.max(x.length, y.length); i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0);
+  return false;
+};
+let game = { version: app.getVersion(), file: path.join(APP_DIR, 'index.html') }; // 지금 띄울 게임
+const gameDir = () => path.join(app.getPath('userData'), 'game');
+const useCached = () => { // 전에 받아 둔 게임이 앱에 든 것보다 새것이면 그걸 쓴다
+  try {
+    const m = JSON.parse(fs.readFileSync(path.join(gameDir(), 'version.json'), 'utf8'));
+    const f = path.join(gameDir(), 'index.html');
+    if (newer(m.version, game.version) && !newer(m.minShell, app.getVersion()) && fs.existsSync(f)) game = { version: m.version, file: f };
+  } catch (e) { /* 받아 둔 게임 없음 */ }
+};
+const fetchBuf = async (url, ms) => {
+  const c = new AbortController(), t = setTimeout(() => c.abort(), ms);
+  try {
+    const r = await net.fetch(url + '?t=' + Date.now(), { signal: c.signal, cache: 'no-store' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return Buffer.from(await r.arrayBuffer());
+  } finally { clearTimeout(t); }
+};
+const checkUpdate = async () => { // 새 게임이 있으면 받아서 game 을 바꾼다 (실패하면 조용히 넘어감)
+  for (const base of UPDATE_BASES) {
+    try {
+      const m = JSON.parse((await fetchBuf(base + 'latest.json', 3000)).toString('utf8'));
+      if (!m.version || !newer(m.version, game.version) || newer(m.minShell, app.getVersion())) return;
+      const raw = await fetchBuf(base + (m.file || 'game.gz'), 15000);
+      let html; try { html = zlib.gunzipSync(raw); } catch (e) { html = raw; } // 서버가 이미 풀어서 준 경우도 받아들임 (아래 sha256 으로 검증)
+      if (crypto.createHash('sha256').update(html).digest('hex') !== m.sha256) throw new Error('sha256 불일치');
+      const dir = gameDir();
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(path.join(dir, 'index.html.tmp'), html);
+      fs.renameSync(path.join(dir, 'index.html.tmp'), path.join(dir, 'index.html'));
+      fs.writeFileSync(path.join(dir, 'version.json'), JSON.stringify({ version: m.version, minShell: m.minShell || '0' }));
+      game = { version: m.version, file: path.join(dir, 'index.html') };
+      console.log('[update] 게임 ' + m.version + ' 받음');
+      return;
+    } catch (e) { console.log('[update] ' + base + ' 실패: ' + e.message); }
+  }
+};
 
 // ── GPU / WebGPU 스위치 (app ready 전에 넣어야 한다) ─────────────────────────────
 // Windows(D3D12) · macOS(Metal) 는 Chromium 에서 WebGPU 가 기본으로 켜져 있지만,
@@ -72,6 +127,7 @@ if (!app.requestSingleInstanceLock()) {
       if (u.host !== HOST) return new Response('Not found', { status: 404 });
       let rel = decodeURIComponent(u.pathname);
       if (rel === '/' || rel === '') rel = '/index.html';
+      if (rel === '/index.html') return await net.fetch(pathToFileURL(game.file).toString()); // 받아 둔 새 게임 또는 앱에 든 게임
       const file = path.normalize(path.join(APP_DIR, rel));
       if (file !== APP_DIR && !file.startsWith(APP_DIR + path.sep)) return new Response('Forbidden', { status: 403 });
       return await net.fetch(pathToFileURL(file).toString());
@@ -101,7 +157,7 @@ if (!app.requestSingleInstanceLock()) {
         webviewTag: false,
         spellcheck: false,
         autoplayPolicy: 'no-user-gesture-required',
-        additionalArguments: [`--skw-version=${app.getVersion()}`],
+        additionalArguments: [`--skw-version=${app.getVersion()}`, `--skw-game=${game.version}`],
       },
     });
     win.setMenuBarVisibility(false);
@@ -145,7 +201,7 @@ if (!app.requestSingleInstanceLock()) {
   });
   ipcMain.handle('skw:openExternal', (e, url) => (fromApp(e) ? openOutside(url) : false));
 
-  app.whenReady().then(() => {
+  app.whenReady().then(async () => {
     // macOS 는 메뉴가 없으면 Cmd+Q 같은 기본 단축키도 사라지므로 최소 메뉴를 둔다
     if (process.platform === 'darwin') {
       Menu.setApplicationMenu(Menu.buildFromTemplate([{ role: 'appMenu' }, { role: 'editMenu' }, { role: 'windowMenu' }]));
@@ -154,6 +210,10 @@ if (!app.requestSingleInstanceLock()) {
     }
 
     protocol.handle(SCHEME, serveApp);
+
+    // 게임 업데이트: 받아 둔 것 확인 → 인터넷으로 새 버전 확인 (오프라인이면 바로 넘어감, 오래 걸려도 몇 초)
+    useCached();
+    if (!process.argv.includes('--no-update')) await checkUpdate();
 
     // 권한: 포인터 고정 · 전체 화면만 허용, 나머지(카메라·마이크·위치·알림 등)는 거절
     const allowed = new Set(['pointerLock', 'fullscreen', 'clipboard-sanitized-write']);

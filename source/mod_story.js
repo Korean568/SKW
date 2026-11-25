@@ -331,7 +331,7 @@
         if(!S.on&&!actN()){stage();const q=+G.params.get('story')||1;if(q>1) begin(q);else if(G.params.has('autostart')||G.params.has('scene')) start();}
      }
       if(actN()) return;// 스토리 2~4 진행 중: 스토리 1 은 쉼
-      const sk=S.on&&G.keys.Tab&&S.cm!=='fps'?4:1,sd=dt*sk;// Tab 누르고 있으면 빨리 감기
+      const sk=S.on&&(G.keys.Space||G.keys.Tab)&&S.cm!=='fps'?4:1,sd=dt*sk;// Space 누르고 있으면 빨리 감기 (Tab 도 됨)
       if(S.on){
         S.t+=sd;
         for(let i=wait.length - 1;i>=0;i--) if(S.t>=wait[i][0]){const f=wait[i][1];wait.splice(i,1);f();}
@@ -375,13 +375,15 @@
 #end h2{margin:0 0 .4em;font:800 5vw system-ui;letter-spacing:.08em}#end h2.r{color:#e03b3b}#end .c{font-style:italic;color:#aab8c6}`);
       const nh=G.params.has('nohud');
       ui.vl=G.el('div',{id:'vl'});ui.bk=G.el('div',{id:'bk'});
-      ui.ov=G.el('div',{id:'ov',innerHTML:`<a class=tb href="https://tribe3dgames.vercel.app/" target=_blank rel=noopener>TRIBE <b>3D</b> GAMES ↗</a><h1>SECOND<i>KOREAN WARS</i></h1><div class=ch><div class=on><p>스토리 1 — 서강시 : 전쟁의 시작 · 대한민국편</p><p>플레이어: 김민철 하사</p></div><div><p>스토리 2 — 북한 마을 : 5일전으로 · 조선민주주의인민공화국편</p><p>플레이어: 북한 군인(동무) · AKM 소총</p></div><div><p>스토리 3 — 북한 주석궁 : 다시 지금 북한으로 · 조선민주주의인민공화국편</p><p>플레이어: 리충성 · 투척단검 · 단검</p></div><div><p>스토리 4 — 폐허가 된 서강 : 고혁명의 배신 · 대한민국편</p><p>플레이어: 김민철 하사 · K2C1 소총</p></div></div><button>시 작</button><div class=k><b>컷신</b> 마우스: 둘러보기 · Tab 누르기: 빨리 감기<br><b>전투</b> WASD 이동 · 마우스 조준 · 왼쪽 클릭 사격 · 오른쪽 클릭 정조준 · R 재장전 · E 줍기 · Shift 달리기 · C 앉기<br><b>F2</b> 그래픽 설정 · Enter 시작</div>`});
+      ui.ov=G.el('div',{id:'ov',innerHTML:`<a class=tb href="https://tribe3dgames.vercel.app/" target=_blank rel=noopener>TRIBE <b>3D</b> GAMES ↗</a><h1>SECOND<i>KOREAN WARS</i></h1><div class=ch><div class=on><p>스토리 1 — 서강시 : 전쟁의 시작 · 대한민국편</p><p>플레이어: 김민철 하사</p></div><div><p>스토리 2 — 북한 마을 : 5일전으로 · 조선민주주의인민공화국편</p><p>플레이어: 북한 군인(동무) · AKM 소총</p></div><div><p>스토리 3 — 북한 주석궁 : 다시 지금 북한으로 · 조선민주주의인민공화국편</p><p>플레이어: 리충성 · 투척단검 · 단검</p></div><div><p>스토리 4 — 폐허가 된 서강 : 고혁명의 배신 · 대한민국편</p><p>플레이어: 김민철 하사 · K2C1 소총</p></div></div><button>시 작</button><div class=k><b>컷신</b> 마우스: 둘러보기 · Space: 건너뛰기 (누르고 있으면 빨리 감기)<br><b>전투</b> WASD 이동 · 마우스 조준 · 왼쪽 클릭 사격 · 오른쪽 클릭 정조준 · R 재장전 · E 줍기 · Shift 달리기 · C 앉기<br><b>F2</b> 그래픽 설정 · Enter 시작</div>`});
       ui.dl=G.el('div',{id:'dl'});ui.cap=G.el('div',{id:'cap'});ui.ttl=G.el('div',{id:'ttl'});
-      ui.sk=G.el('div',{id:'sk',textContent:'건너뛰기 ▸'});ui.end=G.el('div',{id:'end'});
+      ui.sk=G.el('div',{id:'sk',textContent:'Space · 건너뛰기 ▸'});ui.end=G.el('div',{id:'end'});
       if(nh) for(const k of ['dl','cap','ttl','sk']) ui[k].style.visibility='hidden';
       ui.ov.querySelector('button').onclick=()=>begin(sel);
       ui.ov.querySelectorAll('.ch>div').forEach((e,i)=>{e.onclick=()=>pick(i + 1);e.ondblclick=()=>begin(i + 1);});
       ui.sk.onclick=()=>{S.nx=Math.min(S.nx,S.t);S.lineEnd=S.t;};
+      // Space 한 번 = 건너뛰기 버튼 (스토리 1~4 공용 #sk, 보일 때만 · 일시정지 중 제외) · 누르고 있으면 빨리 감기
+      addEventListener('keydown',e=>{if(e.code!=='Space'||e.repeat||G.paused)return;const b=document.getElementById('sk');if(b&&b.style.display==='block'&&b.style.visibility!=='hidden')b.click();});
       addEventListener('keydown',e=>{
         if(S.on||actN()||ui.ov.style.display==='none') return;
         if(e.code==='Enter') begin(sel);
