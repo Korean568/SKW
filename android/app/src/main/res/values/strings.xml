@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Second Korean Wars</string>
+    <string name="back_again">Press back again to exit</string>
+    <string name="no_browser">No app can open this link</string>
+
+    <string name="gpu_title">This device cannot run the game yet</string>
+    <string name="gpu_none">The game needs WebGPU, which this device\'s \"Android System WebView\" does not provide.\n\n• Android 12 or newer is required.\n• Update \"Android System WebView\" (and Chrome) to the latest version in the Play Store, then start the game again.</string>
+    <string name="gpu_noadapter">WebGPU could not use this device\'s graphics chip (GPU).\n\n• Android 12 or newer and a recent Qualcomm Adreno or ARM Mali GPU are required.\n• Update \"Android System WebView\" (and Chrome) to the latest version in the Play Store, then start the game again.</string>
+    <string name="webview_current">Installed WebView: %1$s</string>
+    <string name="webview_unknown">unknown</string>
+    <string name="btn_update_webview">Open WebView in Play Store</string>
+    <string name="btn_exit">Exit</string>
+    <string name="btn_retry">Try again</string>
+
+    <string name="crash_title">The game stopped</string>
+    <string name="crash_body">The graphics process stopped several times in a row. Close other apps and try again. If it keeps happening, this device may not have enough memory or GPU support for the game.</string>
+    <string name="load_title">The game could not be loaded</string>
+    <string name="load_body">The game files inside the app could not be opened. Please reinstall the app.</string>
+</resources>

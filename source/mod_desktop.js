@@ -34,8 +34,12 @@
     const ov = () => document.getElementById('ov');
     let ui, menu = '', from = '', sel = 0;
 
-    const sub = () => ui.sub.textContent = cfg.sub === 's' ? 'html body #dl{font-size:1.95vh}html body #cap{font-size:2.05vh}'
-      : cfg.sub === 'l' ? 'html body #dl{font-size:3.15vh}html body #cap{font-size:3.25vh}' : '';
+    const touch = () => !!(G.touch && G.touch.on); // 터치(휴대폰·안드로이드 앱): 메뉴 구성과 자막 크기를 손가락·작은 화면에 맞춤 (mod_touch 가 뒤에 로드되므로 쓸 때 확인)
+    const sub = () => ui.sub.textContent = touch()
+      ? (cfg.sub === 's' ? 'html.touch body #dl{font-size:clamp(12px,3.3vh,17px)}html.touch body #cap{font-size:clamp(12px,3.3vh,18px)}'
+        : cfg.sub === 'l' ? 'html.touch body #dl{font-size:clamp(17px,5vh,26px)}html.touch body #cap{font-size:clamp(17px,5vh,27px)}' : '')
+      : cfg.sub === 's' ? 'html body #dl{font-size:1.95vh}html body #cap{font-size:2.05vh}'
+        : cfg.sub === 'l' ? 'html body #dl{font-size:3.15vh}html body #cap{font-size:3.25vh}' : '';
     const scale = () => { // 렌더 배율: 수동이면 gpu 모듈의 동적 해상도(?dyn=0 과 같은 경로)를 끄고 G.dyn 고정
       if (cfg.scale) { G.params.set('dyn', '0'); G.dyn = cfg.scale / 100; }
       else { dynURL === null ? G.params.delete('dyn') : G.params.set('dyn', dynURL); G.dyn = 1; }
@@ -131,7 +135,7 @@
       if (!prog && !menu && story() && !G.paused) pause(); // 브라우저가 Esc 로 고정을 푼 경우 · 창 전환 → 바로 메뉴
     });
 
-    G.desktop = { cfg, pause, resume, settings, toTitle, get menu() { return menu; }, progress: () => done.slice(), finish };
+    G.desktop = { cfg, pause, resume, settings, back, toTitle, get menu() { return menu; }, progress: () => done.slice(), finish };
 
     G.register('desktop', {
       init() {
@@ -165,6 +169,10 @@
 ${G.i18n ? '<span>언어</span><div data-k=lang><button data-v=ko data-i18n-skip>한국어</button><button data-v=en data-i18n-skip>English</button></div>' : ''}
 </div><button class=bk data-a=back>돌아가기</button><div class=h><b>Esc</b> 돌아가기 · <b>F11</b> 전체 화면</div></div>`;
         ui = { root, p: root.querySelector('.p'), s: root.querySelector('.s'), st: root.querySelector('.st'), sub: G.el('style', {}, document.head) };
+        if (touch()) { // 터치: 전체 화면 줄은 뜻이 없고(앱은 늘 전체 화면) 감도는 손가락 시점 감도
+          const f = root.querySelector('[data-k=fs]'); f.style.display = f.previousElementSibling.style.display = 'none';
+          root.querySelector('[data-k=sens]').previousElementSibling.textContent = '시점 감도';
+        }
         G.i18n && G.i18n.onChange(() => { menu === 'set' && sync(); }); // 처음 화면 버튼 등 다른 곳에서 바꿔도 설정 표시 맞춤
         root.addEventListener('click', e => { const a = e.target.closest('[data-a]'); if (a) return ACT[a.dataset.a](); const b = e.target.closest('[data-k] button'); b && onSet(b.parentNode.dataset.k, b.dataset.v); });
         root.addEventListener('input', e => { const k = e.target.parentNode.dataset.k; k && onSet(k, e.target.value, 1); });
@@ -185,7 +193,7 @@ ${G.i18n ? '<span>언어</span><div data-k=lang><button data-v=ko data-i18n-skip
         sub();
         if (!G.params.get('q') && (cfg.q === 'auto' ? G.qManual : G.PRESETS[cfg.q] && (!G.qManual || cfg.q !== G.Q.name))) quality(cfg.q);
         if (cfg.scale) scale();
-        if (cfg.fs !== null && D) fsSet(cfg.fs);
+        if (cfg.fs !== null && D && !touch()) fsSet(cfg.fs);
         vol();
       },
       onQuality(Q) { if (!G.params.get('q')) { cfg.q = G.qManual ? Q.name : 'auto'; save(); } menu === 'set' && sync(); }, // F2 · 성능 알약으로 바꾼 것도 기억

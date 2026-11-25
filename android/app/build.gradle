@@ -1,0 +1,95 @@
+plugins {
+    id 'com.android.application'
+}
+
+// ── 값 읽기: -P이름=값 (Gradle 속성)이 먼저, 없으면 같은 이름의 환경 변수 ──
+def opt = { String name ->
+    def v = providers.gradleProperty(name).getOrNull()
+    if (v == null || v.trim().isEmpty()) v = providers.environmentVariable(name).getOrNull()
+    (v == null || v.trim().isEmpty()) ? null : v.trim()
+}
+
+// ── 버전: PC판과 같은 desktop/package.json 의 version 을 쓴다 ──
+//    versionCode = major*10000 + minor*100 + patch  (예: 1.2.0 → 10200)
+//    덮어쓰기: -PversionName=1.2.1 -PversionCode=10201  (또는 환경 변수 SKW_VERSION_NAME / SKW_VERSION_CODE)
+def pkgJson = new groovy.json.JsonSlurper().parseText(rootProject.file('../desktop/package.json').getText('UTF-8'))
+def appVersionName = opt('versionName') ?: opt('SKW_VERSION_NAME') ?: String.valueOf(pkgJson.version)
+def verMatch = (appVersionName =~ /^(\d+)\.(\d+)\.(\d+)/)
+if (!verMatch.find()) {
+    throw new GradleException("versionName 은 1.2.3 꼴이어야 합니다: '${appVersionName}'")
+}
+def computedCode = verMatch.group(1).toInteger() * 10000 + verMatch.group(2).toInteger() * 100 + verMatch.group(3).toInteger()
+def codeOverride = opt('versionCode') ?: opt('SKW_VERSION_CODE')
+def appVersionCode = codeOverride != null ? codeOverride.toInteger() : computedCode
+
+// ── 서명: 업로드 키는 저장소에 없다. 환경 변수(또는 -P)로 받았을 때만 release 를 서명한다 ──
+//    ANDROID_KEYSTORE_FILE (키 저장소 파일의 절대 경로) · ANDROID_KEYSTORE_PASSWORD
+//    ANDROID_KEY_ALIAS (기본 upload) · ANDROID_KEY_PASSWORD (기본 = 저장소 비밀번호)
+def ksPath = opt('ANDROID_KEYSTORE_FILE')
+def ksPass = opt('ANDROID_KEYSTORE_PASSWORD')
+def ksAlias = opt('ANDROID_KEY_ALIAS') ?: 'upload'
+def ksKeyPass = opt('ANDROID_KEY_PASSWORD') ?: ksPass
+def hasKeystore = ksPath != null && ksPass != null && file(ksPath).isFile()
+if (ksPath != null && !hasKeystore) {
+    logger.warn("[skw] ANDROID_KEYSTORE_FILE 이 있지만 파일이 없거나 비밀번호가 없습니다 → release 를 서명하지 않습니다")
+}
+logger.lifecycle("[skw] versionName=${appVersionName} versionCode=${appVersionCode} releaseSigning=${hasKeystore}")
+
+android {
+    namespace 'com.secondkoreanwars.game'
+    compileSdk 36
+
+    defaultConfig {
+        applicationId 'com.secondkoreanwars.game'
+        minSdk 31          // Android 12: WebGPU 가 여기부터
+        targetSdk 36       // Google Play 가 새 앱에 요구하는 수준 (2026-08-31 부터 API 36)
+        versionCode appVersionCode
+        versionName appVersionName
+    }
+
+    signingConfigs {
+        release {
+            if (hasKeystore) {
+                storeFile file(ksPath)
+                storePassword ksPass
+                keyAlias ksAlias
+                keyPassword ksKeyPass
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            if (hasKeystore) {
+                signingConfig signingConfigs.release
+            }
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    lint {
+        checkReleaseBuilds false
+        abortOnError false
+    }
+}
+
+dependencies {
+    // WebViewAssetLoader: 앱 안의 게임 파일을 https://appassets.androidplatform.net/ 로 서빙
+    implementation 'androidx.webkit:webkit:1.14.0'
+}
+
+// 게임 파일(app/src/main/assets/index.html)은 저장소에 없다 → 빌드 전에 있는지 확인
+def gameIndex = file('src/main/assets/index.html')
+tasks.register('checkGameAssets') {
+    doLast {
+        if (!gameIndex.isFile()) {
+            throw new GradleException("게임 파일이 없습니다: ${gameIndex}\n먼저 실행하세요:  node android/scripts/prepare-assets.js")
+        }
+    }
+}
+tasks.matching { it.name == 'preBuild' }.configureEach { dependsOn 'checkGameAssets' }
