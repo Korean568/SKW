@@ -7,9 +7,9 @@
 const fs = require('fs'), path = require('path'), zlib = require('zlib'), D = __dirname;
 const out = process.argv[2] && !process.argv[2].startsWith('--') ? process.argv[2] : path.join(D, '..', 'index.html'), stubs = process.argv.includes('--stubs'), readable = process.argv.includes('--readable'), raw = process.argv.includes('--raw');
 const story = process.argv.includes('--story'), both = process.argv.includes('--naval');
-const NAVAL = ['ocean', 'models', 'game'];
+const NAVAL = ['ocean', 'models', 'game', 'ennav'];
 const ALL = ['gpu', 'sky', 'post', 'ocean', 'mesh', 'models', 'fx', 'audio', 'i18n', 'game', 'people', 'cabin', 'fps', 'village', 'story2', 'palace', 'story3', 'ruins', 'story4', 'story', 'desktop', 'touch', 'en1', 'en2', 'en3', 'en4', 'enui', 'ennav'];
-const SHARED = ['gpu', 'sky', 'post', 'mesh', 'fx', 'audio'];
+const SHARED = ['gpu', 'sky', 'post', 'mesh', 'fx', 'audio', 'i18n', 'enui']; // 언어 모듈은 웹판(해상대전)에도 들어감
 const MODS = both ? ALL : story ? ALL.filter(m => !NAVAL.includes(m)) : ALL.filter(m => SHARED.includes(m) || NAVAL.includes(m));
 const MODE = both ? null : story ? 'story' : 'naval';
 const strip = s => s.replace(/^'use strict';\s*/, '').trimEnd();
