@@ -236,7 +236,7 @@
     hud(dt, warn);
   }
   /* ── HUD: 캔버스(표식·레이더) + DOM 패널(0.2초마다) · 청록 = 아군 / 주황빨강 = 적 / 호박색 = 최우선만 / 흰색 = 선택 ── */
-  const OWN = '#6ef', HOS = '#ff5a3c', AMB = '#fb3', lab = [];
+  const OWN = '#6ef', HOS = '#ff5a3c', AMB = '#fb3', lab = [], tr = s => G.tr ? G.tr(s) : s; // tr = 캔버스 글자 번역 (언어 모듈 mod_i18n 이 없거나 한국어면 그대로)
   let fz;
   // 표식: 미사일 ◇ · 항공기 △ · 함정 ⬟ · 지상 □ · 본함 ➤
   const SH = { msl: [0, -1, 1, 0, 0, 1, -1, 0], jet: [0, -1, 1, .8, -1, .8], ship: [0, -1.1, 1, -.1, .7, .8, -.7, .8, -1, -.1], site: [-1, -1, 1, -1, 1, 1, -1, 1], own: [0, -1.3, .8, .9, 0, .4, -.8, .9] };
@@ -275,7 +275,7 @@
       e.bx = e.sx = sx = G.clamp(sx, 30, W - 30); e.sy = sy = G.clamp(sy, 56, H * .79);
       if (sx !== x0 || sy !== y0) { // 화면 밖
         X.beginPath(); for (let i = -1; i < 2; i++) X.lineTo(sx + Math.cos(a + i * 2.5) * 11, sy + Math.sin(a + i * 2.5) * 11); X.closePath(); ink(HOS, 1);
-        txt(e.lb, sx - Math.cos(a) * (fs * 2 + 22), sy - Math.sin(a) * 26 + fs * .35, col); continue;
+        txt(tr(e.lb), sx - Math.cos(a) * (fs * 2 + 22), sy - Math.sin(a) * 26 + fs * .35, col); continue;
       }
       // ext = 화면상 선체 반길이 (큰 표적: 선택 = 괄호만 / 그 밖 = 표식을 선체 위로)
       const mx = gnd && TYPES[e.model].hp, ext = gnd ? G.modelData[e.model].radius * H * 1.07 / s[2] : 0, r0 = me ? 12 : 9, r = r0 + (top ? 3 + Math.sin(T * 10) * 2 : 0), q = Math.max(r0 + 11, ext), qh = Math.max(r0 + 11, ext * .4),
@@ -287,10 +287,10 @@
       if (me) { X.setLineDash([g, q * 2 - g, g, qh * 2 - g]); X.lineDashOffset = g / 2; X.beginPath(); X.rect(sx - q, sy - qh, q * 2, qh * 2); ink(e === ui.fe && ht < .5 ? HOS : '#fff', 0, 3); X.setLineDash([]); }
       let px = sx, w = 34, ly;
       if (me || top) { // 꼬리표 한 줄 (공중: 위 / 수상·지상: 괄호 왼쪽 아래)
-        const tg = (top ? '최우선' : '') + (me ? (top ? ' · ' : '') + '선택' : ' [Q]'), n = (me ? e.name + ' ' : '') + e.lb, w1 = tw(tg), w2 = tw(n);
+        const tg = tr((top ? '최우선' : '') + (me ? (top ? ' · ' : '') + '선택' : ' [Q]')), n = tr((me ? e.name + ' ' : '') + e.lb), w1 = tw(tg), w2 = tw(n);
         w = w1 + w2; px -= Math.max(0, q - w); ly = slot(px, gnd ? Math.min(sy + qh + fs + 7, H * .83) : sy - qh - 9, w, gnd ? 1 : -1);
         txt(tg, px - w2, ly, 0, top ? AMB : '#fff'); txt(n, px + w1, ly, me ? '#fff' : col);
-      } else { const l = e.k === 'msl' ? e.lt : e.lb; ly = slot(sx, iy + r + fs + 5, tw(l), 1); txt(l, sx, ly, col); }
+      } else { const l = tr(e.k === 'msl' ? e.lt : e.lb); ly = slot(sx, iy + r + fs + 5, tw(l), 1); txt(l, sx, ly, col); }
       if (mx && (me || e.hp < mx)) { // 선체 막대 (흰색 = 방금 깎인 양)
         const x = px - w + 1, y = ly + fs * .36 + 2, k = (w * 2 - 2) / mx;
         X.fillStyle = '#000d'; X.fillRect(x - 1, y - 1, w * 2, 8);
@@ -299,7 +299,7 @@
       }
     }
     if (ht < 2.6) { // 명중 표시 (괄호 오른쪽)
-      const e = ui.fe, t = '✦ ' + ui.fm; font(fs * 1.3); X.globalAlpha = Math.min(1, (2.6 - ht) * 2);
+      const e = ui.fe, t = '✦ ' + tr(ui.fm); font(fs * 1.3); X.globalAlpha = Math.min(1, (2.6 - ht) * 2);
       txt(t, Math.min(e.bx + 12 + tw(t), W - tw(t) - 8), e.sy + 5 - Math.min(ht, 1) * 18, '#fff'); X.strokeStyle = HOS; X.lineWidth = 1.5; X.stroke(); X.globalAlpha = 1;
     }
     // 레이더: 함수가 위 · 고리 1.5(CIWS)/4/8km (반지름 ∝ √거리) · 부채꼴 = 시야
@@ -308,7 +308,7 @@
     font(Math.max(11, fs * .8)); ring(cx, cy, R); X.fillStyle = '#011a'; X.fill(); ink('#8dfa'); X.save(); X.clip();
     const va = 1.57 + P.yaw - cam.az; X.beginPath(); X.moveTo(cx, cy); X.arc(cx, cy, R, va - .7, va + .7); X.fillStyle = '#8df3'; X.fill();
     for (const I of S.isl) if (at(I.p)) {
-      const r = Math.max(7, I.r / 8000 * R); X.beginPath(); X.ellipse(I.lx = bx, by, r * 1.25, r * .8, .5, 0, 7); X.fillStyle = '#586'; X.fill(); X.strokeStyle = X.fillStyle = '#ad9'; X.lineWidth = 1; X.stroke(); X.fillText('섬', bx, I.ly = by + r + fz);
+      const r = Math.max(7, I.r / 8000 * R); X.beginPath(); X.ellipse(I.lx = bx, by, r * 1.25, r * .8, .5, 0, 7); X.fillStyle = '#586'; X.fill(); X.strokeStyle = X.fillStyle = '#ad9'; X.lineWidth = 1; X.stroke(); X.fillText(tr('섬'), bx, I.ly = by + r + fz);
     }
     X.restore(); X.lineWidth = 1; X.strokeStyle = '#8df5'; ring(cx, cy, R * .707); X.moveTo(cx - R, cy); X.lineTo(cx + R, cy); X.moveTo(cx, cy - R); X.lineTo(cx, cy + R); X.stroke();
     X.setLineDash([3, 4]); ring(cx, cy, R * .433); X.stroke(); X.setLineDash([]);
