@@ -1,15 +1,17 @@
-// 단일 HTML 빌드: template.html + core.js + mod_*.js → index.html
-//   node build.js [출력 경로]            압축 빌드 (WGSL 축약 + JS/CSS minify) — 기본 출력 ../index.html
-//   node build.js [출력 경로] --readable 읽기 쉬운 빌드 (디버깅용)
-//   node build.js [출력 경로] --raw      자기해제 압축 없이 minify 만 (JS 가 그대로 보임)
-//   --naval : 예전 해상 반격 임무 모듈도 포함 (?mode=naval)
-//   --stubs : 아직 없는 모듈을 stubs.js 로 채움 (개발용)
+// 단일 HTML 빌드: template.html + core.js + mod_*.js → HTML 한 파일
+//   node build.js                     웹판(GitHub Pages) = 해상대전(해상 반격 임무)만 → ../index.html
+//   node build.js <출력> --story      스토리 게임 (스토리 1~4 · 영어 지원) — PC판(desktop/)이 이걸로 빌드함. 스토리 게임은 itch.io 에서만 배포
+//   node build.js <출력> --naval      개발용: 스토리 + 해상대전 모두 (?mode=naval 로 해상대전)
+//   --readable 읽기 쉬운 빌드 (디버깅용) · --raw 자기해제 압축 없이 minify 만 · --stubs 없는 모듈을 stubs.js 로 채움 (개발용)
 // 기본 빌드는 minify 한 JS 를 gzip + base64 로 담고, 브라우저 내장 DecompressionStream 으로 풀어 실행하는 자기해제 방식 (외부 라이브러리 없음)
 const fs = require('fs'), path = require('path'), zlib = require('zlib'), D = __dirname;
 const out = process.argv[2] && !process.argv[2].startsWith('--') ? process.argv[2] : path.join(D, '..', 'index.html'), stubs = process.argv.includes('--stubs'), readable = process.argv.includes('--readable'), raw = process.argv.includes('--raw');
-// 기본 빌드 = 스토리 1 (여객기). 예전 해상 반격 임무(ocean·models·game)는 --naval 을 붙일 때만 함께 넣음 (그때는 ?mode=naval 로 실행)
-const naval = process.argv.includes('--naval');
-const MODS = ['gpu', 'sky', 'post', 'ocean', 'mesh', 'models', 'fx', 'audio', 'i18n', 'game', 'people', 'cabin', 'fps', 'village', 'story2', 'palace', 'story3', 'ruins', 'story4', 'story', 'desktop', 'en1', 'en2', 'en3', 'en4', 'enui'].filter(m => naval || !['ocean', 'models', 'game'].includes(m));
+const story = process.argv.includes('--story'), both = process.argv.includes('--naval');
+const NAVAL = ['ocean', 'models', 'game'];
+const ALL = ['gpu', 'sky', 'post', 'ocean', 'mesh', 'models', 'fx', 'audio', 'i18n', 'game', 'people', 'cabin', 'fps', 'village', 'story2', 'palace', 'story3', 'ruins', 'story4', 'story', 'desktop', 'en1', 'en2', 'en3', 'en4', 'enui'];
+const SHARED = ['gpu', 'sky', 'post', 'mesh', 'fx', 'audio'];
+const MODS = both ? ALL : story ? ALL.filter(m => !NAVAL.includes(m)) : ALL.filter(m => SHARED.includes(m) || NAVAL.includes(m));
+const MODE = both ? null : story ? 'story' : 'naval';
 const strip = s => s.replace(/^'use strict';\s*/, '').trimEnd();
 const read = f => strip(fs.readFileSync(path.join(D, f), 'utf8'));
 
@@ -45,7 +47,8 @@ function shrinkWgsl(src) {
 }
 
 let code = read('core.js'); const rep = [['core', Buffer.byteLength(code)]];
-if (!naval) code = code.replace(/G\.mode = new URLSearchParams[^;]*;/, "G.mode = 'story';");
+if (MODE) code = code.replace(/G\.mode = new URLSearchParams[^;]*;/, `G.mode = '${MODE}';`);
+console.log(`  빌드: ${both ? '스토리 + 해상대전 (개발용)' : story ? '스토리 게임 (PC판)' : '해상대전 (웹판)'}`);
 for (const m of MODS) {
   if (!fs.existsSync(path.join(D, `mod_${m}.js`))) { console.log(`  (없음) mod_${m}.js`); continue; }
   const s = read(`mod_${m}.js`); code += '\n\n' + s; rep.push([m, Buffer.byteLength(s)]);

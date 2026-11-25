@@ -14,9 +14,9 @@ on:
         type: boolean
         default: true
       release:
-        description: "GitHub Releases 에 올려 누구나 내려받을 수 있는 링크 만들기"
+        description: "GitHub Releases 에도 올리기 (기본 끔 — PC판은 itch.io 에서만 배포)"
         type: boolean
-        default: true
+        default: false
 
 permissions:
   contents: read

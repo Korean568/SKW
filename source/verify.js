@@ -1,4 +1,4 @@
-// 빌드 검증 (스토리 1): node verify.js [서버 루트(이 폴더의 한 단계 위) 기준 경로, 기본 index.html]
+// 빌드 검증 (스토리 게임): node verify.js [서버 루트(이 폴더의 한 단계 위) 기준 경로 — 먼저 npm run build:story 로 source/story.html 을 만들고 source/story.html 을 넘김]
 // 등급 전환·리사이즈 · 처음부터 끝까지 진행(총격전은 자동 플레이) · 패배 경로 · 실시간 루프와 시작 버튼 · WebGPU 미지원 안내
 const { chromium } = require('playwright');
 const FLAGS = ['--enable-unsafe-webgpu', '--use-webgpu-adapter=swiftshader', '--autoplay-policy=no-user-gesture-required'];

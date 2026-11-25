@@ -1,11 +1,12 @@
 {
   "name": "skw-naval",
   "private": true,
-  "description": "Second Korean Wars — 해상 반격: WebGPU 단일 HTML 게임 (소스 → index.html 빌드)",
+  "description": "Second Korean Wars — 웹판(GitHub Pages) 해상대전 + 스토리 게임(PC판·itch.io) WebGPU 단일 HTML 빌드",
   "scripts": {
     "build": "node build.js",
     "build:raw": "node build.js --raw",
-    "build:readable": "node build.js --readable"
+    "build:readable": "node build.js --readable",
+    "build:story": "node build.js story.html --story"
   },
   "devDependencies": {
     "esbuild": "^0.28.2"

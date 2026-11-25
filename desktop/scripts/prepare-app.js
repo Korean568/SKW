@@ -1,16 +1,17 @@
 /*
  * npm run prepare-app
  *
- * 저장소 루트의 빌드된 게임을 desktop/app/ 으로 복사한다. PC판에는 스튜디오 오프닝을 넣지 않는다.
- *   ../index.html  → app/index.html  (복사본에서만 clkky-opening.js 를 불러오는 <script> 한 줄을 뺀다)
- *   build/icon.png → app/icon.png    (Linux 창 아이콘)
+ * 스토리 게임을 소스에서 바로 빌드해 desktop/app/ 에 넣는다. PC판에는 스튜디오 오프닝을 넣지 않는다.
+ *   ../source/build.js --story → app/index.html  (오프닝 <script> 한 줄은 빼고 저장)
+ *   build/icon.png             → app/icon.png    (Linux 창 아이콘)
  *
- * 저장소의 index.html · clkky-opening.js 원본은 절대 고치지 않는다 (웹판은 오프닝을 그대로 쓴다).
- * 게임 소스를 고쳤다면 먼저 저장소 루트에서 cd source && node build.js 로 index.html 을 다시 만든다.
+ * 저장소 루트의 index.html 은 웹판(GitHub Pages)의 해상대전이라 PC판에 쓰지 않는다. 스토리 게임은 itch.io 에서만 배포.
+ * 빌드에 필요한 esbuild 는 이 폴더의 devDependency (npm install 로 설치).
  */
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const { execFileSync } = require('child_process');
 
 const DESK = path.join(__dirname, '..');
 const REPO = path.join(DESK, '..');
@@ -22,16 +23,22 @@ const die = (msg) => { console.error('[prepare-app] 오류: ' + msg); process.ex
 fs.rmSync(APP, { recursive: true, force: true });
 fs.mkdirSync(APP, { recursive: true });
 
-// 2) index.html (오프닝 빼기)
-const indexSrc = path.join(REPO, 'index.html');
-if (!fs.existsSync(indexSrc)) die('../index.html 이 없습니다 (cd source && node build.js 로 먼저 빌드하세요)');
-let html = fs.readFileSync(indexSrc, 'utf8');
+// 2) 스토리 게임 빌드 → index.html (오프닝 빼기)
+const tmp = path.join(APP, 'story.html');
+let log = '';
+try {
+  log = execFileSync(process.execPath, [path.join(REPO, 'source', 'build.js'), tmp, '--story'], {
+    stdio: ['ignore', 'pipe', 'inherit'], env: { ...process.env, NODE_PATH: path.join(DESK, 'node_modules') },
+  }).toString();
+} catch (e) { die('스토리 게임 빌드 실패 (source/build.js --story): ' + e.message); }
+let html = fs.readFileSync(tmp, 'utf8'); fs.rmSync(tmp);
+if (!log.includes('스토리 게임 (PC판)')) die('빌드 결과가 스토리 게임이 아닙니다:\n' + log);
 const OPENING = /<script\b[^>]*\bsrc=["']?clkky-opening\.js["']?[^>]*>\s*<\/script>/gi;
 const n = (html.match(OPENING) || []).length;
 html = html.replace(OPENING, '');
 if (/clkky-opening\.js/.test(html)) die('index.html 에 clkky-opening.js 를 부르는 곳이 남아 있습니다');
 fs.writeFileSync(path.join(APP, 'index.html'), html);
-console.log(`[prepare-app] 오프닝 <script> ${n}줄을 뺐습니다 (PC판은 오프닝 없이 바로 시작)`);
+console.log(`[prepare-app] 스토리 게임 빌드 완료, 오프닝 <script> ${n}줄을 뺐습니다 (PC판은 오프닝 없이 바로 시작)`);
 
 // 3) 창 아이콘
 const icon = path.join(DESK, 'build', 'icon.png');
