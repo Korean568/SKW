@@ -92,4 +92,4 @@ tasks.register('checkGameAssets') {
         }
     }
 }
-tasks.matching { it.name == 'preBuild' }.configureEach { dependsOn 'checkGameAssets' }
+tasks.named('preBuild') { dependsOn 'checkGameAssets' }

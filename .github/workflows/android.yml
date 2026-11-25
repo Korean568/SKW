@@ -1,0 +1,177 @@
+# Android 앱 (Play 스토어 · itch.io) 빌드 — 수동 실행 전용 (Actions 탭 → "Android build" → Run workflow)
+#
+# 1) 스토리 게임을 소스에서 빌드해 android/ 앱에 넣고 APK 를 만든다.
+#      SecondKoreanWars-<버전>-android.apk   업로드 키로 서명한 release (시크릿이 있을 때)
+#      SecondKoreanWars-<버전>-android.aab   Play Console 에 올리는 파일 (시크릿이 있을 때)
+#      SecondKoreanWars-<버전>-android-debug.apk   시크릿이 없을 때의 시험용 (debug 서명)
+# 2) 저장소 시크릿 BUTLER_API_KEY 가 있을 때만 APK 를 itch.io 의 android 채널에 올린다.
+#
+# 읽는 시크릿: ANDROID_KEYSTORE_BASE64 (업로드 키 저장소 파일을 base64 로 바꾼 글자) · ANDROID_KEYSTORE_PASSWORD
+#              (선택) ANDROID_KEY_ALIAS (기본 upload) · ANDROID_KEY_PASSWORD (기본 = 저장소 비밀번호) · BUTLER_API_KEY
+# 읽는 변수:   ITCH_USER (itch.io 사용자 이름, 없으면 API 키로 알아냄) · ITCH_GAME (기본 second-korean-wars)
+# 자세한 설명: android/README-android.md
+name: Android build
+
+on:
+  workflow_dispatch:
+    inputs:
+      push_to_itch:
+        description: "BUTLER_API_KEY 시크릿이 있으면 itch.io (android 채널)에도 올리기"
+        type: boolean
+        default: true
+      version_code:
+        description: "versionCode 직접 지정 (비워 두면 버전에서 계산: 1.2.0 → 10200). 같은 버전을 Play 에 다시 올릴 때만"
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      SKW_VERSION_CODE: ${{ inputs.version_code }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+
+      # Android Gradle Plugin 8.13 은 JDK 17 이 필요하다
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      # 게임 빌드에 쓰는 esbuild 는 PC판과 같은 것(desktop/node_modules). Electron 실행 파일은 받지 않는다
+      - name: Install game build tools
+        working-directory: desktop
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+        run: npm ci
+
+      - name: Prepare assets (story game → android/app/src/main/assets)
+        run: node android/scripts/prepare-assets.js
+
+      - name: Version
+        id: v
+        run: echo "v=$(node -p "require('./desktop/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Build debug APK
+        working-directory: android
+        run: chmod +x gradlew && ./gradlew --no-daemon --stacktrace assembleDebug
+
+      - name: Decode upload keystore
+        id: ks
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ] && [ -n "$ANDROID_KEYSTORE_PASSWORD" ]; then
+            printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode --ignore-garbage > "$RUNNER_TEMP/skw-upload.keystore"
+            if [ ! -s "$RUNNER_TEMP/skw-upload.keystore" ]; then echo "::error::ANDROID_KEYSTORE_BASE64 를 풀 수 없습니다 (base64 글자가 맞는지 확인)"; exit 1; fi
+            echo "signed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ANDROID_KEYSTORE_BASE64 · ANDROID_KEYSTORE_PASSWORD 시크릿이 없어 release 서명을 건너뜁니다 (debug APK 만 만듭니다)."
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build signed release (AAB + APK)
+        if: steps.ks.outputs.signed == 'true'
+        working-directory: android
+        env:
+          ANDROID_KEYSTORE_FILE: ${{ runner.temp }}/skw-upload.keystore
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: chmod +x gradlew && ./gradlew --no-daemon --stacktrace bundleRelease assembleRelease
+
+      - name: Collect files
+        env:
+          V: ${{ steps.v.outputs.v }}
+          SIGNED: ${{ steps.ks.outputs.signed }}
+        run: |
+          set -e
+          mkdir -p out
+          if [ "$SIGNED" = "true" ]; then
+            cp android/app/build/outputs/apk/release/app-release.apk    "out/SecondKoreanWars-$V-android.apk"
+            cp android/app/build/outputs/bundle/release/app-release.aab "out/SecondKoreanWars-$V-android.aab"
+          else
+            cp android/app/build/outputs/apk/debug/app-debug.apk        "out/SecondKoreanWars-$V-android-debug.apk"
+          fi
+          ls -l out
+          # 서명 확인 (Play Console 의 "업로드 키 인증서" 지문과 비교할 수 있게 출력). 도구가 없어도 빌드는 실패시키지 않는다
+          APKSIGNER=$(ls "${ANDROID_HOME:-/usr/local/lib/android/sdk}"/build-tools/*/apksigner 2>/dev/null | sort -V | tail -n1 || true)
+          if [ -n "$APKSIGNER" ]; then "$APKSIGNER" verify --print-certs out/*.apk || true; fi
+
+      - name: Remove keystore
+        if: always()
+        run: rm -f "$RUNNER_TEMP/skw-upload.keystore"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: second-korean-wars-android
+          if-no-files-found: error
+          path: out/*
+
+  itch:
+    needs: build
+    if: ${{ inputs.push_to_itch }}
+    runs-on: ubuntu-latest
+    env:
+      BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
+      ITCH_TARGET: ${{ vars.ITCH_USER }}/${{ vars.ITCH_GAME || 'second-korean-wars' }}
+    steps:
+      - name: Check settings
+        run: |
+          if [ -z "$BUTLER_API_KEY" ]; then echo "BUTLER_API_KEY 시크릿이 없어 itch.io 업로드를 건너뜁니다."; exit 0; fi
+          if [ "${ITCH_TARGET%%/*}" = "" ]; then
+            # ITCH_USER 변수가 없으면 API 키의 주인 이름을 itch.io 에 물어 쓴다
+            # itch.io 가 잠깐 "요청이 너무 많음"(429)을 돌려줄 때가 있어 몇 번 기다렸다 다시 묻는다
+            U=""
+            for i in 1 2 3 4 5 6; do
+              U=$(curl -fsS "https://itch.io/api/1/$BUTLER_API_KEY/me" 2>/dev/null | jq -r '.user.username // empty' 2>/dev/null || true)
+              [ -n "$U" ] || U=$(curl -fsS -H "Authorization: Bearer $BUTLER_API_KEY" https://api.itch.io/profile 2>/dev/null | jq -r '.user.username // empty' 2>/dev/null || true)
+              [ -n "$U" ] && break
+              echo "itch.io 사용자 이름 확인 재시도 ($i)"; sleep $((i * 10))
+            done
+            if [ -z "$U" ]; then echo "::error::itch.io 사용자 이름을 알 수 없습니다. 저장소 변수 ITCH_USER 를 설정하세요"; exit 1; fi
+            echo "ITCH_TARGET=$U/${ITCH_TARGET#*/}" >> "$GITHUB_ENV"
+            echo "itch.io 대상: $U/${ITCH_TARGET#*/}"
+          fi
+
+      - uses: actions/checkout@v4
+        if: env.BUTLER_API_KEY != ''
+        with:
+          sparse-checkout: desktop/package.json
+          sparse-checkout-cone-mode: false
+
+      - uses: actions/download-artifact@v4
+        if: env.BUTLER_API_KEY != ''
+        with:
+          name: second-korean-wars-android
+          path: artifacts
+
+      - name: Install butler
+        if: env.BUTLER_API_KEY != ''
+        run: |
+          curl -fsSL -o butler.zip https://broth.itch.zone/butler/linux-amd64/LATEST/archive/default
+          unzip -q butler.zip -d butler && chmod +x butler/butler && butler/butler -V
+
+      - name: Push to itch.io (android channel)
+        if: env.BUTLER_API_KEY != ''
+        run: |
+          set -e
+          V=$(node -p "require('./desktop/package.json').version")
+          B=butler/butler
+          # 서명한 release 가 있으면 그것을, 없으면 시험용 debug APK 를 올린다
+          APK="artifacts/SecondKoreanWars-$V-android.apk"
+          [ -f "$APK" ] || APK="artifacts/SecondKoreanWars-$V-android-debug.apk"
+          echo "올릴 파일: $APK"
+          # APK 한 파일 그대로 올린다. butler 가 파일 하나를 받지 않으면 APK 만 든 폴더로 올린다
+          $B push "$APK" "$ITCH_TARGET:android" --userversion "$V" || { mkdir -p apk && cp "$APK" apk/ && $B push apk "$ITCH_TARGET:android" --userversion "$V"; }
+          $B status "$ITCH_TARGET"

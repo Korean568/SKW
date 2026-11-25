@@ -1,6 +1,7 @@
 package com.secondkoreanwars.game;
 
 import android.annotation.SuppressLint;
+import android.annotation.TargetApi;
 import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.PackageInfo;
@@ -476,6 +477,7 @@ public class MainActivity extends Activity {
     }
 
     /** API 33 에서 생긴 클래스는 여기서만 쓴다 (Android 12 기기가 이 클래스를 읽지 않게). */
+    @TargetApi(33)
     private static final class Api33 {
         static void registerBack(MainActivity a) {
             a.getOnBackInvokedDispatcher().registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_DEFAULT, a::handleBack);

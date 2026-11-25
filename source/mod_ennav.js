@@ -36,10 +36,10 @@
       '이제 우리가 칠 차례다. 적 수상 전투단을 격침하라.': 'Now it’s our turn to strike. Sink the enemy surface group.',
       '섬의 해안 미사일 포대가 본함을 조준하고 있습니다.': 'The island’s coastal missile battery is targeting us.',
       '적기 격추.': 'Enemy aircraft down.', '적기 이탈.': 'Enemy aircraft withdrawing.',
-      /* ── 함 상태 · 무장 카드 ── */
-      '선체': 'Hull', '속력': 'Speed', '침로': 'Course',
-      '대공 SAM': 'Anti-air SAM', '대함 SSM': 'Anti-ship SSM', '함포': 'Gun', '함포 ·': 'Gun ·', '1.5km 방어': '1.5km defense',
-      '발': 'rds', '발사 가능': 'READY', '사거리 밖': 'Out of range', '공중 표적용': 'Air only', '수상 표적용': 'Surface only', '소진': 'Empty',
+      /* ── 함 상태 · 무장 카드 (카드 너비가 한국어 기준이라 짧게: 잔탄 단위 '발' 은 숫자만) ── */
+      '선체': 'Hull', '속력': 'SPD', '침로': 'CRS', // 추력 = Throttle (조작 안내와 같은 글자)
+      '대공 SAM': 'Anti-air SAM', '대함 SSM': 'Anti-ship SSM', '함포': 'Gun', '함포 ·': 'Gun ·', '1.5km 방어': '1.5km range',
+      '발': '', '발사 가능': 'READY', '사거리 밖': 'Out of range', '공중 표적용': 'Air only', '수상 표적용': 'Surface only', '소진': 'Empty',
       /* ── 표적 카드 · 미사일 경보 ── */
       '표적': 'Target', '없음': 'None', '없음 ·': 'None ·',
       '· 충돌': '· impact', '· 방위': '· brg',
@@ -71,6 +71,10 @@
       [/^명중 −(\d+)%$/, 'HIT −$1%'],
       [/^(\S+) 격파$/, (m, n) => (C[n] || n) + ' destroyed'],
     ]);
+
+    /* 영어일 때만 (한국어 배치는 그대로): 상태·무장 카드 꼬리표의 자간을 없애 한국어와 같은 너비에 담는다 · 좁은 창(카드 5.6em)에서는 영어 꼬리표가 넘치므로 카드만 조금 넓힌다
+       · 결과 화면 제목은 영어가 더 길어 한 줄에 들어가게 조금 작게 (그래도 넘치면 두 줄을 고르게) */
+    G.css('html[lang=en] .w label,html[lang=en] #st .rw label{letter-spacing:0}@media(max-width:1100px){html[lang=en] .w{width:6.6em}}html[lang=en] #ov:not(.t) h1{font-size:3.2em;text-wrap:balance}');
 
     /* 한국어 | English 버튼: mod_i18n 이 #ov 에 한 번만 넣는데, 결과 화면이 #ov.innerHTML 을 새로 쓰면 사라진다 → 그때마다 다시 넣는다 (두 언어 모두) */
     const lng = ov => {
