@@ -228,7 +228,7 @@ html.touch #s2o,html.touch #s3o{left:calc(68px + var(--sl));top:calc(46px + var(
 html.touch #s2p,html.touch #s3p,html.touch #pr,html.touch #pa{font-size:clamp(15px,4vh,20px)}html.touch #s2p,html.touch #s3p{padding:.6em 1.3em;border-radius:9px}html.touch #pr{top:66%;padding:.5em 1.1em;border-radius:9px}
 html.touch #pr[data-k],html.touch #pa[data-k],html.touch #s2p[data-k],html.touch #s3p[data-k]{pointer-events:auto;touch-action:none;background:#000b;border:1px solid #fe9a}html.touch #pa[data-k]{border-width:2px}html.touch #pa{top:24%}
 html.touch #s2m,html.touch #s3m{font-size:clamp(11px,2.8vh,14px)}
-html.touch #s2c{bottom:calc(max(54px,15vh) + var(--sb));gap:8vw}html.touch #s2c button{min-width:160px;min-height:68px;font-size:clamp(22px,6.4vh,34px)}
+html.touch #s2c{bottom:calc(max(54px,15vh) + var(--sb));gap:8vw}html.touch #s2c button{min-width:160px;min-height:68px;padding:.5em 1.2em;white-space:nowrap;font-size:clamp(22px,6.4vh,34px)}
 html.touch #s2t small,html.touch #s3t small,html.touch #s4t small{font-size:clamp(11px,3vh,16px)}html.touch #s2t b,html.touch #s3t b,html.touch #s4t b{font-size:clamp(22px,7vh,52px)}
 html.touch #hp,html.touch #s3hp{left:calc(72px + var(--sl));top:calc(88px + var(--st));bottom:auto;width:128px}html.touch #hp b,html.touch #s3hp b{font-size:24px}
 html.touch #am,html.touch #s3k{right:calc(12px + var(--sr));top:calc(40px + var(--st));bottom:auto;font-size:15px}html.touch #am b,html.touch #s3k b{font-size:30px}html.touch #am small,html.touch #s3k small{font-size:11px}html.touch #s3k s{height:18px}
