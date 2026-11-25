@@ -132,9 +132,9 @@ if(X[3].x>.5){ // 여성 체형: 좁은 어깨 · 허리, 넓은 엉덩이, 가�
 }
 if(m<.5){p.x*=X[2].z;p.y-=X[1].w*.012*ss(1.6,1.565,p.y)*ss(.04,.09,p.z);} // 얼굴 폭 · 말할 때 턱
 else if(m<3.5){p+=normalize(i.n)*(X[2].y+select(0.0,.009,kd>5.5&&kd<6.5&&m>1.5&&mx<10.5));} // 체격 (인민: 솜옷 부피)
-if(m>.5&&m<1.5&&p.y<.79){ // 손가락 말아 쥠 (총을 잡으면 주먹)
-let k=sign(p.x);let a=-k*X[2].w*(.79-p.y)*26.0;let d=p.xy-vec2f(k*.172,.79);
-p=vec3f(k*.172+d.x*cos(a)-d.y*sin(a),.79+d.x*sin(a)+d.y*cos(a),p.z);}
+if(m>.5&&m<1.5&&p.y<.79&&X[2].w>.01){ // 손가락 말아 쥠: 손바닥 쪽(몸 안쪽)으로 R 만큼 떨어진 축을 감싸며 굽힘 (총·칼을 잡으면 손잡이를 감싼 주먹)
+let k=sign(p.x);let R=.026/X[2].w;let s=.79-p.y;let t=(k*.172-p.x)*k;let th=min(s/R,4.2);let ex=s-th*R;
+let q=vec2f(k*(.172-R),.79)+(R-t)*vec2f(k*cos(th),-sin(th))+ex*vec2f(-k*sin(th),-cos(th));p=vec3f(q,p.z);}
 let pm=u32(X[3].y);let pb=select(select(select(select(0u,8u,m==16.0),4u,m==14.0),2u,m==15.0),1u,m==5.0); // 선택 부품: 1 방탄판 · 2 치마 · 4 쪽머리 · 8 권총집
 let hd=(m>5.5&&m<9.5&&abs(m-X[0].w)>.5)||((pm&pb)!=pb)||(X[2].x>.5&&(mx<4.5||(mx>10.5&&mx<16.5)));
 let w=mix(pal[o+u32(i.b.x)]*vec4f(p,1.0),pal[o+u32(i.b.y)]*vec4f(p,1.0),i.b.z);
@@ -167,9 +167,9 @@ fn n3(p:vec3f)->f32{ // 3D 값 잡음 (잡음 텍스처 2탭)
 let z=floor(p.z);let u=(p.xy+.5)/256.0;let o=vec2f(.141,.273);
 return mix(textureSampleLevel(noiseTex,linSamp,u+z*o,0.0).r,textureSampleLevel(noiseTex,linSamp,u+(z+1.0)*o,0.0).r,fract(p.z));
 }
-@fragment fn fs(i:VO)->@location(0)vec4f{
+@fragment fn fs(i:VO,@builtin(front_facing) ff:bool)->@location(0)vec4f{
 let m=i.m.x;let kd=i.m.y;let sd=i.m.z;let b=i.b;let h=b-vec3f(0.0,${YC},.012);let ax=abs(h.x);let fe=i.e.x;let tor=i.e.w<4.5;
-var N=normalize(i.n);let E=normalize(g.cam.xyz-i.w);let Ls=g.sun.xyz;let px=length(fwidth(b));let fpv=i.e.w>31.0;
+var N=normalize(i.n);if(!ff){N=-N;}let E=normalize(g.cam.xyz-i.w);let Ls=g.sun.xyz;let px=length(fwidth(b));let fpv=i.e.w>31.0;
 let hh=hgt(b,m);let dwx=dpdx(i.w);let dwy=dpdy(i.w);let dhx=dpdx(hh);let dhy=dpdy(hh);
 var al=vec3f(.03);var gl=.5;var tc=vec3f(0.0);var sk=0.0;var ao=1.0;var hi=0.0;var cf=0.0;
 let hc=vec3f(.022,.018,.016);
@@ -575,16 +575,18 @@ return vec4f(fogAt(c,i.w),1.0);
   }
  };
 
- let sm,bgl,bg,pb,ib,vb,xb,pipe,spipe,lod=-1,n=0,fpn=-1;const PP={},MR=[],off=[0,0,0,0,0,0,0];
- const mkp=(vs,ds,fragment,count=1)=>G.dev.createRenderPipeline({
+ let sm,bgl,bg,pb,ib,vb,xb,pipe,pipeN,spipe,lod=-1,n=0,fpn=-1;const PP={},PN={},MR=[],off=[0,0,0,0,0,0,0];
+ const mkp=(vs,ds,fragment,count=1,cull='back')=>G.dev.createRenderPipeline({
   layout:G.layout(bgl),vertex:{module:sm,entryPoint:vs,buffers:[
    {arrayStride:40,attributes:[{shaderLocation:0,offset:0,format:'float32x3'},{shaderLocation:1,offset:12,format:'float32x3'},{shaderLocation:2,offset:24,format:'float32x4'}]},
    {arrayStride:4,stepMode:'instance',attributes:[{shaderLocation:3,offset:0,format:'uint32'}]}]},
-  fragment,primitive:{cullMode:'back'},multisample:{count},depthStencil:{format:G.DEPTH,depthWriteEnabled:true,...ds}});
- const draw=(p,pl,s)=>{ // s = 1: 그림자 (1인칭 팔·총 제외: 1인칭은 각 묶음의 마지막 칸)
+  fragment,primitive:{cullMode:cull},multisample:{count},depthStencil:{format:G.DEPTH,depthWriteEnabled:true,...ds}});
+ const draw=(p,pl,s,pn)=>{ // s = 1: 그림자 (1인칭 팔·총 제외: 1인칭은 각 묶음의 마지막 칸)
   if(!n||!pl)return;
   p.setPipeline(pl);p.setBindGroup(1,bg);p.setVertexBuffer(0,vb);p.setVertexBuffer(1,ib);p.setIndexBuffer(xb,'uint16');
-  for(let k=0;k<7;k++){const g=GL[k],c=g.length-(s&&fpn>=0&&g[g.length-1]===fpn?1:0);if(c>0)p.drawIndexed(MR[k][1],c,MR[k][0],0,off[k]);}
+  for(let k=0;k<7;k++){const g=GL[k],f=fpn>=0&&g[g.length-1]===fpn,c=g.length-(f?1:0);if(c>0)p.drawIndexed(MR[k][1],c,MR[k][0],0,off[k]);
+   // 1인칭 팔·무기는 뒷면 제거 없이 따로 그림: 주먹(손가락을 접어 만든 면)이 가까이서 뒤집혀 구멍 나 보이던 것 방지
+   if(f&&!s&&pn){p.setPipeline(pn);p.drawIndexed(MR[k][1],1,MR[k][0],0,off[k]+c);p.setPipeline(pl);}}
  };
  G.register('people',{
   init(){
@@ -598,6 +600,7 @@ return vec4f(fogAt(c,i.w),1.0);
   onQuality(Q){
    const d=G.dev,U=GPUBufferUsage,lo=+(Q.level<1);
    pipe=PP[Q.msaa]||(PP[Q.msaa]=mkp('vs',{depthCompare:'greater'},{module:sm,entryPoint:'fs',targets:[{format:G.HDR}]},Q.msaa));
+   pipeN=PN[Q.msaa]||(PN[Q.msaa]=mkp('vs',{depthCompare:'greater'},{module:sm,entryPoint:'fs',targets:[{format:G.HDR}]},Q.msaa,'none'));
    if(lo===lod)return;lod=lo;V=[];I=[];
    [()=>body(lo),()=>gun(0),()=>gun(1),()=>gun(2),scope,knife,radio].forEach((f,k)=>{const s=I.length;f();MR[k]=[s,I.length-s];});
    for(let t=0;t<I.length;t+=3){ // 면 법선을 정점에 누적 → 매끈한 법선
@@ -627,7 +630,7 @@ return vec4f(fogAt(c,i.w),1.0);
     G.dev.queue.writeBuffer(pb,0,PAL,0,n*NB*16);G.dev.queue.writeBuffer(ib,0,IB,0,o);
    }catch(e){G.err('people: ' +(e.stack||e));n=0;}
   },
-  opaque(p){draw(p,pipe,0);},
+  opaque(p){draw(p,pipe,0,pipeN);},
   shadow(p){draw(p,spipe,1);}
  },'story');
 }
