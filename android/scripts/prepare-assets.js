@@ -23,8 +23,8 @@ const OUT = path.join(AND, 'app', 'src', 'main', 'assets');
 const die = (msg) => { console.error('[prepare-assets] 오류: ' + msg); process.exit(1); };
 
 // esbuild 가 있는지 먼저 확인 (없으면 빌드 오류 대신 해결 방법을 알려 준다)
+//   build-story.js 는 NODE_PATH 를 desktop/node_modules 로 바꿔 빌드하므로, 밖에서 준 NODE_PATH 의 esbuild 는 쓰이지 않는다
 const hasEsbuild = [path.join(REPO, 'desktop', 'node_modules'), path.join(REPO, 'tools', 'node_modules')]
-  .concat((process.env.NODE_PATH || '').split(path.delimiter).filter(Boolean))
   .some((d) => fs.existsSync(path.join(d, 'esbuild', 'package.json')));
 if (!hasEsbuild) die('esbuild 가 없습니다. 먼저 실행하세요:\n    cd desktop && ELECTRON_SKIP_BINARY_DOWNLOAD=1 npm ci');
 
@@ -57,7 +57,7 @@ if (vp.test(html)) {
   html = html.replace(vp, (m, q, c) => /viewport-fit\s*=/.test(c) ? m : `<meta name="viewport" content="${c},viewport-fit=cover">`);
   vpNote = html.match(vp)[2];
 } else {
-  html = html.replace(tag, '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">' + tag);
+  html = html.replace(tag, () => '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">' + tag);
 }
 
 // 4) 저장
