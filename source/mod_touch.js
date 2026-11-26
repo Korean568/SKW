@@ -175,8 +175,10 @@
     function prompts() {
       for (const id of ['pr', 'pa', 's2p', 's3p']) {
         const e = $(id), n = e && e.firstChild; if (!e) continue;
-        const m = n && n.nodeType === 3 && n.nodeValue.match(KEYP), k = m ? 'Key' + m[1] : '';
-        if (m) n.nodeValue = strip(n.nodeValue);
+        const m = n && n.nodeType === 3 && n.nodeValue.match(KEYP);
+        let k = '';
+        if (m) { k = 'Key' + m[1]; n.nodeValue = strip(n.nodeValue); e._tv = n.nodeValue; e._tk = k; }
+        else if (n && n.nodeType === 3 && n.nodeValue === e._tv) k = e._tk; // HUD 가 이번 프레임에 다시 쓰지 않았으면 이미 지운 글자 그대로 → 키 유지 (깜빡임 방지)
         if ((e.dataset.k || '') !== k) k ? e.dataset.k = k : delete e.dataset.k;
       }
     }
