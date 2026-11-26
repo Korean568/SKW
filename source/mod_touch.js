@@ -237,7 +237,7 @@ html.touch #s2t small,html.touch #s3t small,html.touch #s4t small{font-size:clam
 html.touch #hp,html.touch #s3hp{left:calc(72px + var(--sl));top:calc(88px + var(--st));bottom:auto;width:128px}html.touch #hp b,html.touch #s3hp b{font-size:24px}
 html.touch #am,html.touch #s3k{right:calc(12px + var(--sr));top:calc(40px + var(--st));bottom:auto;font-size:15px}html.touch #am b,html.touch #s3k b{font-size:30px}html.touch #am small,html.touch #s3k small{font-size:11px}html.touch #s3k s{height:18px}
 html.touch #ct{top:calc(6px + var(--st));font-size:15px}html.touch #ct b{font-size:20px}html.touch #ct small{font-size:11px}
-html.touch #fd,html.touch #s3d,html.touch #end{z-index:5}html.touch #fd button,html.touch #s3d button{min-height:48px}html.touch #fd button.t,html.touch #s3d button.t{min-height:44px;padding:.6em 1.6em}
+html.touch #fd,html.touch #s3d,html.touch #end{z-index:5}html.touch:has(#fd[style*=grid]) #dl,html.touch:has(#s3d[style*=grid]) #dl{visibility:hidden}html.touch #fd button,html.touch #s3d button{min-height:48px}html.touch #fd button.t,html.touch #s3d button.t{min-height:44px;padding:.6em 1.6em}
 html.touch #dk{align-content:safe center;overflow-y:auto;padding:calc(10px + var(--st)) calc(6vw + var(--sr)) calc(10px + var(--sb)) calc(6vw + var(--sl));font-size:clamp(14px,1.5vw,20px);touch-action:pan-y}
 html.touch #dk .h{display:none}html.touch #dk h2{font-size:clamp(28px,4.4vw,64px)}html.touch #dk .tb{margin-bottom:.7em;font-size:11px}
 html.touch #dk .m{margin-top:.5em}html.touch #dk .m>div{display:flex;align-items:center;min-height:48px;box-sizing:border-box;margin:.15em 0;padding:.3em 2em .3em 1em;font-size:1.3em}
