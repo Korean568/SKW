@@ -116,14 +116,14 @@
       addEventListener('keydown', e => { if (e.code === 'F2') { e.preventDefault(); this.pick(G.qManual ? TIERS[G.Q.level + 1] || '' : 'LOW'); } });
       const s = store(); if (!G.params.get('q') && G.PRESETS[s]) G.setQuality(s, true); // 지난번 수동 선택 유지
     },
-    pick(q) { store(q || ''); low = 0; last = null; G.dyn = 1; G.setQuality(q || G.gpuInfo.tier, !!q); },
+    pick(q) { store(q || ''); low = 0; last = null; hold = 0; G.dyn = 1; G.setQuality(q || G.gpuInfo.tier, !!q); },
     onQuality() { for (const b of el.querySelectorAll('button')) b.className = (G.qManual ? b.dataset.q === G.Q.name : !b.dataset.q) ? 'on' : ''; low = 0; },
     update(dt) {
       const vis = document.visibilityState === 'visible', f = +G.fps;
       // 동적 해상도: 1초마다 GPU 시간(없으면 FPS)으로 배율 0.5~1 조절 (?dyn=0 끔) · 자동 모드: 그래도 4초 넘게 목표의 47% (60fps 기준 28) 미만이면 한 단계 낮춤
       if ((win += dt) >= 1 && vis && !G.params.has('step') && G.params.get('dyn') !== '0') {
         win = 0; let k = 1; const g = G.gpuMs;
-        tgt = Math.min(60, Math.max(tgt, f)); // 상한(30fps 등)이 풀리면 목표도 다시 올라감
+        tgt = f > tgt * 1.15 ? 60 : Math.min(60, Math.max(tgt, f)); // 상한(30fps 등)이 풀리면 (목표보다 15% 넘게 빠름) 다시 60 목표로 — 낮은 상한은 아래 시험이 다시 찾음
         if (g > 0) { // 타이머 값이 프레임 간격과 안 맞으면 (간격의 2.5배 초과 · 느린데 간격의 5% 미만) 5초 연속이면 버리고 FPS 방식으로
           const fi = 1000 / Math.max(f, 1);
           tsBad = g > fi * 2.5 + 2 || (f < 40 && g < fi * .05) ? tsBad + 1 : 0;

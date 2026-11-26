@@ -431,6 +431,7 @@ G.tick = dt => {
     }, () => { tsBusy = 0; });
   }
 };
+G.tsFeed = tsFeed; // 시험용: 가짜 타이머 값 넣기
 /* 검증용(?step): 루프 대신 G.test.run(n, dt) 로 결정적 스텝 → 오프스크린 결과를 읽어 2D 캔버스에 표시(헤드리스 캡처 가능) */
 G.test = {
   async run(n = 1, dt = 1 / 30) { for (let i = 0; i < n; i++) G.tick(dt); await G.test.snap(); return G.errors; },
