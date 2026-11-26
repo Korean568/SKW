@@ -81,6 +81,12 @@ for (const m of MODS) {
 if (stubs) code += '\n\n' + read('stubs.js');
 code += '\n\nG.boot();';
 let html = fs.readFileSync(path.join(D, 'template.html'), 'utf8');
+// 웹판(GitHub Pages) = 해상대전: 탭 제목 · 아이콘을 해상대전으로 바꾼다 (스토리 게임 · PC판 아이콘은 template.html 그대로 — desktop/scripts/make-icon.js 가 거기서 만든다)
+if (MODE === 'naval') {
+  const icon = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='#0b2140'/><rect y='20' width='32' height='12' fill='#1b4f7a'/><path d='M3 19h26l-3 5H6z' fill='#a7b2bd'/><rect x='13' y='13' width='7' height='6' fill='#c3ccd5'/><rect x='16' y='8' width='1.6' height='5' fill='#c3ccd5'/><rect x='6' y='16' width='5' height='3' fill='#c3ccd5'/><path d='M3 27c3-1.5 6 1.5 9 0s6 1.5 9 0 6 1.5 9 0' stroke='#8fc1e3' stroke-width='1.4' fill='none'/></svg>";
+  html = html.replace(/<title>[^<]*<\/title>/, '<title>해상대전 · Second Korean Wars</title>')
+    .replace(/<link rel="icon" href="[^"]*">/, () => '<link rel="icon" href="data:image/svg+xml,' + encodeURIComponent(icon) + '">');
+}
 const srcKB = Buffer.byteLength(code) / 1024; let rawKB = 0;
 if (readable) html = html.replace('/*__CODE__*/', () => "'use strict';\n" + code);
 else {
