@@ -1,0 +1,4 @@
+// Android Gradle Plugin 8.13.x: Gradle 8.13 이상 · JDK 17 · API 36 까지 지원
+plugins {
+    id 'com.android.application' version '8.13.2' apply false
+}

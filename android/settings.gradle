@@ -1,0 +1,17 @@
+// Second Korean Wars — Android 앱 (스토리 게임을 WebView 로 감싼 껍데기)
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+rootProject.name = 'SecondKoreanWars'
+include ':app'

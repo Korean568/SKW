@@ -12,6 +12,11 @@
       '그래픽': 'Graphics', '자동': 'Auto', '렌더 배율': 'Render Scale',
       '전체 화면': 'Fullscreen', '켜기': 'On', '끄기': 'Off',
       '소리 크기': 'Volume', '마우스 감도': 'Mouse Sensitivity',
+      /* ── 터치 조작 (mod_touch: 휴대폰 · 안드로이드 앱) ── */
+      '시점 감도': 'Look Sensitivity',
+      '사격': 'FIRE', '조준': 'AIM', '장전': 'RELOAD', '앉기': 'CROUCH', '방탄': 'PLATE', '줍기': 'GRAB', '무기': 'WEAPON', '스코프': 'SCOPE', '사용': 'USE', '단검': 'STAB', '투척': 'THROW',
+      '조작': 'Controls', '화면 왼쪽을 밀어 이동 · 오른쪽을 밀어 둘러보기': 'Drag the left side to move · drag the right side to look',
+      '오른쪽 버튼으로 사격 · 조준 · 줍기': 'Buttons on the right: fire · aim · pick up',
       '자막 크기': 'Subtitle Size', '작게': 'Small', '보통': 'Medium', '크게': 'Large',
       '언어': 'Language', '돌아가기': 'Back', '돌아가기 ·': 'Back ·',
       /* ── 성능 알약 ── */
