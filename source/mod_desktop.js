@@ -7,7 +7,7 @@
     const web = !!(D && D.platform === 'web'), canQuit = !web, canFs = !web || !!D.canFullscreen;
     const KEY = 'skw-desktop-settings', PKEY = 'skw-progress', TITLE = 'Second Korean Wars · 제 2차 한국전쟁';
     const ls = (k, v) => { try { if (v === undefined) return JSON.parse(localStorage.getItem(k)); localStorage.setItem(k, JSON.stringify(v)); } catch (e) { return null; } };
-    // 설정: q 그래픽('auto'|LOW|MEDIUM|HIGH) · scale 렌더 배율(0 = 자동 동적 해상도, 50~100 수동) · fs 전체 화면 · vol 소리 · sens 마우스 감도 · sub 자막(s|m|l)
+    // 설정: q 그래픽('auto' | 등급 이름 'Very Low'…'Ultra' — 예전 저장값 LOW/MEDIUM/HIGH 도 G.tierOf 로 읽음) · scale 렌더 배율(0 = 자동 동적 해상도, 50~100 수동) · fs 전체 화면 · vol 소리 · sens 마우스 감도 · sub 자막(s|m|l)
     const cfg = Object.assign({ q: 'auto', scale: 0, fs: null, vol: 1, sens: 1, sub: 'm' }, ls(KEY) || {});
     const save = () => ls(KEY, cfg);
     let done = ls(PKEY); if (!Array.isArray(done)) done = [];
@@ -47,11 +47,13 @@
       else { dynURL === null ? G.params.delete('dyn') : G.params.set('dyn', dynURL); G.dyn = 1; }
       G.resize();
     };
-    const quality = q => { // 'auto' | LOW | MEDIUM | HIGH — 성능 알약(mod_gpu)과 같은 경로
-      const g = G.mods.gpu, m = q === 'auto' ? '' : q;
-      g && g.pick ? g.pick(m) : G.setQuality(m || 'MEDIUM', !!m);
-      if (cfg.scale) scale();
+    const quality = q => { // 'auto' | 등급 이름 — 성능 알약 · F2 (mod_gpu)와 같은 경로 G.gpu.pick ('' = 자동)
+      const p = q === 'auto' ? null : G.tierOf(q), m = p ? p.name : '';
+      G.gpu && G.gpu.pick ? G.gpu.pick(m) : G.setQuality(m || 'Medium', !!m);
+      if (cfg.scale) scale(); // pick 이 동적 해상도를 1 로 되돌림 → 수동 렌더 배율 다시 적용
     };
+    // '자동' 이 고를 등급: 자동 모드면 지금 등급 (자동 하향·휴대폰 상향 반영), 수동이면 감지 등급 (G.tierCap 이하)
+    const autoName = () => G.qManual ? (G.TIERS[G.clamp(Math.min((G.gpu && G.gpu.detected) || 4, G.tierCap), 1, 10) - 1] || G.Q).name : G.Q.name;
     const marks = () => { // 타이틀 챕터 옆 ✓
       const o = ov(); if (!o) return;
       o.querySelectorAll('.ch>div').forEach((e, i) => {
@@ -101,13 +103,15 @@
     /* ── 설정 화면 갱신 ── */
     function sync() {
       const r = ui.s, seg = (k, v) => r.querySelectorAll(`[data-k=${k}] button`).forEach(b => b.classList.toggle('on', b.dataset.v === String(v)));
-      seg('q', G.qManual ? G.Q.name : 'auto'); seg('sub', cfg.sub); G.i18n && seg('lang', G.lang); seg('sc', cfg.scale ? '' : 'auto');
+      seg('q', G.qManual ? G.Q.name : 'auto'); r.querySelector('[data-k=q] .qa').textContent = ` (${autoName()})`; seg('sub', cfg.sub); G.i18n && seg('lang', G.lang); seg('sc', cfg.scale ? '' : 'auto');
       const sc = r.querySelector('[data-k=sc] input'); sc.value = cfg.scale || Math.round(G.dyn * 100);
-      r.querySelector('[data-k=sc] output').textContent = (cfg.scale ? cfg.scale : Math.round(G.dyn * 100)) + ' %' + (cfg.scale ? '' : ' (자동)');
+      r.querySelector('[data-k=sc] output').textContent = scOut(cfg.scale || Math.round(G.dyn * 100));
       r.querySelector('[data-k=vol] input').value = Math.round(cfg.vol * 100); r.querySelector('[data-k=vol] output').textContent = Math.round(cfg.vol * 100) + ' %';
       r.querySelector('[data-k=sens] input').value = cfg.sens; r.querySelector('[data-k=sens] output').textContent = cfg.sens.toFixed(1) + 'x';
       fsGet().then(v => { if (menu === 'set') seg('fs', v ? 1 : 0); });
     }
+    // 렌더 배율 출력: "75 % (자동) · 1440×810" — 배율은 등급의 기본 배율(초표본 등급은 1 보다 큼)에 곱해지므로 실제 렌더 해상도를 같이 보여 줌
+    const scOut = v => v + ' %' + (cfg.scale ? '' : ' (자동)') + (G.targets && G.targets.w ? ` · ${G.targets.w}×${G.targets.h}` : '');
     function onSet(k, v, input) {
       if (k === 'q') { cfg.q = v; quality(v); }
       if (k === 'sc') { cfg.scale = v === 'auto' ? 0 : +v; scale(); }
@@ -116,7 +120,7 @@
       if (k === 'sens') cfg.sens = +v;
       if (k === 'sub') { cfg.sub = v; sub(); }
       if (k === 'lang') G.i18n && G.i18n.set(v); // 언어 (mod_i18n): 화면 글자는 사전이 바로 바꿈
-      save(); if (!input || k !== 'sc') sync(); else ui.s.querySelector('[data-k=sc] output').textContent = v + ' %';
+      save(); if (!input || k !== 'sc') sync(); else { ui.s.querySelector('[data-k=sc] output').textContent = scOut(v); ui.s.querySelector('[data-k=sc] button').classList.remove('on'); } // 밀면 바로 수동 (자동 표시를 끔)
     }
 
     /* ── 입력 ── */
@@ -159,6 +163,9 @@
 #dk .h{margin-top:1.6em;font-size:max(11px,.9vw);color:#9fb1c4}#dk .h b{color:#dfe8f2;font-weight:600}
 #dk .g{display:grid;grid-template-columns:auto auto;gap:.85em 2.2em;align-items:center;margin-top:1.3em}#dk .g>span{color:#aebccb;letter-spacing:.12em}
 #dk .g>div{display:flex;align-items:center;gap:.5em}#dk .g button{font:600 .95em system-ui;letter-spacing:.08em;padding:.3em .9em;color:#dfe8f2;background:#0006;border:1px solid #fff4;border-radius:5px;cursor:pointer}#dk .g button:hover{border-color:#fff}#dk .g button.on{color:#0b0f14;background:#fff;border-color:#fff}
+#dk .g>div[data-k=q]{display:grid;grid-template-columns:auto repeat(5,minmax(0,1fr));gap:.4em}#dk [data-k=q] button{min-width:0;padding:.3em .55em;white-space:nowrap}
+#dk [data-k=q] [data-v=auto]{grid-row:span 2;padding:.3em .9em}#dk [data-k=q] .qa{display:block;font-weight:400;font-size:.9em;opacity:.8}
+html.touch #dk .g [data-k=q] button{min-width:0;min-height:40px;padding:.25em .2em;font-size:.8em;line-height:1.15;white-space:normal;letter-spacing:.02em}html.touch #dk .g [data-k=q] [data-v=auto]{padding:.25em .6em}
 #dk input[type=range]{width:clamp(150px,15vw,300px);accent-color:#fff;cursor:pointer}#dk output{min-width:6.5em;color:#fff;font-variant-numeric:tabular-nums}
 #dk .bk{margin-top:1.6em;padding:.45em 2.2em;font:700 1.2em system-ui;letter-spacing:.3em;color:#0b0f14;background:#fff;border:0;border-radius:6px;cursor:pointer;box-shadow:0 6px 30px #fff4}#dk .bk.sel{outline:2px solid #fff;outline-offset:3px}
 #ov .dkb{display:flex;gap:.7em;margin:.2em 0 0}#ov .dkb button{margin:.5em 0 0;padding:.35em 1.5em;font:600 max(11px,1.05vw) system-ui;letter-spacing:.22em;color:#dfe8f2;background:#0006;border:1px solid #fff5;border-radius:6px;box-shadow:none}#ov .dkb button:hover{color:#fff;border-color:#fff}
@@ -168,7 +175,7 @@
 <div class=m><div data-a=resume>계속하기</div><div data-a=set>설정</div><div data-a=title>처음 화면으로</div>${canQuit ? '<div data-a=quit>게임 종료</div>' : ''}</div>
 <div class=h><b>Esc</b> 계속하기 · <b>↑ ↓</b> 선택 · <b>Enter</b> 확인</div></div>
 <div class=s><div class=tb>SECOND <b>KOREAN</b> WARS</div><h2>설정</h2><div class=g>
-<span>그래픽</span><div data-k=q><button data-v=auto>자동</button><button data-v=LOW>LOW</button><button data-v=MEDIUM>MEDIUM</button><button data-v=HIGH>HIGH</button></div>
+<span>그래픽</span><div data-k=q><button data-v=auto>자동<span class=qa data-i18n-skip></span></button>${G.TIER_NAMES.map((n, i) => `<button data-v="${n}" title="${i + 1}/10">${n}</button>`).join('')}</div>
 <span>렌더 배율</span><div data-k=sc><button data-v=auto>자동</button><input type=range min=50 max=100 step=5><output></output></div>
 <span>전체 화면</span><div data-k=fs><button data-v=1>켜기</button><button data-v=0>끄기</button></div>
 <span>소리 크기</span><div data-k=vol><input type=range min=0 max=100 step=5><output></output></div>
@@ -199,12 +206,15 @@ ${G.i18n ? '<span>언어</span><div data-k=lang><button data-v=ko data-i18n-skip
         }
         // 저장된 설정 적용 (?q= 로 고정한 경우 그래픽은 그대로)
         sub();
-        if (!G.params.get('q') && (cfg.q === 'auto' ? G.qManual : G.PRESETS[cfg.q] && (!G.qManual || cfg.q !== G.Q.name))) quality(cfg.q);
+        const sq = cfg.q === 'auto' ? null : G.tierOf(cfg.q); // 예전 'LOW'/'MEDIUM'/'HIGH' → Very Low / Medium / High
+        if (sq && cfg.q !== sq.name) { cfg.q = sq.name; save(); }
+        if (!G.params.get('q') && (cfg.q === 'auto' ? G.qManual : sq && (!G.qManual || sq.tier !== G.Q.tier))) quality(cfg.q);
         if (cfg.scale) scale();
         if (cfg.fs !== null && D && !web && !touch()) fsSet(cfg.fs); // 브라우저는 사용자 입력 없이 전체 화면을 켤 수 없다
         vol();
       },
       onQuality(Q) { if (!G.params.get('q')) { cfg.q = G.qManual ? Q.name : 'auto'; save(); } menu === 'set' && sync(); }, // F2 · 성능 알약으로 바꾼 것도 기억
+      onResize() { menu === 'set' && sync(); }, // 렌더 해상도 표시 (동적 해상도 · 등급 전환)
       update() {
         // 엔딩 카드에 닿으면 완료 기록 (스토리 1 은 승리 엔딩만)
         const s1 = G.story && G.story.S;

@@ -16,18 +16,24 @@
       m && m.setAttribute('content', 'width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover');
     }
 
-    /* ── 성능: 휴대폰은 화면 밀도가 높다 → 내부 해상도를 LOW ≈ 960×540, MEDIUM ≈ 1280×720 이하로 묶음 (동적 해상도는 그대로 동작) ── */
-    const P = G.PRESETS;
-    P.LOW.dprCap = Math.max(P.LOW.dprCap, 1.5); P.LOW.maxPx = Math.min(P.LOW.maxPx, 5.2e5);
-    P.MEDIUM.maxPx = Math.min(P.MEDIUM.maxPx, 9.3e5); P.HIGH.maxPx = Math.min(P.HIGH.maxPx, 1.7e6);
-    // GPU 이름: 모바일 GPU(Adreno · Mali · PowerVR · Xclipse · Apple GPU …)와 이름을 모르는 기기는 LOW 로 시작
+    /* ── 성능: 휴대폰은 화면 밀도가 높고 메모리가 적다 → 10단계 모두 내부 해상도(화소 예산 maxPx)를 묶음 (동적 해상도는 그대로 동작)
+          Very Low ≈ 960×540 · Medium ≈ 1280×720 · High ≈ 1740×975 · Ultra ≈ 2160×1215 — 수동으로 Ultra 를 골라도 1000만 화소 버퍼는 만들지 않음.
+          dprCap 1.5~2: 낮은 등급도 화면 밀도를 조금 살리고(예전 LOW 와 같은 1.5) 높은 등급도 2 를 넘지 않게. 그림자 맵은 4096² 까지 (8192² 깊이 = 256MB) ── */
+    const PX = [5.2e5, 6.2e5, 7.6e5, 9.3e5, 1.1e6, 1.35e6, 1.7e6, 2.1e6, 2.5e6, 2.9e6];
+    for (const P of G.TIERS) {
+      P.dprCap = G.clamp(P.dprCap, 1.5, 2); P.maxPx = Math.min(P.maxPx, PX[P.tier - 1]);
+      if (P.shadowRes > 4096) P.shadowRes = 4096;
+    }
+    // 자동 선택은 Medium(4단계)까지 — 그 위는 설정 · 성능 알약에서 직접 고를 때만 (G.tierCap 은 수동 선택을 막지 않음)
+    G.tierCap = Math.min(G.tierCap, 4);
+    // GPU 이름: 모바일 GPU(Adreno · Mali · PowerVR · Xclipse · Apple GPU …)와 이름을 모르는 기기는 Very Low(1단계)로 시작 (안드로이드 앱 · iPhone 웹)
     const MOB = /adreno|mali|immortalis|powervr|xclipse|maleoon|apple gpu|apple a\d|qualcomm|\barm\b|imgtec|imagination|samsung|valhall|bifrost|midgard|videocore|tegra/;
     const gm = G.mods.gpu;
     if (gm && gm.detect) {
       const det = gm.detect;
       gm.detect = async function (...a) {
         const i = await det.apply(this, a);
-        if (MOB.test((i.name + ' ' + i.vendor + ' ' + i.arch).toLowerCase()) || i.nameTier === '?') { i.mobile = 1; i.nameTier = 'LOW'; i.tier = 'LOW'; }
+        if (MOB.test((i.name + ' ' + i.vendor + ' ' + i.arch).toLowerCase()) || i.nameTier === '?') { i.mobile = 1; i.nameTier = 'LOW'; i.tier = G.TIER_NAMES[0]; i.tierN = i.detN = 1; }
         return i;
       };
     }
@@ -172,7 +178,7 @@
     };
 
     /* ── 화면 맞춤: 버튼 보이기/강조 · 프롬프트의 [E] 같은 키 표시 지우기 ── */
-    let lastSet = null, lastMenu = 0, raiseT = 0, raised = 0;
+    let lastSet = null, lastMenu = 0, raiseT = 0, tried = 0, noRaise = 0;
     const KEYP = /\s*\[([A-Z])\]\s*/, strip = s => s.replace(KEYP, (m, k, i) => i && i + m.length < s.length ? ' ' : '');
     function prompts() {
       for (const id of ['pr', 'pa', 's2p', 's3p']) {
@@ -290,13 +296,17 @@ html.touch #dk{background:linear-gradient(90deg,#000f,#000f 50%,#000e)}
       },
       update(dt) {
         prompts();
-        // 자동 등급: LOW 로 시작한 기기가 20초 동안 여유(해상도 100% · 목표 FPS 의 92% 이상)를 보이고 벤치마크도 받쳐 주면 한 번만 MEDIUM 으로 올려 봄 (무거우면 gpu 모듈이 다시 내림)
+        // 자동 등급 올려 보기: 휴대폰(Very Low 로 시작)이 20초 동안 여유(해상도 100% · 목표 FPS 의 92% 이상)를 보이면 한 단계 위로 (G.tierCap = Medium 까지,
+        //   벤치마크 등급보다 위로는 안 감). 올린 등급마다 한 번만: 무거우면 gpu 모듈이 다시 내리고(↓) 그 뒤로는 더 올리지 않음 (오르내림 반복 방지)
         //   목표 FPS = gpu 모듈이 찾은 프레임 상한 (보통 60 · iPhone 저전력 모드 / 첫 터치 전 iframe 등 30fps 상한이면 30 → 55 고정이면 영영 못 올림)
-        const g = G.gpuInfo;
-        if (!raised && g && g.mobile && !G.qManual && G.Q.level === 0 && g.benchTier !== 'LOW' && !G.params.has('step') && !G.params.get('q')) {
-          const ft = G.gpu && G.gpu.fpsTarget || 60;
-          raiseT = G.dyn > .99 && +G.fps >= ft * .92 ? raiseT + dt : 0;
-          if (raiseT > 20) { raised = 1; g.tier = 'MEDIUM'; g.auto = '↑'; G.setQuality('MEDIUM', false); }
+        const g = G.gpuInfo, t = G.Q.tier;
+        if (!noRaise && g && g.mobile && !G.qManual && !G.params.has('step') && !G.params.get('q')) {
+          if (tried && t < tried) noRaise = 1; // 올린 등급이 무거워 내려옴 → 여기서 멈춤
+          else if (t < Math.min(G.tierCap, g.benchTierN || 0, 10)) {
+            const ft = G.gpu && G.gpu.fpsTarget || 60;
+            raiseT = G.dyn > .99 && +G.fps >= ft * .92 ? raiseT + dt : 0;
+            if (raiseT > 20) { raiseT = 0; tried = t + 1; g.tier = G.TIER_NAMES[t]; g.auto = '↑'; G.setQuality(g.tier, false); }
+          } else raiseT = 0;
         }
       },
       prepare() {

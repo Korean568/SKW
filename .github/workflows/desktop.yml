@@ -4,6 +4,8 @@
 # 2) 저장소 시크릿 BUTLER_API_KEY 가 있을 때만 itch.io 에 butler 로 올린다.
 #    올릴 곳은 저장소 변수 ITCH_USER (itch.io 사용자 이름), ITCH_GAME (기본 second-korean-wars).
 #    자세한 설명: desktop/README-itch.md
+# 버전: 파일 이름 · itch.io 버전 · Releases 이름은 desktop/package.json 의 skwLabel (보이는 번호, 예 0.13),
+#       Releases 태그는 version (내부 번호, 예 1.3.0 — 릴리스마다 올라가 겹치지 않음). 규칙: README-itch.md "버전 번호"
 name: Desktop builds
 
 on:
@@ -82,19 +84,21 @@ jobs:
 
       - name: Version
         id: v
-        run: echo "v=$(node -p "require('./desktop/package.json').version")" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "v=$(node -p "require('./desktop/package.json').version")" >> "$GITHUB_OUTPUT"
+          echo "l=$(node -p "require('./desktop/package.json').skwLabel")" >> "$GITHUB_OUTPUT"
 
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: desktop-v${{ steps.v.outputs.v }}
-          name: Second Korean Wars PC ${{ steps.v.outputs.v }}
+          name: Second Korean Wars PC ${{ steps.v.outputs.l }}
           target_commitish: ${{ github.sha }}
           make_latest: true
           files: artifacts/*
           body: |
-            Second Korean Wars (제 2차 한국전쟁) PC 다운로드판 ${{ steps.v.outputs.v }}
+            Second Korean Wars (제 2차 한국전쟁) PC 다운로드판 ${{ steps.v.outputs.l }}
 
-            - Windows: SecondKoreanWars-${{ steps.v.outputs.v }}-win-x64.zip (압축을 풀고 Second Korean Wars.exe 실행) 또는 -portable.exe (바로 실행)
+            - Windows: SecondKoreanWars-${{ steps.v.outputs.l }}-win-x64.zip (압축을 풀고 Second Korean Wars.exe 실행) 또는 -portable.exe (바로 실행)
             - macOS: -mac-arm64.zip (Apple 실리콘) / -mac-x64.zip (인텔). 처음 열 때 우클릭 → 열기
             - Linux: .AppImage 또는 .tar.gz (안 켜지면 --no-sandbox)
 
@@ -148,7 +152,8 @@ jobs:
         if: env.BUTLER_API_KEY != ''
         run: |
           set -e
-          V=$(node -p "require('./desktop/package.json').version")
+          # 파일 이름 · itch 에 보이는 버전 = skwLabel (예: 0.13)
+          V=$(node -p "require('./desktop/package.json').skwLabel")
           B=butler/butler
           $B push artifacts/SecondKoreanWars-$V-win-x64.zip      "$ITCH_TARGET:windows"   --userversion "$V"
           # 압축 풀 필요 없는 exe 한 파일 (포터블). butler 가 파일 하나를 받지 않으면 exe 만 든 폴더로 올린다

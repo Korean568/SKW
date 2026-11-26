@@ -74,6 +74,17 @@ function unpack(z) {
 let code = read('core.js'); const rep = [['core', Buffer.byteLength(code)]];
 if (MODE) code = code.replace(/G\.mode = new URLSearchParams[^;]*;/, `G.mode = '${MODE}';`);
 console.log(`  빌드: ${both ? '스토리 + 해상대전 (개발용)' : story ? '스토리 게임 (PC판)' : '해상대전 (웹판)'}`);
+// 스토리 게임의 버전: 게임 안에 G.LABEL (사람에게 보이는 0.xx) · G.VERSION (내부 semver, 자동 업데이트 비교용) 을 넣는다
+//   → 어떤 껍데기(PC 옛 앱 · Android · 브라우저)로 띄워도 게임이 스스로 버전을 안다. 값은 desktop/package.json 의 skwLabel · version
+//   --label=0.13 으로 덮어쓰기. 해상대전 웹판에는 넣지 않는다
+if (MODE !== 'naval') {
+  let pkg = {}; try { pkg = JSON.parse(fs.readFileSync(path.join(D, '..', 'desktop', 'package.json'), 'utf8')); } catch (e) { }
+  const arg = process.argv.find(a => a.startsWith('--label=')), label = arg ? arg.slice(8) : pkg.skwLabel, ver = pkg.version;
+  const ok = v => typeof v === 'string' && /^[0-9A-Za-z.+-]{1,24}$/.test(v);
+  if (ok(label)) code += `\nG.LABEL = ${JSON.stringify(label)};`;
+  if (ok(ver)) code += `\nG.VERSION = ${JSON.stringify(ver)};`;
+  console.log(`  버전: ${ok(label) ? label : '(표시 번호 없음)'} (내부 ${ok(ver) ? ver : '-'})`);
+}
 for (const m of MODS) {
   if (!fs.existsSync(path.join(D, `mod_${m}.js`))) { console.log(`  (없음) mod_${m}.js`); continue; }
   const s = read(`mod_${m}.js`); code += '\n\n' + s; rep.push([m, Buffer.byteLength(s)]);

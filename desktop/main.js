@@ -7,6 +7,7 @@
  *  - 자동 업데이트: 켜질 때 저장소의 desktop/update/latest.json 을 보고 게임이 더 새것이면
  *    game.gz 를 받아(sha256 확인) 사용자 폴더(userData/game/)에 두고 그 게임을 띄운다 → exe 를 다시 받을 필요 없음.
  *    앱(껍데기)이 옛것이라 새 게임과 안 맞으면(minShell) 받지 않는다. 받기 실패·오프라인이면 가진 것으로 시작.
+ *    버전 번호 둘: version (내부 semver — 비교는 이것만) · label (사람에게 보이는 0.xx — 게임에 --skw-label 로 넘겨 표시용).
  *    file:// 대신 표준·보안 스킴을 쓰는 까닭: WebGPU(보안 컨텍스트 필요), localStorage,
  *    오프닝 iframe(srcdoc) 이 모두 일반 웹사이트처럼 동작하게 하려고.
  *  - 창 하나, 전체 화면으로 시작, 메뉴 막대 없음.
@@ -42,13 +43,17 @@ const newer = (a, b) => { // a 가 b 보다 새 버전인가
   for (let i = 0; i < Math.max(x.length, y.length); i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0);
   return false;
 };
-let game = { version: app.getVersion(), file: path.join(APP_DIR, 'index.html') }; // 지금 띄울 게임
+// 사람에게 보이는 번호(0.xx): 앱에 든 게임은 package.json 의 skwLabel, 받은 게임은 latest.json 의 label. 이상한 글자는 버린다
+const cleanLabel = (v) => (typeof v === 'string' && /^[0-9A-Za-z.+-]{1,24}$/.test(v) ? v : '');
+let pkgLabel = '';
+try { pkgLabel = cleanLabel(require('./package.json').skwLabel); } catch (e) { /* 없음 */ }
+let game = { version: app.getVersion(), label: pkgLabel, file: path.join(APP_DIR, 'index.html') }; // 지금 띄울 게임
 const gameDir = () => path.join(app.getPath('userData'), 'game');
 const useCached = () => { // 전에 받아 둔 게임이 앱에 든 것보다 새것이면 그걸 쓴다
   try {
     const m = JSON.parse(fs.readFileSync(path.join(gameDir(), 'version.json'), 'utf8'));
     const f = path.join(gameDir(), 'index.html');
-    if (newer(m.version, game.version) && !newer(m.minShell, app.getVersion()) && fs.existsSync(f)) game = { version: m.version, file: f };
+    if (newer(m.version, game.version) && !newer(m.minShell, app.getVersion()) && fs.existsSync(f)) game = { version: m.version, label: cleanLabel(m.label), file: f };
   } catch (e) { /* 받아 둔 게임 없음 */ }
 };
 const fetchBuf = async (url, ms) => {
@@ -71,9 +76,10 @@ const checkUpdate = async () => { // 새 게임이 있으면 받아서 game 을 
       fs.mkdirSync(dir, { recursive: true });
       fs.writeFileSync(path.join(dir, 'index.html.tmp'), html);
       fs.renameSync(path.join(dir, 'index.html.tmp'), path.join(dir, 'index.html'));
-      fs.writeFileSync(path.join(dir, 'version.json'), JSON.stringify({ version: m.version, minShell: m.minShell || '0' }));
-      game = { version: m.version, file: path.join(dir, 'index.html') };
-      console.log('[update] 게임 ' + m.version + ' 받음');
+      const label = cleanLabel(m.label);
+      fs.writeFileSync(path.join(dir, 'version.json'), JSON.stringify({ version: m.version, label, minShell: m.minShell || '0' }));
+      game = { version: m.version, label, file: path.join(dir, 'index.html') };
+      console.log('[update] 게임 ' + m.version + (label ? ' (' + label + ')' : '') + ' 받음');
       return;
     } catch (e) { console.log('[update] ' + base + ' 실패: ' + e.message); }
   }
@@ -157,7 +163,7 @@ if (!app.requestSingleInstanceLock()) {
         webviewTag: false,
         spellcheck: false,
         autoplayPolicy: 'no-user-gesture-required',
-        additionalArguments: [`--skw-version=${app.getVersion()}`, `--skw-game=${game.version}`],
+        additionalArguments: [`--skw-version=${app.getVersion()}`, `--skw-game=${game.version}`, `--skw-label=${game.label}`],
       },
     });
     win.setMenuBarVisibility(false);

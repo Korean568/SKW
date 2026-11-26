@@ -41,7 +41,7 @@ APK 는 3번의 **Android build** 를 한 번 실행한 뒤에 itch.io 페이지
 - 결과 파일은 실행 기록 맨 아래 **Artifacts → second-korean-wars-android** 에서 받을 수 있습니다.
   - `SecondKoreanWars-<버전>-android.apk` · `SecondKoreanWars-<버전>-android.aab` — 업로드 키로 서명한 정식 파일 (4-3 의 시크릿이 있을 때)
   - `SecondKoreanWars-<버전>-android-debug.apk` — 시크릿이 없을 때 나오는 시험용
-- 버전은 PC판과 같은 번호를 씁니다 (`desktop/package.json` 의 `version`). 예: 1.2.0 → 내부 번호(versionCode) 10200.
+- 버전은 PC판과 같은 번호를 씁니다 (`desktop/package.json`, 규칙은 `desktop/README-itch.md` 의 **버전 번호**): `<버전>` · 앱 정보의 버전(versionName) = `skwLabel` (예: 0.13), Play 의 versionCode = 내부 번호 `version` 에서 계산 (1.3.0 → 10300, 0.14 = 1.4.0 → 10400 · 늘 커짐).
 - 앱 아이콘, 스토어 아이콘, 스토어 그래픽 이미지, 스토어 설명 글(한국어 · 영어), 개인정보처리방침 페이지를 만들어 두었습니다 (아래 5번 표).
 
 ## 4. 소유자만 할 수 있는 일 — Play 스토어에 올리기
@@ -143,6 +143,6 @@ cd android && ./gradlew assembleDebug                            # app/build/out
 ```
 
 서명한 release (`bundleRelease assembleRelease`)는 환경 변수 `ANDROID_KEYSTORE_FILE`(키 파일의 절대 경로) · `ANDROID_KEYSTORE_PASSWORD` 가 있을 때만 서명됩니다. 선택: `ANDROID_KEY_ALIAS`(기본 `upload`) · `ANDROID_KEY_PASSWORD`(기본 = 저장소 비밀번호).
-버전 덮어쓰기: `./gradlew assembleDebug -PversionName=1.2.1 -PversionCode=10201` (Play 는 올릴 때마다 versionCode 가 전보다 커야 합니다 → 올리기 전에 `desktop/package.json` 의 버전을 올리세요).
+버전 덮어쓰기: `./gradlew assembleDebug -PversionName=0.13 -PversionCode=10301` (Play 는 올릴 때마다 versionCode 가 전보다 커야 합니다 → 올리기 전에 `desktop/package.json` 의 `version` · `skwLabel` 을 올리세요).
 
 기술 요약: 최소 Android 12 (API 31), 대상 API 36 (Google Play 가 2026년 8월 31일부터 새 앱에 요구), Android Gradle Plugin 8.13.2 · Gradle 8.14.3 · JDK 17, 의존 라이브러리는 `androidx.webkit` 하나, 권한 없음.

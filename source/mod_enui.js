@@ -23,8 +23,9 @@
       '자막 크기': 'Subtitle Size', '작게': 'Small', '보통': 'Medium', '크게': 'Large',
       '언어': 'Language', '돌아가기': 'Back', '돌아가기 ·': 'Back ·',
       /* ── 성능 알약 ── */
-      '그래픽 설정 · F2 순환': 'Graphics settings · F2 to cycle',
-      '수동': 'Manual', '자동↓': 'Auto↓', '알 수 없는 GPU': 'Unknown GPU',
+      '그래픽 설정 · F2 순환': 'Graphics settings · F2 to cycle', '그래픽 등급 · F2 순환': 'Graphics tier · F2 to cycle',
+      '자동 감지': 'Auto-detect', // 알약의 '자동' 버튼 설명 (등급 이름 Very Low … Ultra 는 두 언어 모두 영어)
+      '수동': 'Manual', '자동↓': 'Auto↓', '자동↑': 'Auto↑', '알 수 없는 GPU': 'Unknown GPU',
       /* ── 실행 불가 · 장치 끊김 안내 (core.js G.fatal) ── */
       'WebGPU 를 사용할 수 없습니다': 'WebGPU is not available',
       '사용 가능한 GPU 어댑터가 없습니다': 'No usable GPU adapter found',
@@ -49,9 +50,10 @@
     G.i18n.re([
       // 설정: 렌더 배율 출력 "75 % (자동)"
       [/^(\d+) % \(자동\)$/, '$1 % (auto)'],
-      // 성능 알약 상세: "이름 판별 LOW · 벤치마크 MEDIUM (0.512ms)" (' · ' 조각마다)
-      [/^이름 판별 (\S+)$/, 'Name check $1'],
-      [/^벤치마크 (\S+) \((.+)\)$/, 'Benchmark $1 ($2)'],
+      // 성능 알약 상세: "이름 판별 Medium High (13.5) · 벤치마크 Very Low (0.512ms)" (' · ' 조각마다 — 등급 이름에 빈칸이 있음)
+      [/^이름 판별 (.+)$/, 'Name check $1'],
+      [/^벤치마크 (.+)$/, 'Benchmark $1'],
+      // 알약 상태 줄 "4/10 · 자동 · 1280×720 · MSAA4" 는 ' · ' 조각마다 ('자동' · '자동↓' · '자동↑' · '수동')
       [/^(.+) \(소프트웨어\)$/, '$1 (software)'],
     ]);
   }

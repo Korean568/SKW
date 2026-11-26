@@ -6,6 +6,7 @@
  *
  *   1) source/build.js --story → HTML 한 파일
  *   2) <head> 맨 앞(<meta charset> 바로 뒤)에 android-shim.js 를 끼워 넣음 → 게임 코드보다 먼저 window.skwDesktop 이 생김
+ *      (version = desktop/package.json 의 version (내부 번호), label = skwLabel (보이는 번호) 을 넣어서)
  *   3) viewport 에 viewport-fit=cover 가 없으면 추가 (노치 영역까지 그리고 env(safe-area-inset-*) 를 쓰기 위해)
  *
  * 빌드에 필요한 esbuild 는 desktop/node_modules 에서 찾는다:
@@ -33,9 +34,12 @@ let r;
 try { r = require(path.join(REPO, 'desktop', 'scripts', 'build-story.js'))(); } catch (e) { die(e.message); }
 let html = r.html;
 
-// 2) 다리 스크립트 끼워 넣기 (주석을 지우고 한 덩어리로)
+// 2) 다리 스크립트 끼워 넣기 (주석을 지우고 한 덩어리로, 버전 두 개를 넣어서)
+const { version, label } = r;
 const shim = fs.readFileSync(path.join(__dirname, 'android-shim.js'), 'utf8')
-  .replace(/\/\*[^]*?\*\//g, '').split('\n').map((l) => l.trim()).filter(Boolean).join('\n');
+  .replace(/\/\*[^]*?\*\//g, '').split('\n').map((l) => l.trim()).filter(Boolean).join('\n')
+  .replace('__SKW_VERSION__', version).replace('__SKW_LABEL__', label);
+if (/__SKW_(VERSION|LABEL)__/.test(shim) || !shim.includes(`'${version}'`) || !shim.includes(`'${label}'`)) die('android-shim.js 에 __SKW_VERSION__ · __SKW_LABEL__ 자리가 하나씩 있어야 합니다');
 if (/<\/script/i.test(shim)) die('android-shim.js 안에 </script 가 있으면 안 됩니다');
 if (/[^\x00-\x7f]/.test(shim)) die('android-shim.js 의 코드는 ASCII 만 써야 합니다');
 const tag = '<script>' + shim + '</script>';
@@ -64,6 +68,5 @@ if (vp.test(html)) {
 fs.rmSync(OUT, { recursive: true, force: true });
 fs.mkdirSync(OUT, { recursive: true });
 fs.writeFileSync(path.join(OUT, 'index.html'), html);
-const version = require(path.join(REPO, 'desktop', 'package.json')).version;
-console.log(`[prepare-assets] 스토리 게임 ${version} → ${path.relative(REPO, path.join(OUT, 'index.html'))} ` +
+console.log(`[prepare-assets] 스토리 게임 ${label} (내부 ${version}) → ${path.relative(REPO, path.join(OUT, 'index.html'))} ` +
   `(${(Buffer.byteLength(html) / 1024).toFixed(0)} KB · 오프닝 <script> ${r.openingRemoved}줄 뺌 · 다리 스크립트 ${tag.length} B · viewport: ${vpNote})`);

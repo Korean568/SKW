@@ -87,7 +87,11 @@ const ensureCss = () => { // 오류 상자 · 실행 불가 화면 버튼 (templ
   s.textContent = `#skwerr{position:fixed;left:8px;top:8px;z-index:98;max-width:min(480px,calc(100vw - 16px));max-height:60vh;overflow:auto;padding:8px 10px;border:1px solid #a54;border-radius:8px;background:#1a0b0be8;color:#fdd;font:12px/1.45 ui-monospace,monospace;pointer-events:auto;-webkit-user-select:text;user-select:text;overflow-wrap:anywhere}
 #skwerr b{color:#ff9a7a}#skwerr ol{margin:4px 0;padding-left:18px}#skwerr small,#fatal small{display:block;margin:4px 0;opacity:.65;font:11px/1.4 ui-monospace,monospace;overflow-wrap:anywhere}
 #skwerr button{float:right;margin:-4px -6px 0 8px;font:16px/1 sans-serif;color:#fdd;background:none;border:0;padding:4px 8px;cursor:pointer}
-#fatal button{font:inherit;font-weight:600;padding:7px 18px;color:#012;background:#8df;border:0;border-radius:6px;cursor:pointer}#fatal>div{max-height:calc(100vh - 32px);overflow:auto;box-sizing:border-box}`;
+#fatal button{font:inherit;font-weight:600;padding:7px 18px;color:#012;background:#8df;border:0;border-radius:6px;cursor:pointer}
+#fatal{overflow:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;touch-action:pan-y;overscroll-behavior:contain;place-items:start center;padding:10px 0;box-sizing:border-box}
+#fatal>div{margin:auto 12px;max-width:min(580px,calc(100vw - 24px));max-height:none;overflow:visible;box-sizing:border-box}
+@media(max-height:520px){#fatal>div{padding:14px 18px}#fatal h1{font-size:19px;margin-bottom:8px}#fatal ul{margin:6px 0;padding-left:20px}}`;
+// 실행 불가 화면은 화면 전체가 세로로 스크롤 (짧은 휴대폰 가로 화면에서도 맨 아래 기술 정보 줄까지 읽고 캡처할 수 있게): 상자는 잘리지 않고, 남는 공간이 있으면 가운데 (margin:auto)
 };
 let eb, ebT = 0;
 const errBox = () => { // 오류 목록 (G.errors) 을 왼쪽 위 작은 상자로 — × 로 닫음, 새 오류가 오면 다시 보임
@@ -128,9 +132,11 @@ G.gpuTips = () => {
     desktop: L('<b>PC</b>: 최신 <b>Chrome · Edge</b>, macOS 는 <b>Safari 26</b> 이상도 가능 (Firefox 는 141 이상 · Windows)',
       '<b>PC</b>: a current <b>Chrome or Edge</b>; on a Mac also <b>Safari 26</b> or later (Firefox 141+ on Windows)'),
   };
+  // iPhone · iPad: 카카오톡 · 인스타그램 등 앱 안의 브라우저(WKWebView)는 WebGPU 가 꺼져 있을 때가 많음 → Safari 로 열기
+  const inApp = os === 'ios' ? L('<li>카카오톡 등 다른 앱 안에서 열었다면 Safari 로 열어 주세요</li>', '<li>If you opened this inside another app (KakaoTalk, Instagram…), open it in Safari.</li>') : '';
   const pc = os === 'desktop' ? L('<li>브라우저 설정에서 <b>하드웨어 가속</b> 켜기 → 브라우저 재시작 · 그래픽 드라이버 업데이트 · 주소창 <code>chrome://gpu</code> 에서 WebGPU 상태 확인 (Linux Chrome 은 <code>chrome://flags/#enable-unsafe-webgpu</code>)</li>',
     '<li>Turn on <b>hardware acceleration</b> in the browser settings and restart it · update the graphics driver · check WebGPU at <code>chrome://gpu</code> (Linux Chrome: <code>chrome://flags/#enable-unsafe-webgpu</code>)</li>') : '';
-  return `<p>${L('이 게임은 <b>WebGPU</b> 가 필요합니다.', 'This game needs <b>WebGPU</b>.')}</p><ul><li>${T[os]}</li>${pc}${['ios', 'android', 'desktop'].filter(k => k !== os).map(k => `<li style="opacity:.7">${T[k]}</li>`).join('')}</ul>`;
+  return `<p>${L('이 게임은 <b>WebGPU</b> 가 필요합니다.', 'This game needs <b>WebGPU</b>.')}</p><ul><li>${T[os]}</li>${inApp}${pc}${['ios', 'android', 'desktop'].filter(k => k !== os).map(k => `<li style="opacity:.7">${T[k]}</li>`).join('')}</ul>`;
 };
 
 /* ───────── 품질 프리셋 ───────── */

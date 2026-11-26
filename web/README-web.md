@@ -16,7 +16,7 @@ GitHub 의 **Actions 탭 → "Web build (itch.io HTML5)" → Run workflow** 를 
 
 1. 스토리 게임을 빌드해 `index.html` 한 파일과 그것을 담은 zip 을 만듭니다 (Actions 실행 결과의 `second-korean-wars-web` 에서 내려받을 수 있음).
 2. 저장소 시크릿 `BUTLER_API_KEY` 가 있으면(PC판 · Android 판과 같은 키) itch.io 의 **`html5` 채널**에 자동으로 올립니다.
-   버전 번호는 `desktop/package.json` 의 version 을 씁니다.
+   itch.io 에 보이는 버전 · 파일 이름은 `desktop/package.json` 의 `skwLabel` (예: 0.13) 을 씁니다 (규칙: `desktop/README-itch.md` 의 **버전 번호**).
 
 직접 만들려면 (개발자용): `cd desktop && ELECTRON_SKIP_BINARY_DOWNLOAD=1 npm ci` 후 저장소 맨 위에서 `node web/scripts/build-web.js`
 → `web/dist/index.html` 과 `web/dist/second-korean-wars-web.zip` (zip 은 itch.io 에 손으로 올릴 때 씀).

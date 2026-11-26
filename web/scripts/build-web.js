@@ -116,18 +116,17 @@ if (require.main !== module) return;
 const hasEsbuild = [path.join(REPO, 'desktop', 'node_modules'), path.join(REPO, 'tools', 'node_modules')]
   .some((d) => fs.existsSync(path.join(d, 'esbuild', 'package.json')));
 if (!hasEsbuild) die('esbuild 가 없습니다. 먼저 실행하세요:\n    cd desktop && ELECTRON_SKIP_BINARY_DOWNLOAD=1 npm ci');
-const version = require(path.join(REPO, 'desktop', 'package.json')).version;
-if (!/^[0-9A-Za-z.+-]+$/.test(version)) die('desktop/package.json 의 version 이 이상합니다: ' + version);
 let r;
 try { r = require(path.join(REPO, 'desktop', 'scripts', 'build-story.js'))(); } catch (e) { die(e.message); }
+const { version, label } = r; // desktop/package.json 의 version (내부 번호) · skwLabel (보이는 번호, 파일 이름 · itch 버전)
 let html = r.html;
 if (/SkwNative|skw:quit/.test(html)) die('게임 HTML 에 다른 플랫폼의 다리 스크립트가 들어 있습니다');
 
-/* ── 2) 다리 스크립트 (주석을 지우고 한 덩어리로, 버전을 넣어서) ── */
+/* ── 2) 다리 스크립트 (주석을 지우고 한 덩어리로, 버전 두 개를 넣어서) ── */
 const shim = fs.readFileSync(path.join(WEB, 'web-shim.js'), 'utf8')
   .replace(/\/\*[^]*?\*\//g, '').split('\n').map((l) => l.trim()).filter(Boolean).join('\n')
-  .replace('__SKW_VERSION__', version);
-if (shim.includes('__SKW_VERSION__') || !shim.includes(`'${version}'`)) die('web-shim.js 에 버전 자리(__SKW_VERSION__)가 하나 있어야 합니다');
+  .replace('__SKW_VERSION__', version).replace('__SKW_LABEL__', label);
+if (/__SKW_(VERSION|LABEL)__/.test(shim) || !shim.includes(`'${version}'`) || !shim.includes(`'${label}'`)) die('web-shim.js 에 버전 자리(__SKW_VERSION__ · __SKW_LABEL__)가 하나씩 있어야 합니다');
 if (/<\/script/i.test(shim)) die('web-shim.js 안에 </script 가 있으면 안 됩니다');
 if (/[^\x00-\x7f]/.test(shim)) die('web-shim.js 의 코드는 ASCII 만 써야 합니다');
 const tag = '<script>' + shim + '</script>';
@@ -167,5 +166,5 @@ const zip = makeZip([['index.html', buf]]);
 const back = readZip(zip);
 if (Object.keys(back).join() !== 'index.html' || !back['index.html'].equals(buf)) die('zip 을 다시 읽어 보니 내용이 다릅니다');
 fs.writeFileSync(path.join(DIST, ZIP), zip);
-console.log(`[build-web] 브라우저판 ${version} → ${path.relative(REPO, path.join(DIST, 'index.html'))} (${(buf.length / 1024).toFixed(0)} KB · 오프닝 <script> ${r.openingRemoved}줄 뺌 · 다리 스크립트 ${tag.length} B · ${iconNote})`);
+console.log(`[build-web] 브라우저판 ${label} (내부 ${version}) → ${path.relative(REPO, path.join(DIST, 'index.html'))} (${(buf.length / 1024).toFixed(0)} KB · 오프닝 <script> ${r.openingRemoved}줄 뺌 · 다리 스크립트 ${tag.length} B · ${iconNote})`);
 console.log(`[build-web] itch.io 용 zip → ${path.relative(REPO, path.join(DIST, ZIP))} (${(zip.length / 1024).toFixed(0)} KB, 안에 index.html 하나)`);

@@ -9,14 +9,15 @@
  *   isFullscreen()       → Promise<bool>
  *   canFullscreen        이 화면에서 전체 화면이 되는지 (iPhone · 전체 화면을 허락하지 않은 iframe 에서는 false → 설정의 전체 화면 줄을 숨김)
  *   openExternal(url)    새 탭 (window.open(url, '_blank', 'noopener'))
- *   version · gameVersion   desktop/package.json 의 version (빌드할 때 __SKW_VERSION__ 자리에 들어감)
+ *   version · gameVersion   desktop/package.json 의 version — 내부 번호 semver (빌드할 때 __SKW_VERSION__ 자리에 들어감)
+ *   label                   desktop/package.json 의 skwLabel — 사람에게 보이는 번호, 예 0.13 (__SKW_LABEL__ 자리)
  * 이 파일은 ASCII 만 쓴다 (주석 제외 — 주석은 넣을 때 지운다).
  */
 (function () {
   'use strict';
   if (window.skwDesktop) return;
   var d = document, de = d.documentElement, n = navigator, ua = n.userAgent || '';
-  var V = '__SKW_VERSION__';
+  var V = '__SKW_VERSION__', L = '__SKW_LABEL__';
   var req = de.requestFullscreen || de.webkitRequestFullscreen;
   var ext = d.exitFullscreen || d.webkitExitFullscreen;
   var iPhone = /iPhone|iPod/.test(ua);
@@ -39,6 +40,7 @@
     },
     version: V,
     gameVersion: V,
+    label: L,
     platform: 'web'
   };
 })();
