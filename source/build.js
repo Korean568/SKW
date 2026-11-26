@@ -46,6 +46,31 @@ function shrinkWgsl(src) {
   return [o, cnt];
 }
 
+// 자기해제 래퍼 (브라우저에서 실행, 게임 코드보다 먼저). z = gzip+base64 게임 코드.
+// 풀기·실행이 실패하면 (DecompressionStream 없음 = WebGPU 도 없는 옛 브라우저, 또는 실행 중 예외) 언어·기기에 맞는 안내와 오류 내용을 화면에 표시.
+// 언어 규칙은 mod_i18n 과 같음: ?lang= > localStorage 'skw-lang' > 브라우저 언어 (한국어가 아니면 영어)
+function unpack(z) {
+  const fail = e => {
+    const n = navigator, u = n.userAgent || '', q = new URLSearchParams(location.search).get('lang'); let s;
+    try { s = localStorage.getItem('skw-lang'); } catch (x) { }
+    const en = (q === 'en' || q === 'ko' ? q : s === 'en' || s === 'ko' ? s : (n.languages && n.languages.length ? [...n.languages] : [n.language || 'ko']).some(l => /^ko/i.test(l)) ? 'ko' : 'en') === 'en';
+    const os = /iPhone|iPad|iPod/.test(u) || (n.platform === 'MacIntel' && n.maxTouchPoints > 1) ? 0 : /Android/i.test(u) ? 1 : 2, L = (k, e) => en ? e : k;
+    const T = [L('<b>iPhone · iPad</b>: iOS / iPadOS <b>26 이상</b>의 Safari (저전력 모드에서는 느려질 수 있음)', '<b>iPhone · iPad</b>: Safari on iOS / iPadOS <b>26 or later</b> (Low Power Mode may slow it down)'),
+      L('<b>Android</b>: Android <b>12 이상</b> + 최신 Chrome · Android System WebView', '<b>Android</b>: Android <b>12 or later</b> with an up-to-date Chrome / Android System WebView'),
+      L('<b>PC</b>: 최신 Chrome · Edge, 또는 Safari 26 이상', '<b>PC</b>: a current Chrome or Edge, or Safari 26 or later')];
+    const old = e === 0, h = String(e && (e.stack || e.message) || e).replace(/[&<>]/g, c => '&#' + c.charCodeAt(0) + ';').slice(0, 400);
+    document.body.insertAdjacentHTML('beforeend', `<div id=fatal><div><h1>${old ? L('이 브라우저에서는 실행할 수 없습니다', 'This browser cannot run the game') : L('게임을 시작하지 못했습니다', 'The game could not start')}</h1>`
+      + `<p>${old ? L('<b>WebGPU</b> 를 지원하는 브라우저가 필요합니다.', 'It needs a browser with <b>WebGPU</b>.') : L('다시 시작을 눌러 보세요. 계속되면 이 화면을 캡처해서 보내 주세요.', 'Try Reload. If it keeps happening, please send a screenshot of this screen.')}</p>`
+      + `<ul><li>${T[os]}</li>${T.filter((_, i) => i !== os).map(t => `<li style="opacity:.7">${t}</li>`).join('')}</ul>`
+      + `<p><button onclick="location.reload()" style="font:inherit;padding:7px 18px;border:0;border-radius:6px;background:#8df;color:#012">${L('다시 시작', 'Reload')}</button></p>`
+      + `<p style="opacity:.65;font:11px/1.4 monospace;overflow-wrap:anywhere">${old ? 'no DecompressionStream' : h}<br>${u.replace(/</g, '')}</p></div></div>`);
+  };
+  (async () => {
+    if (!self.DecompressionStream) throw 0;
+    (0, eval)(await new Response(new Blob([Uint8Array.from(atob(z), c => c.charCodeAt(0))]).stream().pipeThrough(new DecompressionStream('gzip'))).text());
+  })().catch(fail);
+}
+
 let code = read('core.js'); const rep = [['core', Buffer.byteLength(code)]];
 if (MODE) code = code.replace(/G\.mode = new URLSearchParams[^;]*;/, `G.mode = '${MODE}';`);
 console.log(`  빌드: ${both ? '스토리 + 해상대전 (개발용)' : story ? '스토리 게임 (PC판)' : '해상대전 (웹판)'}`);
@@ -63,8 +88,8 @@ else {
   const [w, cnt] = shrinkWgsl(code);
   let js = esbuild.transformSync(`(()=>{'use strict';${w}\n})();`, { minify: true, target: 'es2022', legalComments: 'none' }).code.trim();
   rawKB = Buffer.byteLength(js) / 1024;
-  // 자기해제: gzip → base64. DecompressionStream 이 없는 구형 브라우저는 WebGPU 도 없으므로 같은 안내를 표시
-  if (!raw) js = `(async()=>{if(!self.DecompressionStream)return document.body.insertAdjacentHTML("beforeend","<div id=fatal><div><h1>이 브라우저에서는 실행할 수 없습니다</h1><p>WebGPU 를 지원하는 최신 Chrome · Edge · Safari 가 필요합니다.</p></div></div>");(0,eval)(await new Response(new Blob([Uint8Array.from(atob("${zlib.gzipSync(Buffer.from(js), { level: 9 }).toString('base64')}"),c=>c.charCodeAt(0))]).stream().pipeThrough(new DecompressionStream("gzip"))).text())})()`;
+  // 자기해제: gzip → base64 를 풀어 eval (래퍼는 아래 unpack 함수를 minify 해서 씀)
+  if (!raw) js = esbuild.transformSync(`(${unpack})("__Z__")`, { minify: true, target: 'es2020', charset: 'utf8' }).code.trim().replace('"__Z__"', () => `"${zlib.gzipSync(Buffer.from(js), { level: 9 }).toString('base64')}"`);
   const css = (_, s) => '<style>' + esbuild.transformSync(s, { loader: 'css', minify: true }).code.trim();
   html = html.replace(/<style>([^]*?)(?=<\/style>)/, css).replace(/>\s+</g, '><').replace('/*__CODE__*/', () => js).replace(/<script>\s+/, '<script>').replace(/\s+<\/script>/, '</script>');
   console.log(`  WGSL 템플릿 ${cnt}개 축약`);

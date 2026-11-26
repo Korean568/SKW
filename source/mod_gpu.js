@@ -30,6 +30,7 @@
     try {
       const gl = document.createElement('canvas').getContext('webgl'), x = gl.getExtension('WEBGL_debug_renderer_info');
       let r = gl.getParameter(x ? x.UNMASKED_RENDERER_WEBGL : gl.RENDERER) || '';
+      const lc = gl.getExtension('WEBGL_lose_context'); lc && lc.loseContext(); // 이름만 읽고 바로 반납
       const m = r.match(/^ANGLE \((?:[^,]+, )?(.+?)(?:,[^,]*)?\)$/); if (m) r = m[1];
       return r.replace(/^ANGLE Metal Renderer: /, '').replace(/\s*\(0x[0-9a-f]+\)/i, '').replace(/\s*(Direct3D|OpenGL|vs_\d|ps_\d).*$/i, '').replace(/, or similar$/, '').trim();
     } catch (e) { return ''; }
@@ -74,20 +75,29 @@
   }
   const store = v => { try { v === undefined || (v ? localStorage.setItem('skw_q', v) : localStorage.removeItem('skw_q')); return localStorage.getItem('skw_q'); } catch (e) { return null; } };
   let el, low = 0, acc = 0, win = 0, cool = 0, probe = 0;
-  G.gpu = { classify, TIERS };
+  // FPS 방식 동적 해상도: tgt = 목표 FPS (60, 프레임 상한이 확인되면 그 값), last = 방금 낮춘 시험 {f: 그때 FPS, d: 그때 배율}, hold = 다시 낮추지 않을 초, tsBad = 타이머 이상 연속 횟수
+  let tgt = 60, last = null, hold = 0, tsBad = 0;
+  G.gpu = { classify, TIERS, get fpsTarget() { return tgt; } };
   G.register('gpu', {
     async detect(adapter, dev) {
       const i = adapter.info || (adapter.requestAdapterInfo ? await adapter.requestAdapterInfo() : {});
       const vendor = (i.vendor || '').toLowerCase(), arch = i.architecture || '', gl = glName();
       const same = !vendor || gl.toLowerCase().includes(vendor) || (vendor === 'amd' && /radeon|ati/i.test(gl)) || (vendor === 'google' && /swiftshader/i.test(gl));
-      const name = i.description || (same && gl) || [vendor, arch, i.device].filter(Boolean).join(' ') || gl || '알 수 없는 GPU';
+      // Safari 는 vendor·architecture·device·description 이 모두 'apple' (Metal 장치 이름 첫 단어) → description 이 vendor 와 같으면 정보가 없는 것
+      const desc = i.description && i.description.toLowerCase() !== vendor ? i.description : '';
+      const name = desc || (same && gl) || [vendor, arch, i.device].filter(Boolean).join(' ') || gl || '알 수 없는 GPU';
       const soft = i.isFallbackAdapter || adapter.isFallbackAdapter || /swiftshader/.test(arch);
-      const nameTier = soft ? 0 : classify(name + ' ' + vendor + ' ' + arch);
+      let nameTier = soft ? 0 : classify(name + ' ' + vendor + ' ' + arch);
+      // 이름으로 모르는 Apple GPU: iPhone·iPad (터치 · WebKit) 는 LOW 로 시작, Mac 은 벤치마크로 고르되 MEDIUM 까지 (보수적으로)
+      const apple = nameTier < 0 && (vendor === 'apple' || /^apple gpu$/i.test(gl)), mobile = apple && (G.os === 'ios' || navigator.maxTouchPoints > 1);
+      if (mobile) nameTier = 0;
       let b = { ms: 0, frames: [], tier: 1 };
       try { b = await bench(dev); } catch (e) { G.err('벤치마크 실패: ' + e.message); }
       // 이름을 알면 이름 기준(내장=LOW), 벤치마크가 2단계 이상 낮으면 한 단계 내림. 모르면 벤치마크.
-      const t = nameTier < 0 ? b.tier : nameTier - b.tier >= 2 ? nameTier - 1 : nameTier;
+      let t = nameTier < 0 ? b.tier : nameTier - b.tier >= 2 ? nameTier - 1 : nameTier;
+      if (apple && !mobile) t = Math.min(t, 1);
       const info = { name: soft && !/swiftshader|software/i.test(name) ? name + ' (소프트웨어)' : name, vendor, arch, tier: TIERS[t], nameTier: TIERS[nameTier] || '?', benchTier: TIERS[b.tier], benchMs: +b.ms.toFixed(3), benchFrames: b.frames.map(x => +x.toFixed(2)), benchScale: +(b.scale || 0).toFixed(3) };
+      if (apple) info.apple = 1; if (mobile) info.mobile = 1;
       console.info('[SKW] GPU 감지', info);
       return info;
     },
@@ -106,26 +116,39 @@
       addEventListener('keydown', e => { if (e.code === 'F2') { e.preventDefault(); this.pick(G.qManual ? TIERS[G.Q.level + 1] || '' : 'LOW'); } });
       const s = store(); if (!G.params.get('q') && G.PRESETS[s]) G.setQuality(s, true); // 지난번 수동 선택 유지
     },
-    pick(q) { store(q || ''); low = 0; G.dyn = 1; G.setQuality(q || G.gpuInfo.tier, !!q); },
+    pick(q) { store(q || ''); low = 0; last = null; G.dyn = 1; G.setQuality(q || G.gpuInfo.tier, !!q); },
     onQuality() { for (const b of el.querySelectorAll('button')) b.className = (G.qManual ? b.dataset.q === G.Q.name : !b.dataset.q) ? 'on' : ''; low = 0; },
     update(dt) {
-      const vis = document.visibilityState === 'visible';
-      // 동적 해상도: 1초마다 GPU 시간(없으면 FPS)으로 배율 0.5~1 조절 (?dyn=0 끔) · 자동 모드: 그래도 4초 넘게 28fps 미만이면 한 단계 낮춤
+      const vis = document.visibilityState === 'visible', f = +G.fps;
+      // 동적 해상도: 1초마다 GPU 시간(없으면 FPS)으로 배율 0.5~1 조절 (?dyn=0 끔) · 자동 모드: 그래도 4초 넘게 목표의 47% (60fps 기준 28) 미만이면 한 단계 낮춤
       if ((win += dt) >= 1 && vis && !G.params.has('step') && G.params.get('dyn') !== '0') {
         win = 0; let k = 1; const g = G.gpuMs;
+        tgt = Math.min(60, Math.max(tgt, f)); // 상한(30fps 등)이 풀리면 목표도 다시 올라감
+        if (g > 0) { // 타이머 값이 프레임 간격과 안 맞으면 (간격의 2.5배 초과 · 느린데 간격의 5% 미만) 5초 연속이면 버리고 FPS 방식으로
+          const fi = 1000 / Math.max(f, 1);
+          tsBad = g > fi * 2.5 + 2 || (f < 40 && g < fi * .05) ? tsBad + 1 : 0;
+          if (tsBad >= 5) { tsBad = 0; G.tsOff && G.tsOff(`gpu ${g.toFixed(2)}ms @ ${f.toFixed(0)}fps`); }
+        }
         if (cool > 0) cool--;
-        else if (g > 0) { if (g > 13.6 || g < 9.8) k = G.clamp(Math.sqrt(11.7 / g), .75, 1.15); }
-        else if (G.fps < 52) k = .9;
-        else if (++probe > 20) { probe = 0; k = 1.08; }
+        else if (G.gpuMs > 0) { if (g > 13.6 || g < 9.8) k = G.clamp(Math.sqrt(11.7 / g), .75, 1.15); }
+        else {
+          // FPS 방식: 낮춘 뒤 FPS 가 8% 이상 오르지 않았으면 GPU 부하가 아니라 프레임 상한(Safari 저전력·iframe 30fps, 30Hz 화면 등)이나 CPU 병목
+          // → 배율을 되돌리고 그 FPS 를 목표로 삼아 10초 쉼. 목표 근처면 상한 아래에서도 4초마다 배율을 올려 봄 (60fps 목표는 예전처럼 20초)
+          const t = last; last = null;
+          if (t && G.dyn < t.d && f < t.f * 1.08) { tgt = Math.max(t.f, f); hold = 10; G.dyn = t.d; G.resize(); cool = 2; }
+          else if (hold > 0) hold--;
+          else if (f < tgt * .87) { last = { f, d: G.dyn }; k = .9; }
+          else if (++probe > (tgt < 55 && f >= tgt * .95 ? 4 : 20)) { probe = 0; k = 1.08; }
+        }
         const d = G.clamp(G.dyn * k, .5, 1);
-        if (Math.abs(d - G.dyn) > .03) { G.dyn = d; G.resize(); cool = 2; }
+        if (Math.abs(d - G.dyn) > .03) { G.dyn = d; G.resize(); cool = 2; } else if (k < 1) last = null; // 더 못 낮추면 시험할 것도 없음
       }
-      low = !G.qManual && G.Q.level > 0 && G.dyn < .56 && G.fps < 28 && vis ? low + dt : 0;
-      if (low > 4) { low = 0; G.dyn = 1; G.gpuInfo.tier = TIERS[G.Q.level - 1]; G.gpuInfo.auto = '↓'; G.setQuality(G.gpuInfo.tier, false); }
+      low = !G.qManual && G.Q.level > 0 && G.dyn < .56 && f < tgt * .47 && vis ? low + dt : 0;
+      if (low > 4) { low = 0; last = null; G.dyn = 1; G.gpuInfo.tier = TIERS[G.Q.level - 1]; G.gpuInfo.auto = '↓'; G.setQuality(G.gpuInfo.tier, false); }
       if ((acc += dt) < .25) return; acc = 0;
-      const Q = G.Q, T = G.targets, f = G.fps;
+      const Q = G.Q, T = G.targets;
       el.firstChild.innerHTML = `<i>${G.gpuInfo.name}</i><b class="t${Q.level}">${Q.name}</b> · ${f.toFixed(0)} FPS`;
-      el.lastChild.children[2].textContent = `${G.qManual ? '수동' : '자동' + (G.gpuInfo.auto || '')} · ${T.w}×${T.h}${G.dyn < .99 ? ' (' + (G.dyn * 100 | 0) + '%)' : ''}${Q.msaa > 1 ? ' · MSAA' + Q.msaa : ''}${G.gpuMs ? ' · GPU ' + G.gpuMs.toFixed(1) + 'ms' : ''}`;
+      el.lastChild.children[2].textContent = `${G.qManual ? '수동' : '자동' + (G.gpuInfo.auto || '')} · ${T.w}×${T.h}${G.dyn < .99 ? ' (' + (G.dyn * 100 | 0) + '%)' : ''}${Q.msaa > 1 ? ' · MSAA' + Q.msaa : ''}${G.gpuMs ? ' · GPU ' + G.gpuMs.toFixed(1) + 'ms' : ''}${tgt < 55 ? ' · ≤' + tgt.toFixed(0) + 'fps' : ''}`;
     }
   });
 }

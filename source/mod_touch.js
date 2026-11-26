@@ -115,7 +115,7 @@
         const s = { x: t.clientX, y: t.clientY, role: '' };
         if (b) { s.role = 'btn'; s.a = b.dataset.a; b.classList.add('dn'); s.el = b; DOWN[s.a] && DOWN[s.a](); }
         else if (el.id === 'sk') { s.role = 'skip'; s.el = el; el.classList.add('dn'); key('Space', 0); key('Space', 1); } // 한 번 = 건너뛰기, 누르고 있으면 빨리 감기
-        else if (pk && pk.dataset.k) { s.role = 'tap'; tap(pk.dataset.k); }
+        else if (pk && pk.dataset.k) { s.role = ctx().look ? 'look' : 'none'; s.pk = pk.dataset.k; s.t0 = now(); s.d = 0; } // 프롬프트: 짧게 톡 = 실행 · 밀면 시점 (화면 가운데에 있어 둘러보다 잘못 누르지 않게)
         else if (surface(el)) {
           ctx();
           if (C.move && !joy && t.clientX < innerWidth * .4) { s.role = 'joy'; joy = s; ui.joy.style.display = 'block'; ui.joy.style.transform = `translate(${s.x}px,${s.y}px)`; ui.knob.style.transform = ''; }
@@ -134,7 +134,8 @@
           if (len > R * 1.35) { const k = (len - R * 1.35) / len; s.x += dx * k; s.y += dy * k; dx = t.clientX - s.x; dy = t.clientY - s.y; len = R * 1.35; ui.joy.style.transform = `translate(${s.x}px,${s.y}px)`; } // 손가락을 따라옴
           const c = Math.min(1, R / (len || 1)); ui.knob.style.transform = `translate(${dx * c}px,${dy * c}px)`;
           ctx().move ? stick(dx, dy, len) : stick(0, 0, 0);
-        } else if (s.role === 'look' || s.role === 'btn' && DRAG[s.a]) { if (ctx().look) look(t.clientX - s.x, t.clientY - s.y); s.x = t.clientX; s.y = t.clientY; }
+        } else if (s.role === 'look' || s.role === 'btn' && DRAG[s.a]) { s.d = (s.d || 0) + Math.hypot(t.clientX - s.x, t.clientY - s.y); if (ctx().look) look(t.clientX - s.x, t.clientY - s.y); s.x = t.clientX; s.y = t.clientY; }
+        else if (s.pk) { s.d += Math.hypot(t.clientX - s.x, t.clientY - s.y); s.x = t.clientX; s.y = t.clientY; }
       }
       if (used && e.cancelable) e.preventDefault();
     }
@@ -146,6 +147,7 @@
         if (s.role === 'joy') { joy = null; ui.joy.style.display = 'none'; for (const k of MOVE) key(k, 0); }
         if (s.role === 'btn') { s.el.classList.remove('dn'); UP[s.a] && UP[s.a](); }
         if (s.role === 'skip') { s.el.classList.remove('dn'); key('Space', 0); }
+        if (s.pk && e.type === 'touchend' && s.d < 14 && now() - s.t0 < 600 && !ctx().menu) tap(s.pk);
       }
       if (used && e.cancelable) e.preventDefault();
     }
@@ -182,12 +184,12 @@
       if (!ui) return; ctx();
       if (C.menu && !lastMenu || C.set !== lastSet) release(C.menu);
       lastMenu = C.menu;
-      if (C.set !== lastSet) { lastSet = C.set; for (const b of ui.b) b.classList.toggle('v', b.dataset.s.split(' ').includes(C.set)); }
+      if (C.set !== lastSet) { lastSet = C.set; ui.root.dataset.s = C.set; for (const b of ui.b) b.classList.toggle('v', b.dataset.s.split(' ').includes(C.set)); }
       const rc = C.menu ? 'off' : C.move && !joy ? 'mv' : ''; if (ui.root.className !== rc) ui.root.className = rc;
       ui.pause.classList.toggle('v', !!(C.n && G.desktop && !C.menu));
       const pr = $('pr'), k = pr && C.set === 'fps' && $('fh').style.display !== 'none' ? pr.dataset.k : '', S = C.set === 'fps' ? G.fps.S : null;
       const cls = (a, c, v) => ui[a].classList.toggle(c, !!v);
-      if (C.set === 'fps') { cls('use', 'v', k === 'KeyE'); cls('reload', 'hl', k === 'KeyR'); cls('plate', 'hl', S.plate <= 10 && S.spare > 0); cls('scope', 'on', S.scope); }
+      if (C.set === 'fps') { cls('use', 'v', k === 'KeyE'); cls('reload', 'hl', k === 'KeyR'); cls('plate', 'hl', S.plate <= 10 && S.spare > 0); cls('scope', 'on', S.scope && G.people && G.people.fp.gun !== 'pistol'); } // 권총에는 스코프가 없다 → 불 끔
       if (C.set === 's2') cls('act', 'v', shown($('s2p')));
       if (C.n === 3 && C.set) cls('grab', 'v', shown($('s3p')));
       cls('aim', 'on', tog.aim); cls('crouch', 'on', tog.crouch);
@@ -211,15 +213,15 @@ html[lang=en] #tc .b{font-size:11px;letter-spacing:.02em}html[lang=en] #tc .b[da
 #tcj{position:absolute;left:-58px;top:-58px;width:116px;height:116px;border-radius:50%;border:2px solid #fff7;background:#0b101744;display:none;will-change:transform}#tck{position:absolute;left:31px;top:31px;width:50px;height:50px;border-radius:50%;background:#fffb;box-shadow:0 2px 8px #0008}
 #tch{position:absolute;left:calc(8vw + var(--sl));bottom:calc(11vh + var(--sb));width:96px;height:96px;border-radius:50%;border:2px dashed #fff4;display:none}#tch:after{content:'';position:absolute;inset:27px;border-radius:50%;background:#fff3}#tc.mv #tch{display:block}
 html.touch #lk,html.touch #s2h,html.touch #s3h,html.touch #s4h,html.touch #s3n,html.touch #ov .k,html.touch #fd button+small,html.touch #s3d button+small,html.touch #s2c small{display:none!important}
-html.touch #ov{grid-template-columns:auto minmax(0,1fr);column-gap:4vw;align-items:center;padding:calc(10px + var(--st)) calc(5vw + var(--sr)) calc(10px + var(--sb)) calc(5vw + var(--sl));background:linear-gradient(90deg,#000d,#000a 60%,#0007)}
+html.touch #ov{grid-template-columns:auto minmax(0,1fr);column-gap:4vw;align-items:center;align-content:safe center;overflow-y:auto;padding:calc(10px + var(--st)) calc(5vw + var(--sr)) calc(10px + var(--sb)) calc(5vw + var(--sl));background:linear-gradient(90deg,#000d,#000a 60%,#0007)}
 html.touch #ov .tb{grid-column:1;grid-row:1;margin:0 0 .9em;font-size:11px}html.touch #ov h1{grid-column:1;grid-row:2;font-size:clamp(32px,5.2vw,84px)}
 html.touch #ov>button{grid-column:1;grid-row:3;margin:.8em 0 .1em;padding:.6em 2.2em;font-size:clamp(17px,2vw,26px)}html.touch #ov .dkb{grid-column:1;grid-row:4}html.touch #ov .dkb button{min-height:44px;padding:.6em 1.4em;font-size:clamp(13px,1.3vw,17px)}
 html.touch #ov .tk{grid-column:1;grid-row:5;margin-top:.9em;max-width:42vw;font-size:clamp(11px,1.25vw,15px);line-height:1.6;color:#9fb1c4}html.touch #ov .tk b{color:#dfe8f2;font-weight:600}
 html.touch #ov .ch{grid-column:2;grid-row:1/span 5;margin:0}html.touch #ov .ch>div{margin:.3em 0;padding:.45em 0 .45em .9em;min-height:44px;box-sizing:border-box}
 html.touch #ov .ch p{margin:0;font-size:clamp(13px,1.6vw,19px);line-height:1.4}html.touch #ov .ch p+p{font-size:clamp(11px,1.25vw,15px)}
-html.touch #ov .lng{top:auto;bottom:calc(10px + var(--sb));right:calc(12px + var(--sr));font-size:13px}html.touch #ov .lng span{padding:.65em 1.2em}html.touch #ov .dkv{left:calc(5vw + var(--sl));right:auto;bottom:calc(6px + var(--sb))}
+html.touch #ov .lng{position:static;grid-column:2;grid-row:6;justify-self:end;margin-top:.3em;font-size:13px}html.touch #ov .lng span{padding:.65em 1.2em}html.touch #ov .dkv{left:calc(5vw + var(--sl));right:auto;bottom:calc(6px + var(--sb))}
 html.touch #perf{right:calc(10px + var(--sr));top:calc(8px + var(--st))}html.touch #perf button{padding:7px 12px;font-size:13px}
-html.touch #dl{bottom:calc(max(10px,3vh) + var(--sb));width:min(620px,calc(100vw - 404px - var(--sl) - var(--sr)));min-width:280px;padding:.5em 1em .6em;font-size:clamp(14px,4.1vh,21px);line-height:1.4}
+html.touch #dl{bottom:calc(max(10px,3vh) + var(--sb));width:min(620px,calc(100vw - 404px - var(--sl) - var(--sr)));min-width:220px;padding:.5em 1em .6em;font-size:clamp(14px,4.1vh,21px);line-height:1.4}
 html.touch #cap{top:calc(max(34px,10vh) + var(--st));width:min(760px,74vw);font-size:clamp(14px,4.1vh,22px);line-height:1.5}
 html.touch #ttl{left:calc(68px + var(--sl));top:calc(14px + var(--st));font-size:clamp(12px,3.2vh,18px)}
 html.touch #sk{right:calc(12px + var(--sr));bottom:calc(10px + var(--sb));min-height:46px;box-sizing:border-box;padding:.8em 1.3em;font-size:15px;border-radius:9px;border-color:#fff7;touch-action:none}html.touch #sk.dn{background:#fff3}
@@ -233,13 +235,15 @@ html.touch #s2t small,html.touch #s3t small,html.touch #s4t small{font-size:clam
 html.touch #hp,html.touch #s3hp{left:calc(72px + var(--sl));top:calc(88px + var(--st));bottom:auto;width:128px}html.touch #hp b,html.touch #s3hp b{font-size:24px}
 html.touch #am,html.touch #s3k{right:calc(12px + var(--sr));top:calc(40px + var(--st));bottom:auto;font-size:15px}html.touch #am b,html.touch #s3k b{font-size:30px}html.touch #am small,html.touch #s3k small{font-size:11px}html.touch #s3k s{height:18px}
 html.touch #ct{top:calc(6px + var(--st));font-size:15px}html.touch #ct b{font-size:20px}html.touch #ct small{font-size:11px}
-html.touch #fd button,html.touch #s3d button{min-height:48px}html.touch #fd button.t,html.touch #s3d button.t{min-height:44px;padding:.6em 1.6em}
+html.touch #fd,html.touch #s3d,html.touch #end{z-index:5}html.touch #fd button,html.touch #s3d button{min-height:48px}html.touch #fd button.t,html.touch #s3d button.t{min-height:44px;padding:.6em 1.6em}
 html.touch #dk{align-content:safe center;overflow-y:auto;padding:calc(10px + var(--st)) calc(6vw + var(--sr)) calc(10px + var(--sb)) calc(6vw + var(--sl));font-size:clamp(14px,1.5vw,20px);touch-action:pan-y}
 html.touch #dk .h{display:none}html.touch #dk h2{font-size:clamp(28px,4.4vw,64px)}html.touch #dk .tb{margin-bottom:.7em;font-size:11px}
 html.touch #dk .m{margin-top:.5em}html.touch #dk .m>div{display:flex;align-items:center;min-height:48px;box-sizing:border-box;margin:.15em 0;padding:.3em 2em .3em 1em;font-size:1.3em}
 html.touch #dk .g{gap:.45em 1.4em;margin-top:.6em}html.touch #dk .g button{min-width:52px;min-height:40px;padding:.5em 1em}html.touch #dk input[type=range]{width:clamp(150px,24vw,300px);height:38px}
 html.touch #dk .bk{position:absolute;top:calc(12px + var(--st));right:calc(6vw + var(--sr));min-height:46px;margin:0;padding:.6em 1.8em;font-size:1.05em}
-@media(max-height:520px){html.touch #dk .tb{display:none}}`);
+@media(max-height:520px){html.touch #dk .tb{display:none}html.touch #ov .ch>div{margin:.15em 0;padding:.3em 0 .3em .9em}}
+#tc[data-s=s4] .b[data-a=aim]{right:calc(26px + var(--sr))!important;bottom:calc(66px + var(--sb))!important;width:68px!important;height:68px!important}
+html.touch #dk{background:linear-gradient(90deg,#000f,#000e 50%,#000d)}`);
         const root = G.el('div', { id: 'tc' }), mk = (a, txt, s, css, id) => { const b = G.el('div', { className: 'b', textContent: txt }, root); b.dataset.a = a; b.dataset.s = s; b.style.cssText = css; id && (b.id = id); return b; };
         ui = { root, b: [] };
         for (const [a, txt, s, r, y, sz] of BTN) {

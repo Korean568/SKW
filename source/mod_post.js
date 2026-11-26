@@ -16,7 +16,11 @@
 @group(1) @binding(3) var<uniform> u: vec4f; // 노출, 블룸, 빛줄기, 업스케일
 @group(1) @binding(4) var dep: texture_depth_2d;
 @group(1) @binding(5) var shf: texture_2d<f32>;
-fn S(uv: vec2f) -> vec3f { return min(textureSampleLevel(src, smp, uv, 0.0).rgb, vec3f(64.0)); } // NaN·Inf 차단
+fn S(uv: vec2f) -> vec3f { // NaN·Inf 차단 — 비트로 판별 (Metal relaxed/fast math 에서는 min() 이 NaN 을 걸러 준다는 보장이 없음)
+  let c = textureSampleLevel(src, smp, uv, 0.0).rgb; let b = bitcast<vec3u>(c);
+  // 지수 비트가 모두 1 = Inf·NaN: +Inf → 64, NaN·-Inf → 0 / 정상 값은 0..64
+  return select(clamp(c, vec3f(0.0), vec3f(64.0)), select(vec3f(0.0), vec3f(64.0), b == vec3u(0x7f800000u)), (b & vec3u(0x7fffffffu)) >= vec3u(0x7f800000u));
+}
 fn box(uv: vec2f, t: vec2f) -> vec3f { let e = vec2f(t.x, -t.y); return (S(uv + t) + S(uv - t) + S(uv + e) + S(uv - e)) * .25; }
 fn ign(p: vec2f) -> f32 { return fract(52.9829189 * fract(dot(p, vec2f(.06711056, .00583715)))); }
 fn mx(c: vec3f) -> f32 { return max(c.r, max(c.g, c.b)); }
