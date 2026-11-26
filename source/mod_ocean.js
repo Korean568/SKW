@@ -171,7 +171,7 @@ ${R ? `  let zw = g.misc.x / i.pos.z; let pu = i.pos.xy * g.res.zw; // 굴절 + 
           multisample: { count: Q.msaa }, depthStencil: { format: G.DEPTH, depthWriteEnabled: true, depthCompare: 'greater' } });
       }
       O.pipe = O.pc[key]; O.n = N * N * 6; O.hi = q > 1;
-      O.smp = d.createSampler({ magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear', addressModeU: 'repeat', addressModeV: 'repeat', maxAnisotropy: q ? 2 << q : 4 });
+      O.smp = d.createSampler({ magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear', addressModeU: 'repeat', addressModeV: 'repeat', maxAnisotropy: G.clamp(Q.aniso || (q ? 2 << q : 4), 1, 16) }); // 등급별 이방성 (Q.aniso 1…16)
     },
     onResize() { // 굴절용 사본 뷰가 바뀌므로 바인드 그룹만 다시 묶음
       const T = G.targets;

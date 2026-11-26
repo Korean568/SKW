@@ -74,6 +74,10 @@ fn cr(uv: vec2f) -> vec3f { // Catmull-Rom 5탭 + 링잉 방지
   let t = 1.0 / vec2f(textureDimensions(src)); let q = i.uv - .5; let W = vec3f(.2126, .7152, .0722);
   var c = S(i.uv);
   if (u.w > 0.0) { c = cr(i.uv); }
+  else if (u.w < 0.0) { // 초표본(렌더 > 화면, 상위 등급): 화면 화소 하나를 덮는 쌍선형 4탭 상자 필터로 축소
+    let h = t * (-u.w * .25);
+    c = (S(i.uv + h) + S(i.uv - h) + S(i.uv + vec2f(h.x, -h.y)) + S(i.uv - vec2f(h.x, -h.y))) * .25;
+  }
   else if (g.sun.w > .5) { // 샤픈
     let a = S(i.uv + vec2f(t.x, 0.0)); let b = S(i.uv - vec2f(t.x, 0.0)); let d = S(i.uv + vec2f(0.0, t.y)); let e = S(i.uv - vec2f(0.0, t.y));
     c = clamp(c + (c * 4.0 - a - b - d - e) * .22, min(c, min(min(a, b), min(d, e))), max(c, max(max(a, b), max(d, e))));
@@ -105,7 +109,7 @@ fn cr(uv: vec2f) -> vec3f { // Catmull-Rom 5탭 + 링잉 방지
       this.ub = dev.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }); this.tx = [];
     },
     onResize() {
-      const dev = G.dev, T = G.targets, n = G.Q.bloom && Math.min(4 + G.Q.level, Math.log2(T.h) | 0), V = this.v = [T.hdrView];
+      const dev = G.dev, T = G.targets, n = G.Q.bloom && Math.min(G.Q.bloomLv || 4 + G.Q.level, Math.log2(T.h) | 0), V = this.v = [T.hdrView];
       const bg = (a, b = a, c = a) => dev.createBindGroup({ layout: this.bgl, entries: [{ binding: 0, resource: a }, { binding: 1, resource: b }, { binding: 2, resource: G.clampSamp }, { binding: 3, resource: { buffer: this.ub } }, { binding: 4, resource: T.depthView }, { binding: 5, resource: c }] });
       const tex = (s, mipLevelCount = 1) => this.tx[this.tx.push(dev.createTexture({ size: [T.w >> s, T.h >> s], mipLevelCount, format: G.HDR, usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING })) - 1];
       for (const t of this.tx) t.destroy();
@@ -122,7 +126,7 @@ fn cr(uv: vec2f) -> vec3f { // Catmull-Rom 5탭 + 링잉 방지
       const f = Math.max(-v[2] * s[0] - v[6] * s[1] - v[10] * s[2], 0) ** 4; // 역광: 노출 ↓
       fl *= Math.exp(-G.dt * 12);
       U[0] = e.exposure * .345 * (1 + 2 * fl) * (1 + .6 * lo * lo) * (1 - (n ? .2 : .32) * f); // 낮 +0.3 EV, 해 질 녘 그대로
-      U[1] = n && 1; U[2] = .6 + .9 * e.haze; U[3] = T.w < T.cw;
+      U[1] = n && 1; U[2] = .6 + .9 * e.haze; U[3] = T.w < T.cw ? 1 : T.w > T.cw * 1.02 ? -T.w / T.cw : 0; // 1 = 확대(Catmull-Rom) · 음수 = 초표본 축소 (배율)
       G.dev.queue.writeBuffer(this.ub, 0, U);
       for (let i = 0; i < n; i++) pass(enc, V[i + 1], this.pd, B[i]);
       if (n) { pass(enc, sv[0], this.pm, B[Math.min(3, n)]); pass(enc, sv[1], this.pr, sb[0]); pass(enc, sv[0], this.pq, sb[1]); }

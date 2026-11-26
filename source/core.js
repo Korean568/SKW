@@ -135,13 +135,49 @@ G.gpuTips = () => {
 
 /* ───────── 품질 프리셋 ───────── */
 G.HDR = 'rgba16float'; G.DEPTH = 'depth32float';
-G.PRESETS = {
-  LOW: { name: 'LOW', level: 0, scale: .75, dprCap: 1, maxPx: 1.4e6, particles: 500, ocean: 0, clouds: 0, shadows: 0, bloom: 0, refract: 0, shadowRes: 0, msaa: 1 },
-  MEDIUM: { name: 'MEDIUM', level: 1, scale: 1, dprCap: 1.5, maxPx: 2.4e6, particles: 3000, ocean: 1, clouds: 1, shadows: 0, bloom: 1, refract: 0, shadowRes: 0, msaa: 4 },
-  HIGH: { name: 'HIGH', level: 2, scale: 1, dprCap: 2, maxPx: 4.2e6, particles: 12000, ocean: 2, clouds: 2, shadows: 1, bloom: 1, refract: 1, shadowRes: 4096, msaa: 4 },
+/* 10단계 그래픽 등급 (실제 성능순 기준 카드: GTX 1080 · RTX 5050 · 2080 · 5060 · 3090 · 5070 · 5080 · 4090 · 5090 이 경계)
+   tier 1..10 · name 영어 이름 · level 0/1/2 (예전 LOW/MEDIUM/HIGH 와 같은 굵은 단계: 1–2 → 0, 3–5 → 1, 6–10 → 2 — level 만 아는 모듈용)
+   scale 렌더 배율 상한(>1 = 초표본, 동적 해상도 G.dyn 과 화소 예산 maxPx 가 다시 제한) · dprCap · maxPx · msaa 1|4
+   shadowRes 그림자 맵(0 = 없음; 해상전은 4단계까지 없음) · pcf 그림자 필터 반경(1 = 3×3, 2 = 5×5) · shadowDist 그림자 범위 배율
+   cloudSteps 볼륨 구름 스텝 · cloudDiv 구름 버퍼 축소 배율 · cloudMap 구름 그림자 맵 한 변 · bloom 0/1 · bloomLv 블룸 밉 단계
+   particles 파티클 예산 · lights 점광 수(≤8) · aniso 이방성 필터 · ocean 0/1/2 · clouds 0/1/2 (예전 필드 = level) · refract 0/1 */
+G.TIER_NAMES = ['Very Low', 'Low', 'Medium Low', 'Medium', 'Medium High', 'Medium Super', 'High', 'Super', 'Max', 'Ultra'];
+G.TIERS = (() => {
+  const K = 'scale dprCap maxPx msaa shadowRes pcf shadowDist cloudSteps cloudDiv cloudMap bloomLv particles lights aniso ocean refract'.split(' ');
+  return [ //  scale dpr  maxPx  msaa shRes pcf shD  cStp cDiv cMap bLv  parts  lt an oc rf
+    [.6,   1,    .9e6,  1,    0,    0,  1,    10,  4,   0,   0,   300,   2, 1, 0, 0], // 1 Very Low — 휴대폰 · 내장 그래픽 · GTX 1080 미만
+    [.8,   1,    1.5e6, 1,    0,    0,  1,    14,  3,   0,   3,   800,   3, 2, 0, 0], // 2 Low — GTX 1080 ~ RTX 5050 미만
+    [.9,   1.25, 2e6,   4,    1024, 1,  1,    18,  3,   256, 4,   2000,  4, 4, 1, 0], // 3 Medium Low — RTX 5050 ~ 2080 미만
+    [1,    1.5,  2.4e6, 4,    2048, 1,  1,    22,  3,   256, 5,   3000,  4, 4, 1, 0], // 4 Medium (= 예전 MEDIUM) — RTX 2080 ~ 5060 미만
+    [1,    1.75, 3e6,   4,    2048, 1,  1,    28,  2.5, 256, 5,   4500,  4, 8, 1, 0], // 5 Medium High — RTX 5060 ~ 3090 미만
+    [1,    2,    3.6e6, 4,    3072, 1,  1,    36,  2,   512, 6,   7000,  5, 8, 2, 1], // 6 Medium Super — RTX 3090 ~ 5070 미만
+    [1,    2,    4.2e6, 4,    4096, 1,  1,    48,  2,   512, 6,   12000, 6, 8, 2, 1], // 7 High (= 예전 HIGH) — RTX 5070 ~ 5080 미만
+    [1.15, 2,    5.6e6, 4,    4096, 2,  1,    56,  2,   512, 7,   16000, 6, 16, 2, 1], // 8 Super — RTX 5080 ~ 4090 미만
+    [1.3,  2,    7.4e6, 4,    6144, 2,  1.25, 64,  2,   768, 7,   20000, 8, 16, 2, 1], // 9 Max — RTX 4090 ~ 5090 미만
+    [1.5,  2,    10e6,  4,    8192, 2,  1.5,  72,  1.5, 1024, 8,  24000, 8, 16, 2, 1], // 10 Ultra — RTX 5090 이상
+  ].map((r, i) => {
+    const o = { name: G.TIER_NAMES[i], tier: i + 1, level: i < 2 ? 0 : i < 5 ? 1 : 2 };
+    K.forEach((k, j) => o[k] = r[j]);
+    o.clouds = o.level; o.bloom = +(o.bloomLv > 0);
+    if (G.mode !== 'story' && o.tier < 5) o.shadowRes = 0; // 해상전: 그림자 맵은 5단계부터 (예전 MEDIUM 처럼 4단계까지 없음)
+    o.shadows = +(o.shadowRes > 0);
+    return o;
+  });
+})();
+G.PRESETS = {}; // 이름 → 프리셋. 예전 이름 LOW/MEDIUM/HIGH 는 같은 객체를 가리키는 별칭 (열거되지 않음)
+G.TIERS.forEach(p => G.PRESETS[p.name] = p);
+[['LOW', 1], ['MEDIUM', 4], ['HIGH', 7]].forEach(([k, t]) => Object.defineProperty(G.PRESETS, k, { value: G.TIERS[t - 1], enumerable: false }));
+/* 이름·번호 → 프리셋 (없으면 null): 7 · '7' · 'ultra' · 'Medium High' · 'medium_high' · 'MEDIUM' (= Medium) · 'LOW' (= Very Low) · 'HIGH' (= High) */
+G.tierOf = q => {
+  if (q && typeof q === 'object' && q.tier) return G.TIERS[q.tier - 1];
+  const s = String(q ?? '').trim(); if (!s) return null;
+  if (/^\d+$/.test(s)) return G.TIERS[+s - 1] || null;
+  if (G.PRESETS[s.toUpperCase()] && /^(low|medium|high)$/i.test(s)) return G.PRESETS[s.toUpperCase()];
+  const k = s.toLowerCase().replace(/[\s_-]+/g, '');
+  return G.TIERS.find(p => p.name.toLowerCase().replace(/\s+/g, '') === k) || ({ med: G.TIERS[3], vlow: G.TIERS[0], max: G.TIERS[8] })[k] || null;
 };
+G.tierCap = 10; // 자동 선택의 상한 (휴대폰 모듈 등이 낮춤). 수동 선택은 제한하지 않음
 /* ───────── 환경(태양·바람·파도) ───────── */
-if (G.mode === 'story') Object.assign(G.PRESETS.MEDIUM, { shadows: 1, shadowRes: 2048 });
 G.env = { indoor: 0, sunAz: 40, sunEl: 26, cloud: .45, haze: .35, sea: .55, windDir: .6, windSpd: 9, fogDen: 1 / 9000, exposure: 1 };
 G.sun = { dir: [0, 1, 0], col: [3, 3, 3] };
 G.waves = new Float32Array(48); // 6개 거스트너 파: [dirx,dirz,진폭,k, ω,가파름Q,위상,0]
@@ -179,15 +215,16 @@ struct Globals {
   invViewProj: mat4x4f,  // 클립→(카메라 기준 상대 월드). worldAt()/viewRay() 로만 사용
   shadowVP: mat4x4f,     // 월드→그림자 맵 클립 (표준 z 0..1)
   cam: vec4f,            // xyz 카메라 위치, w 시간(초)
-  sun: vec4f,            // xyz 태양 방향(지표→태양, 단위), w 품질 0 LOW·1 MEDIUM·2 HIGH
+  sun: vec4f,            // xyz 태양 방향(지표→태양, 단위), w 굵은 품질 단계 Q.level 0·1·2 (세부 등급은 qual.x)
   sunCol: vec4f,         // rgb 태양광(HDR), w 그림자 사용 0/1
   res: vec4f,            // 렌더 타깃 w,h,1/w,1/h
   fog: vec4f,            // x 안개 밀도(/m), y 구름량 0..1, z 연무 0..1, w 해상 상태 0..1
   wind: vec4f,           // xy 바람 방향(xz 평면, 단위), z 풍속 m/s, w 실내 계수 0..1 (기내 = 1: 하늘 환경광·직사광 차폐)
   misc: vec4f,           // x near, y dt, z 프레임, w 노출
   waves: array<vec4f, 12>, // 파 i: [2i]=(dirx,dirz,진폭,k) [2i+1]=(ω,Q,위상,0)
-  lights: array<vec4f, 8>, // 점광 i: [2i]=(pos,반경) [2i+1]=(rgb*세기,0)
+  lights: array<vec4f, 16>, // 점광 i (0..7): [2i]=(pos,반경) [2i+1]=(rgb*세기,0) — 등급에 따라 앞의 g.qual.z 개만 채워짐
   cmap: vec4f,           // 구름 그림자 맵: xy 중심(월드 xz), z 1/한 변 길이(m), w 사용 0/1
+  qual: vec4f,           // x 등급 1..10, y 그림자 PCF 반경(1 = 3×3, 2 = 5×5), z 점광 수, w 등급 0..1 ((tier-1)/9)
 };
 @group(0) @binding(0) var<uniform> g: Globals;
 @group(0) @binding(1) var shadowTex: texture_depth_2d;
@@ -239,17 +276,17 @@ fn fogAt(col: vec3f, P: vec3f) -> vec3f { // 대기 원근: 채널별 소광(파
   // NaN → 0 (비트 판별: Metal relaxed/fast math 에서는 min() 이 NaN 을 걸러 준다는 보장이 없음), 나머지는 40 으로 상한
   return select(min(c, vec3f(40.0)), vec3f(0.0), (bitcast<vec3u>(c) & vec3u(0x7fffffffu)) > vec3u(0x7f800000u));
 }
-fn shadowAt(P: vec3f, N: vec3f) -> f32 { // 1 = 햇빛, 0 = 그림자 (3x3 PCF, 깊이 범위 900m)
+fn shadowAt(P: vec3f, N: vec3f) -> f32 { // 1 = 햇빛, 0 = 그림자 (PCF 3×3 · 상위 등급 5×5, 깊이 범위 900m)
   if (g.sunCol.w < .5) { return 1.0; }
   let q = g.shadowVP * vec4f(P + N * .3, 1.0);
   let uv = q.xy * vec2f(.5, -.5) + .5;
   let e = min(min(uv.x, uv.y), min(1.0 - uv.x, 1.0 - uv.y));
   if (e <= 0.0 || q.z > 1.0) { return 1.0; }
-  let ts = 1.4 / f32(textureDimensions(shadowTex).x); var s = 0.0;
-  for (var y = -1; y <= 1; y++) { for (var x = -1; x <= 1; x++) {
+  let r = clamp(i32(g.qual.y), 1, 3); let ts = select(1.4, .85, r > 1) / f32(textureDimensions(shadowTex).x); var s = 0.0;
+  for (var y = -r; y <= r; y++) { for (var x = -r; x <= r; x++) {
     s += textureSampleCompareLevel(shadowTex, shadowSamp, uv + vec2f(f32(x), f32(y)) * ts, q.z - .0005);
   } }
-  return mix(1.0, s / 9.0, smoothstep(0.0, .06, e)); // 맵 가장자리에서 서서히 사라짐
+  return mix(1.0, s / f32((2 * r + 1) * (2 * r + 1)), smoothstep(0.0, .06, e)); // 맵 가장자리에서 서서히 사라짐
 }
 fn cloudVis(P: vec3f) -> f32 { // 구름 그림자: 1 = 햇빛, 0 = 완전 그늘 (맵이 없으면 1)
   if (g.cmap.w < .5) { return 1.0; }
@@ -272,9 +309,9 @@ fn gerstner(p: vec2f, t: f32) -> vec3f { // 기준 수면 변위 (JS G.waveAt �
   }
   return d;
 }
-fn pointLights(P: vec3f, N: vec3f) -> vec3f { // 폭발 섬광 등 동적 점광 4개
+fn pointLights(P: vec3f, N: vec3f) -> vec3f { // 폭발 섬광 등 동적 점광 (등급별 2..8개 = g.qual.z)
   var c = vec3f(0.0);
-  for (var i = 0; i < 4; i++) {
+  for (var i = 0; i < min(i32(g.qual.z), 8); i++) {
     let l = g.lights[i * 2]; if (l.w <= 0.0) { continue; }
     let v = l.xyz - P; let d = length(v); let a = max(1.0 - d / l.w, 0.0);
     c += g.lights[i * 2 + 1].rgb * a * a * max(dot(N, v / max(d, 1e-3)), 0.0);
@@ -321,10 +358,15 @@ G.resize = quiet => {
   if (G.params.has('step')) { G.test.tex && G.test.tex.destroy(); G.test.tex = dev.createTexture({ size: [cw, ch], format: G.fmt, usage: U.RENDER_ATTACHMENT | U.COPY_SRC }); }
   if (G.ready && !quiet) hook('onResize');
 };
+/* 등급 전환: name = 등급 이름·번호·예전 이름 (G.tierOf 참고, 모르면 Medium). manual = 사용자가 고름 (자동 하향 끔).
+   자동 선택(manual 아님)은 G.tierCap 을 넘지 않음. */
 G.setQuality = (name, manual) => {
-  const dev = G.dev, Q = G.Q = G.PRESETS[name] || G.PRESETS.MEDIUM; G.qManual = !!manual;
+  let Q = G.tierOf(name) || G.TIERS[3];
+  if (!manual && Q.tier > G.tierCap) Q = G.TIERS[G.clamp(G.tierCap | 0, 1, 10) - 1];
+  const dev = G.dev; G.Q = Q; G.qManual = !!manual;
   G.shadowTex && G.shadowTex.destroy(); G.shadowTex = null;
-  if (Q.shadows) G.shadowTex = dev.createTexture({ size: [Q.shadowRes, Q.shadowRes], format: G.DEPTH, usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING });
+  const sr = Math.min(Q.shadowRes, dev.limits.maxTextureDimension2D || 8192);
+  if (Q.shadows) G.shadowTex = dev.createTexture({ size: [sr, sr], format: G.DEPTH, usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING });
   G.shadowView = G.shadowTex ? G.shadowTex.createView() : null;
   G.bindGlobals = () => {
   const bg = sv => dev.createBindGroup({ layout: G.bgl0, entries: [{ binding: 0, resource: { buffer: G.globalsBuf } }, { binding: 1, resource: sv }, { binding: 2, resource: G.shadowSamp }, { binding: 3, resource: G.noiseView }, { binding: 4, resource: G.linSamp }, { binding: 5, resource: G.cloudMap.view || G.dummyView }] });
@@ -339,7 +381,7 @@ G.setQuality = (name, manual) => {
 /* ───────── 카메라 / 전역 유니폼 ───────── */
 G.cam = { pos: [0, 40, -200], target: [0, 10, 0], up: [0, 1, 0], fov: 50 * Math.PI / 180, near: 1 };
 G.shadowFocus = [0, 0, 0]; G.shadowRange = 240;
-const GF = new Float32Array(160);
+const GF = new Float32Array(196);
 function writeGlobals() {
   const c = G.cam, T = G.targets, Q = G.Q, e = G.env;
   c.view = M4.lookAt(c.pos, c.target, c.up); c.proj = M4.persp(c.fov, T.w / T.h, c.near);
@@ -347,8 +389,8 @@ function writeGlobals() {
   const vr = new Float32Array(c.view); vr[12] = vr[13] = vr[14] = 0;
   GF.set(c.viewProj, 0); GF.set(M4.invert(M4.mul(c.proj, vr)), 16);
   if (Q.shadows) { // 태양 방향 직교 투영, 텍셀 단위 스냅으로 떨림 방지
-    const sd = G.sun.dir, R = G.shadowRange, up = Math.abs(sd[1]) > .98 ? [0, 0, 1] : [0, 1, 0];
-    const lz = V3.norm(sd), lx = V3.norm(V3.cross(up, lz)), ly = V3.cross(lz, lx), tx = 2 * R / Q.shadowRes;
+    const sd = G.sun.dir, R = G.shadowRange * (Q.shadowDist || 1), up = Math.abs(sd[1]) > .98 ? [0, 0, 1] : [0, 1, 0];
+    const lz = V3.norm(sd), lx = V3.norm(V3.cross(up, lz)), ly = V3.cross(lz, lx), tx = 2 * R / (G.shadowTex ? G.shadowTex.width : Q.shadowRes);
     const fx = Math.round(V3.dot(G.shadowFocus, lx) / tx) * tx, fy = Math.round(V3.dot(G.shadowFocus, ly) / tx) * tx, fz = V3.dot(G.shadowFocus, lz);
     const f = V3.add(V3.add(V3.mul(lx, fx), V3.mul(ly, fy)), V3.mul(lz, fz));
     G.shadowVP = M4.mul(M4.ortho(-R, R, -R, R, 1, 900), M4.lookAt(V3.add(f, V3.mul(lz, 450)), f, up));
@@ -359,13 +401,14 @@ function writeGlobals() {
   GF.set(G.waves, 76);
   G.lights = G.lights.filter(l => (l.life -= G.dt) > 0);
   G.lights.sort((a, b) => b.intensity * b.life / b.max - a.intensity * a.life / a.max);
-  for (let i = 0; i < 4; i++) {
-    const l = G.lights[i], o = 124 + i * 8;
+  for (let i = 0; i < 8; i++) { // 등급별 점광 수 (Q.lights, 2..8) — 셰이더 pointLights() 가 g.qual.z 개까지 읽음
+    const l = i < (Q.lights || 4) && G.lights[i], o = 124 + i * 8;
     if (!l) { GF.fill(0, o, o + 8); continue; }
     const k = l.intensity * (l.life / l.max) ** 2;
     GF.set([l.pos[0], l.pos[1], l.pos[2], l.radius, l.rgb[0] * k, l.rgb[1] * k, l.rgb[2] * k, 0], o);
   }
-  const cm = G.cloudMap; GF[156] = cm.x; GF[157] = cm.z; GF[158] = 1 / cm.size; GF[159] = cm.view ? 1 : 0;
+  const cm = G.cloudMap; GF[188] = cm.x; GF[189] = cm.z; GF[190] = 1 / cm.size; GF[191] = cm.view ? 1 : 0;
+  GF[192] = Q.tier || Q.level * 3 + 1; GF[193] = Q.pcf || 1; GF[194] = Math.min(Q.lights || 4, 8); GF[195] = ((Q.tier || 4) - 1) / 9;
   G.dev.queue.writeBuffer(G.globalsBuf, 0, GF);
 }
 G.project = p => { // 월드 → 화면(CSS px). 반환 [x, y, w]; w<=0 이면 카메라 뒤
@@ -511,8 +554,8 @@ G.boot = async () => {
     G.pipeDR = dev.createRenderPipeline({ layout: 'auto', vertex: { module: mDR, entryPoint: 'vs' }, fragment: { module: mDR, entryPoint: 'fs', targets: [] }, depthStencil: { format: G.DEPTH, depthWriteEnabled: true, depthCompare: 'always' } });
     if (hasTS && !G.params.has('step')) G.ts = { qs: dev.createQuerySet({ type: 'timestamp', count: 2 }), buf: dev.createBuffer({ size: 16, usage: GPUBufferUsage.QUERY_RESOLVE | GPUBufferUsage.COPY_SRC }), rb: dev.createBuffer({ size: 16, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ }) };
     G.gpuInfo = await G.mods.gpu.detect(adapter, dev); // {name, vendor, tier, ...}
-    const q = (G.params.get('q') || '').toUpperCase();
-    G.setQuality(G.PRESETS[q] ? q : G.gpuInfo.tier, !!G.PRESETS[q]);
+    const q = G.tierOf(G.params.get('q')); // ?q=LOW|MEDIUM|HIGH · ?q=ultra · ?q=7 · ?q=medium_high
+    G.setQuality(q || G.gpuInfo.tier, !!q);
     for (const m of G.order) m.init && await m.init();
     G.ready = true; hook('onQuality', G.Q); hook('onResize');
     // 크기 변경: 실시간 루프에서는 프레임당 한 번만 (회전 · iframe 최대화 때 연달아 오는 resize 마다 타깃 전부를 다시 만들지 않게)

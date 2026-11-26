@@ -4,7 +4,7 @@
   const COMMON = `
 @group(1) @binding(0) var cl: texture_2d<f32>;
 @group(1) @binding(1) var vol: texture_3d<f32>;
-@group(1) @binding(2) var<uniform> cu: vec4f; // 구름층 밑면(m)·두께(m)·스토리 0/1
+@group(1) @binding(2) var<uniform> cu: vec4f; // 구름층 밑면(m)·두께(m)·스토리 0/1·볼륨 스텝 수(등급 Q.cloudSteps)
 fn V(p: vec3f) -> f32 { return textureSampleLevel(vol, linSamp, p, 0.0).r; }
 fn n2(p: vec2f) -> f32 { // 1탭 값 잡음
   let f = fract(p);
@@ -87,7 +87,7 @@ fn hg(mu: f32, k: f32) -> f32 { return (1.0 - k * k) / pow(1.0 + k * k - 2.0 * k
   let s = g.sun.xyz; let mu = dot(rd, s); let A = amb(); let lo = low(); let S = sunc() * mix(vec3f(1.0), vec3f(1.0, .74, .8), lo); let hi = g.sun.w > 1.5;
   var ph = mix(hg(mu, -.3), hg(mu, .5), .5) + hg(mu, .85) * (.04 + .05 * lo); ph *= 1.5 / (1.0 + .22 * ph); // 무릎
   ph = mix(ph, 7.0 * pow(max(mu, 0.0), 24.0) + .3, lo); // 낮은 태양: 전방 산란 좁게
-  let N = i32(14.0 + 8.5 * g.sun.w * g.sun.w); let fN = f32(N); // 14 / 22 / 48 스텝
+  let N = select(i32(14.0 + 8.5 * g.sun.w * g.sun.w), clamp(i32(cu.w), 6, 128), cu.w > 0.0); let fN = f32(N); // 등급별 10 … 72 스텝 (예전 14 / 22 / 48)
   let c = ta + 300.0; let gk = pow((tb + c) / (ta + c), 1.0 / fN) - 1.0; // 아래: 균등 · 안/위: 거리 비례
   var dt = mix((tb - ta) / fN, (ta + c) * gk, ab);
   var t = ta + dt * fract(dot(i.pos.xy, vec2f(.5, .75))); // 정적 2×2 지터
@@ -153,22 +153,24 @@ fn hg(mu: f32, k: f32) -> f32 { return (1.0 - k * k) / pow(1.0 + k * k - 2.0 * k
       this.nv = noise3(); this.pv = pipe(m, 'fs'); this.pm = pipe(m, 'fm'); this.bv = bind(G.dummyView, this.nv);
       this.b0 = G.dev.createBindGroup({ layout: G.bgl0, entries: [{ buffer: G.globalsBuf }, G.dummyDepthView, G.shadowSamp, G.noiseView, G.linSamp, G.dummyView].map((resource, binding) => ({ binding, resource })) });
     },
-    onQuality(Q) { // 그림자 맵 256²/512²
+    onQuality(Q) { // 구름 그림자 맵: 등급별 Q.cloudMap (0 · 256² … 1024²; 예전 256 × level)
       if (this.ms !== Q.msaa) this.ps = pipe(G.shader(COMMON + SKY, 'sky'), 'fs', { format: G.DEPTH, depthWriteEnabled: false, depthCompare: 'equal' }, this.ms = Q.msaa);
-      const o = this.mt, n = this.mn = 256 * Q.level;
+      const n = Q.cloudMap ?? 256 * Q.level;
+      if (n === this.mn && (this.mt || !n)) return;
+      const o = this.mt; this.mn = n;
       this.mt = n ? tex(n, n) : null;
       G.setCloudMap(this.mv = n ? this.mt.createView() : null);
       o && o.destroy();
     },
-    onResize() {
-      const T = G.targets, d = G.Q.level > 1 ? 2 : 3;
+    onResize() { // 볼륨 구름 버퍼: 렌더 크기 ÷ Q.cloudDiv (4 … 1.5; 예전 HIGH 2 · 나머지 3)
+      const T = G.targets, d = G.Q.cloudDiv || (G.Q.level > 1 ? 2 : 3);
       this.ct && this.ct.destroy();
       this.ct = tex(Math.ceil(T.w / d), Math.ceil(T.h / d));
       this.bs = bind(this.cv = this.ct.createView(), this.nv);
     },
     update() { // 맵 중심: 카메라 (텍셀 스냅)
       const m = G.cloudMap, t = m.size / (this.mn || 1), c = G.cam.pos, e = G.env, st = G.mode == 'story';
-      cu[0] = e.cloudBase ?? (st ? 1000 : 1500); cu[1] = Math.max((e.cloudTop ?? cu[0] + 2000) - cu[0], 100); cu[2] = +st; // env.cloudBase/cloudTop
+      cu[0] = e.cloudBase ?? (st ? 1000 : 1500); cu[1] = Math.max((e.cloudTop ?? cu[0] + 2000) - cu[0], 100); cu[2] = +st; cu[3] = G.Q.cloudSteps || 0; // env.cloudBase/cloudTop · 등급별 스텝 수
       G.dev.queue.writeBuffer(ub, 0, cu);
       m.x = Math.round(c[0] / t) * t; m.z = Math.round(c[2] / t) * t;
     },

@@ -264,7 +264,7 @@ html.touch #dk .bk{position:absolute;top:calc(12px + var(--st));right:calc(6vw +
 @media(max-height:380px){html.touch #ov{padding-top:calc(30px + var(--st))}html.touch #ov .ch p{font-size:12px;line-height:1.3}html.touch #ov .ch p+p{font-size:10px}html.touch #ov .tk{display:none}html.touch #ov h1{font-size:clamp(28px,4.6vw,40px)}}
 #tc[data-s=s4] .b[data-a=aim]{right:calc(26px + var(--sr))!important;bottom:calc(66px + var(--sb))!important;width:68px!important;height:68px!important}
 html.touch #dk{background:linear-gradient(90deg,#000f,#000f 50%,#000e)}
-#rot{position:absolute;inset:0;z-index:60;display:none;place-content:center;justify-items:center;gap:12px;padding:24px calc(24px + var(--sr)) calc(24px + var(--sb)) calc(24px + var(--sl));background:#05080c;color:#dfe8f2;text-align:center;pointer-events:auto;touch-action:none;font:700 clamp(18px,5.4vw,26px)/1.35 system-ui,'Apple SD Gothic Neo','Malgun Gothic',sans-serif}html.rot #rot{display:grid}
+#rot{position:absolute;inset:0;z-index:60;display:none;place-content:center;justify-items:center;gap:12px;padding:24px calc(24px + var(--sr)) calc(24px + var(--sb)) calc(24px + var(--sl));background:#05080c;color:#dfe8f2;text-align:center;word-break:keep-all;pointer-events:auto;touch-action:none;font:700 clamp(18px,5.4vw,26px)/1.35 system-ui,'Apple SD Gothic Neo','Malgun Gothic',sans-serif}html.rot #rot{display:grid}
 #rot svg{width:min(30vw,112px);height:auto;margin-bottom:6px}#rot .ph{transform-box:fill-box;transform-origin:center;animation:tcrot 2.6s ease-in-out infinite}@keyframes tcrot{0%,22%{transform:rotate(0)}52%,100%{transform:rotate(-90deg)}}
 #rot small{max-width:22em;font:400 clamp(12px,3.6vw,15px)/1.5 system-ui,'Apple SD Gothic Neo',sans-serif;color:#9fb1c4}`);
         const root = G.el('div', { id: 'tc' }), mk = (a, txt, s, css, id) => { const b = G.el('div', { className: 'b', textContent: txt }, root); b.dataset.a = a; b.dataset.s = s; b.style.cssText = css; id && (b.id = id); return b; };
@@ -275,8 +275,10 @@ html.touch #dk{background:linear-gradient(90deg,#000f,#000f 50%,#000e)}
         }
         ui.pause = mk('pause', '', '', '', 'tcp');
         // "가로로 돌려 주세요" (영어는 mod_enui 사전)
-        if (rotOK) G.el('div', { id: 'rot', innerHTML: '<svg viewBox="0 0 96 96" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><g class=ph><rect x="32" y="14" width="32" height="60" rx="6"/><path d="M44 66h8"/></g><path d="M74 26a32 32 0 0 1 8 22" stroke-width="3.5"/><path d="M82 49l-6-5m6 5l4-7" stroke-width="3.5"/></svg><b>휴대폰을 가로로 돌려 주세요</b><small>화면이 돌아가지 않으면 세로 화면 고정(자동 회전) 설정을 확인해 주세요</small>' });
-        if (mqP) { const f = () => sync(); mqP.addEventListener ? mqP.addEventListener('change', f) : mqP.addListener && mqP.addListener(f); }
+        const tab = Math.min(screen.width || 0, screen.height || 0) >= 600; // iPad · 태블릿: "휴대폰" 대신 "태블릿"
+        if (rotOK) G.el('div', { id: 'rot', innerHTML: `<svg viewBox="0 0 96 96" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><g class=ph><rect x="32" y="14" width="32" height="60" rx="6"/><path d="M44 66h8"/></g><path d="M74 26a32 32 0 0 1 8 22" stroke-width="3.5"/><path d="M82 49l-6-5m6 5l4-7" stroke-width="3.5"/></svg><b>${tab ? '태블릿을' : '휴대폰을'} 가로로 돌려 주세요</b><small>화면이 돌아가지 않으면 세로 화면 고정(자동 회전) 설정을 확인해 주세요</small>` });
+        // iOS 는 방향이 바뀐 직후의 resize 에서 innerWidth/innerHeight 가 아직 옛 값일 때가 있음 (특히 iframe) → 잠시 뒤 한 번 더 resize 를 알려 캔버스 크기를 다시 잼
+        if (mqP) { const f = () => { sync(); setTimeout(() => { try { dispatchEvent(new Event('resize')); } catch (e) { } }, 400); }; mqP.addEventListener ? mqP.addEventListener('change', f) : mqP.addListener && mqP.addListener(f); }
         addEventListener('resize', () => sync());
         ui.joy = G.el('div', { id: 'tcj', innerHTML: '<div id=tck></div>' }, root); ui.knob = ui.joy.firstChild; G.el('div', { id: 'tch' }, root);
         const sk = $('sk'); sk && (sk.textContent = '건너뛰기 ▸');
