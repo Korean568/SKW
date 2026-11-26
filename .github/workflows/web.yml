@@ -110,8 +110,10 @@ jobs:
           set -e
           V=$(node -p "require('./desktop/package.json').version")
           B=butler/butler
-          # index.html 하나만 든 폴더를 올린다 (itch.io 가 그 index.html 을 브라우저에서 띄움)
+          # itch.io 는 브라우저 게임을 "index.html 이 든 zip" 으로만 받는다. 파일이 하나뿐이면 일반 다운로드 파일로
+          # 취급해 브라우저 게임으로 고를 수 없으므로, 작은 안내 파일을 하나 더 넣어 zip 묶음으로 올라가게 한다
+          test -f artifacts/html5/index.html || { echo "::error::html5 폴더에 index.html 이 없습니다"; exit 1; }
+          printf 'Second Korean Wars (%s)\nPlay in the browser: index.html\nhttps://whgkwns.itch.io/second-korean-wars\n' "$V" > artifacts/html5/readme.txt
           ls -l artifacts/html5
-          test "$(ls artifacts/html5)" = "index.html" || { echo "::error::html5 폴더에 index.html 말고 다른 파일이 있습니다"; exit 1; }
           $B push artifacts/html5 "$ITCH_TARGET:html5" --userversion "$V"
           $B status "$ITCH_TARGET"
