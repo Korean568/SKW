@@ -1,0 +1,117 @@
+# 브라우저판 (itch.io HTML5 — iPhone · iPad · Android · PC 브라우저) 빌드 — 수동 실행 전용 (Actions 탭 → "Web build (itch.io HTML5)" → Run workflow)
+#
+# 1) 스토리 게임을 소스에서 빌드해 web/dist/index.html 과 second-korean-wars-web.zip 을 만들고 워크플로 아티팩트로 올린다.
+# 2) 저장소 시크릿 BUTLER_API_KEY 가 있고 push_to_itch 가 켜져 있을 때만 itch.io 의 html5 채널에 올린다 (index.html 하나만 든 폴더).
+#    처음 한 번은 itch.io 대시보드에서 "브라우저에서 플레이" 설정을 직접 해야 한다 — web/README-web.md
+#
+# 읽는 시크릿: BUTLER_API_KEY
+# 읽는 변수:   ITCH_USER (itch.io 사용자 이름, 없으면 API 키로 알아냄) · ITCH_GAME (기본 second-korean-wars)
+name: Web build (itch.io HTML5)
+
+on:
+  workflow_dispatch:
+    inputs:
+      push_to_itch:
+        description: "BUTLER_API_KEY 시크릿이 있으면 itch.io (html5 채널)에도 올리기"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+
+      # 게임 빌드에 쓰는 esbuild 는 PC판과 같은 것(desktop/node_modules). Electron 실행 파일은 받지 않는다
+      - name: Install game build tools
+        working-directory: desktop
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+        run: npm ci
+
+      - name: Build web version (web/dist)
+        run: node web/scripts/build-web.js
+
+      - name: Version
+        id: v
+        run: echo "v=$(node -p "require('./desktop/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Collect files
+        run: |
+          set -e
+          mkdir -p out/html5
+          cp web/dist/index.html out/html5/index.html
+          cp web/dist/second-korean-wars-web.zip "out/SecondKoreanWars-${{ steps.v.outputs.v }}-web.zip"
+          ls -l out out/html5
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: second-korean-wars-web
+          if-no-files-found: error
+          path: out/
+
+  itch:
+    needs: build
+    if: ${{ inputs.push_to_itch }}
+    runs-on: ubuntu-latest
+    env:
+      BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
+      ITCH_TARGET: ${{ vars.ITCH_USER }}/${{ vars.ITCH_GAME || 'second-korean-wars' }}
+    steps:
+      - name: Check settings
+        run: |
+          if [ -z "$BUTLER_API_KEY" ]; then echo "BUTLER_API_KEY 시크릿이 없어 itch.io 업로드를 건너뜁니다."; exit 0; fi
+          if [ "${ITCH_TARGET%%/*}" = "" ]; then
+            # ITCH_USER 변수가 없으면 API 키의 주인 이름을 itch.io 에 물어 쓴다
+            # itch.io 가 잠깐 "요청이 너무 많음"(429)을 돌려줄 때가 있어 몇 번 기다렸다 다시 묻는다
+            U=""
+            for i in 1 2 3 4 5 6; do
+              U=$(curl -fsS "https://itch.io/api/1/$BUTLER_API_KEY/me" 2>/dev/null | jq -r '.user.username // empty' 2>/dev/null || true)
+              [ -n "$U" ] || U=$(curl -fsS -H "Authorization: Bearer $BUTLER_API_KEY" https://api.itch.io/profile 2>/dev/null | jq -r '.user.username // empty' 2>/dev/null || true)
+              [ -n "$U" ] && break
+              echo "itch.io 사용자 이름 확인 재시도 ($i)"; sleep $((i * 10))
+            done
+            if [ -z "$U" ]; then echo "::error::itch.io 사용자 이름을 알 수 없습니다. 저장소 변수 ITCH_USER 를 설정하세요"; exit 1; fi
+            echo "ITCH_TARGET=$U/${ITCH_TARGET#*/}" >> "$GITHUB_ENV"
+            echo "itch.io 대상: $U/${ITCH_TARGET#*/}"
+          fi
+
+      - uses: actions/checkout@v4
+        if: env.BUTLER_API_KEY != ''
+        with:
+          sparse-checkout: desktop/package.json
+          sparse-checkout-cone-mode: false
+
+      - uses: actions/download-artifact@v4
+        if: env.BUTLER_API_KEY != ''
+        with:
+          name: second-korean-wars-web
+          path: artifacts
+
+      - name: Install butler
+        if: env.BUTLER_API_KEY != ''
+        run: |
+          curl -fsSL -o butler.zip https://broth.itch.zone/butler/linux-amd64/LATEST/archive/default
+          unzip -q butler.zip -d butler && chmod +x butler/butler && butler/butler -V
+
+      - name: Push to itch.io (html5 channel)
+        if: env.BUTLER_API_KEY != ''
+        run: |
+          set -e
+          V=$(node -p "require('./desktop/package.json').version")
+          B=butler/butler
+          # index.html 하나만 든 폴더를 올린다 (itch.io 가 그 index.html 을 브라우저에서 띄움)
+          ls -l artifacts/html5
+          test "$(ls artifacts/html5)" = "index.html" || { echo "::error::html5 폴더에 index.html 말고 다른 파일이 있습니다"; exit 1; }
+          $B push artifacts/html5 "$ITCH_TARGET:html5" --userversion "$V"
+          $B status "$ITCH_TARGET"

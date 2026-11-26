@@ -81,8 +81,21 @@
     echo = gn(.5, dl); to(dl, gn(.45, dl)); to(dl, mix);
     MB = { calm: gn(0, mus), combat: gn(0, mus) };
   };
+  // 다시 켜기: iOS 는 전화·Siri·알람·잠금·앱 전환 뒤 'suspended' 또는 'interrupted' 로 남고, 사용자 제스처 안에서 resume() 해야 돌아옴
+  let off = 0; // 화면이 숨겨져서 우리가 멈춘 상태
+  const kick = () => { if (c && c.state !== 'running' && c.state !== 'closed' && !document.hidden && c instanceof AudioContext) { off = 0; c.resume().catch(() => { }); } };
+  for (const t of ['pointerdown', 'pointerup', 'touchend', 'click', 'keydown']) addEventListener(t, kick, { capture: true, passive: true });
+  document.addEventListener('visibilitychange', () => { // 숨겨지면 멈추고 (뒤 탭에서 배경음이 계속 나지 않게), 보이면 다시
+    if (!(c instanceof AudioContext)) return;
+    if (document.hidden) { if (c.state === 'running') { off = 1; c.suspend().catch(() => { }); } } else kick();
+  });
   const api = {
-    init() { c || use(new AudioContext()); c.resume(); },
+    init() {
+      // iOS: Web Audio 만 쓰면 '주변 소리(ambient)' 로 분류돼 무음 스위치에 묶임 → 'playback' 이면 무음 모드에서도 소리가 남 (Safari 16.4+, 없으면 건너뜀)
+      try { const s = navigator.audioSession; if (s && s.type !== 'playback') s.type = 'playback'; } catch (e) { }
+      if (!c) { use(new AudioContext()); c.onstatechange = () => { c.state !== 'running' && !off && kick(); }; } // 끊긴 뒤 스스로 돌아오지 않으면 다음 제스처에서
+      kick();
+    },
     play(name, o) {
       const f = SND[name], p = (o = o || {}).pos, now = c.currentTime; if (!f) return;
       let g = o.gain ?? 1, out, d = 0, dx, dz;

@@ -66,7 +66,45 @@ const M4 = { // 열 우선(column-major) Float32Array(16) — WGSL mat4x4f 와 �
 G.clamp = (x, a, b) => Math.min(b, Math.max(a, x));
 G.lerp = (a, b, t) => a + (b - a) * t;
 G.rng = s => () => { s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
-G.err = m => { m = String(m); if (G.errors.length < 40 && !G.errors.includes(m)) { G.errors.push(m); console.error('[SKW]', m); } };
+G.err = m => { m = String(m); if (G.errors.length < 40 && !G.errors.includes(m)) { G.errors.push(m); console.error('[SKW]', m); errSoon(); } };
+/* ───────── 화면 안내 (휴대폰에는 콘솔이 없음): 언어 · 기기 종류 · 오류 상자 · 실행 불가 화면 ───────── */
+// 언어: mod_i18n 과 같은 규칙 (?lang= > localStorage 'skw-lang' > 브라우저 언어). 언어 모듈이 없거나 뜨기 전에도 동작
+G.L = (ko, en) => {
+  let l = G.i18n && G.i18n.lang; const q = G.params.get('lang');
+  if (!l && (q === 'en' || q === 'ko')) l = q;
+  if (!l) try { const s = localStorage.getItem('skw-lang'); if (s === 'en' || s === 'ko') l = s; } catch (e) { }
+  if (!l) l = (navigator.languages && navigator.languages.length ? [...navigator.languages] : [navigator.language || 'ko']).some(x => /^ko/i.test(x)) ? 'ko' : 'en';
+  return l === 'en' ? en : ko;
+};
+{ const u = navigator.userAgent || ''; G.os = /iPhone|iPad|iPod/.test(u) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) ? 'ios' : /Android/i.test(u) ? 'android' : 'desktop'; }
+const esc = s => String(s).replace(/[&<>\x22\x27]/g, c => '&#' + c.charCodeAt(0) + ';'); // (따옴표는 \x 로: build.js 의 WGSL 축약기가 정규식 안 따옴표를 문자열로 오해함)
+// 짧은 기술 정보 한 줄 (캡처해서 보내 달라고 할 때)
+G.diag = () => [navigator.userAgent, G.gpuInfo && `GPU ${G.gpuInfo.name} (${G.gpuInfo.vendor || '?'})`, G.Q && G.Q.name, G.targets && G.targets.w && `${G.targets.w}x${G.targets.h}`, G.fmt, G.ts ? 'ts' : G.tsWhy && 'ts-off ' + G.tsWhy, G.mode].filter(Boolean).join(' · ');
+let cssDone = 0;
+const ensureCss = () => { // 오류 상자 · 실행 불가 화면 버튼 (template.html 과 dev.html 양쪽에서 쓰므로 여기서 주입)
+  if (cssDone || !document.head) return; cssDone = 1;
+  const s = document.createElement('style'); document.head.appendChild(s);
+  s.textContent = `#skwerr{position:fixed;left:8px;top:8px;z-index:98;max-width:min(480px,calc(100vw - 16px));max-height:60vh;overflow:auto;padding:8px 10px;border:1px solid #a54;border-radius:8px;background:#1a0b0be8;color:#fdd;font:12px/1.45 ui-monospace,monospace;pointer-events:auto;-webkit-user-select:text;user-select:text;overflow-wrap:anywhere}
+#skwerr b{color:#ff9a7a}#skwerr ol{margin:4px 0;padding-left:18px}#skwerr small,#fatal small{display:block;margin:4px 0;opacity:.65;font:11px/1.4 ui-monospace,monospace;overflow-wrap:anywhere}
+#skwerr button{float:right;margin:-4px -6px 0 8px;font:16px/1 sans-serif;color:#fdd;background:none;border:0;padding:4px 8px;cursor:pointer}
+#fatal button{font:inherit;font-weight:600;padding:7px 18px;color:#012;background:#8df;border:0;border-radius:6px;cursor:pointer}#fatal>div{max-height:calc(100vh - 32px);overflow:auto;box-sizing:border-box}`;
+};
+let eb, ebT = 0;
+const errBox = () => { // 오류 목록 (G.errors) 을 왼쪽 위 작은 상자로 — × 로 닫음, 새 오류가 오면 다시 보임
+  ebT = 0; if (!document.body || G.dead) return; ensureCss();
+  if (!eb) { eb = document.createElement('div'); eb.id = 'skwerr'; eb.setAttribute('data-i18n-skip', ''); document.body.appendChild(eb); eb.onclick = e => { if (e.target.dataset.x) eb.style.display = 'none'; }; }
+  const dbg = G.params.has('debug') && G.adapter ? `<br>features: ${esc([...G.adapter.features].join(' '))}<br>limits: tex2D ${G.dev.limits.maxTextureDimension2D} · buf ${G.dev.limits.maxBufferSize} · dpr ${devicePixelRatio} · ${innerWidth}x${innerHeight}` : '';
+  eb.style.display = '';
+  eb.innerHTML = `<button data-x="1" aria-label="close">×</button><b>${G.errors.length ? G.L('오류가 발생했습니다', 'Something went wrong') : 'debug'}</b><div>${G.errors.length ? G.L('이 상자를 캡처해서 보내 주시면 고치는 데 큰 도움이 됩니다.', 'Please send a screenshot of this box — it helps us fix it.') : ''}</div>`
+    + `<small>${esc(G.diag())}${dbg}</small><ol>${G.errors.slice(0, 6).map(m => `<li>${esc(m.length > 200 ? m.slice(0, 200) + '…' : m)}</li>`).join('')}</ol>`;
+};
+const errSoon = () => { ebT || (ebT = setTimeout(errBox, 60)); };
+// 잡히지 않은 예외 · 프라미스 거부도 G.err 로 (사용자 제스처가 필요한 API 의 흔한 거부는 무시: 포인터 잠금 · 전체 화면 · 재생)
+// 브라우저 확장 프로그램(지갑 · 번역 · 광고 차단 등)이 페이지에 넣은 스크립트의 오류도 게임 오류가 아니므로 무시
+const ext = s => /(^|[\s(@])(chrome|moz|safari(-web)?|ms-browser)-extension:|webkit-masked-url:/.test(String(s || ''));
+const benign = x => !!x && (/^(AbortError|NotAllowedError|SecurityError|WrongDocumentError)$/.test(x.name) || /pointer ?lock|exited the lock|fullscreen|ResizeObserver loop|^Script error\.?$/i.test(x.message || x) || ext(x.stack));
+addEventListener('error', e => { if (e.message && !benign(e.error) && !benign(e) && !ext(e.filename)) G.err(`${e.message} @${String(e.filename || '').split('/').pop()}:${e.lineno}:${e.colno}`); });
+addEventListener('unhandledrejection', e => { const r = e.reason; if (!benign(r)) G.err('[promise] ' + (r && (r.stack || r.message) || r)); });
 // 게임 모드: 기본 'story'(스토리 1 — 여객기), '?mode=naval' = 해상 반격 임무. 세 번째 인자가 있으면 그 모드에서만 등록 (API 객체는 그대로 남음)
 G.mode = new URLSearchParams(location.search).get('mode') === 'naval' ? 'naval' : 'story';
 G.register = (name, mod, mode) => { if (mode && mode !== G.mode) return mod; G.mods[name] = mod; G.order.push(mod); return mod; };
@@ -74,9 +112,25 @@ G.ui = document.getElementById('ui');
 G.el = (tag, props = {}, parent = G.ui) => { const e = document.createElement(tag); Object.assign(e, props); parent.appendChild(e); return e; };
 G.css = t => { G.el('style', { textContent: t }, document.head); };
 G.tr = s => s; // 언어 모듈(mod_i18n.js)이 있으면 영어로 바꿔 준다
-G.fatal = (title, html) => {
-  G.dead = true; console.error('[SKW fatal]', title);
-  (document.getElementById('fatal') || G.el('div', { id: 'fatal' }, document.body)).innerHTML = `<div><h1>${title}</h1>${html}</div>`;
+// 실행 불가 화면: 제목 + 안내(HTML) + 다시 시작 버튼 + 기술 정보 한 줄 (detail = 오류 내용, 선택)
+G.fatal = (title, html, detail) => {
+  G.dead = true; console.error('[SKW fatal]', title, detail || ''); ensureCss(); eb && (eb.style.display = 'none');
+  (document.getElementById('fatal') || G.el('div', { id: 'fatal' }, document.body)).innerHTML = `<div><h1>${title}</h1>${html}<p><button onclick="location.reload()">${G.L('다시 시작', 'Reload')}</button></p>`
+    + `${detail ? `<p><code>${esc(String(detail).slice(0, 400))}</code></p>` : ''}${G.errors.length ? `<small>${esc(G.errors.slice(0, 3).join(' | ').slice(0, 600))}</small>` : ''}<small>${esc(G.diag())}</small></div>`;
+};
+// WebGPU 가 없을 때의 안내: 지금 기기에 맞는 줄을 맨 위(굵게), 나머지 기기는 아래 (짧게)
+G.gpuTips = () => {
+  const L = G.L, os = G.os, T = {
+    ios: L('<b>iPhone · iPad</b>: iOS / iPadOS <b>26 이상</b>의 Safari (설정 › 일반 › 소프트웨어 업데이트). 저전력 모드에서는 느려질 수 있고, 차단 모드(Lockdown Mode)에서는 WebGPU 가 꺼집니다.',
+      '<b>iPhone · iPad</b>: Safari on iOS / iPadOS <b>26 or later</b> (Settings › General › Software Update). Low Power Mode may slow it down; Lockdown Mode turns WebGPU off.'),
+    android: L('<b>Android</b>: Android <b>12 이상</b> + 최신 Chrome (Play 스토어에서 Chrome · Android System WebView 업데이트)',
+      '<b>Android</b>: Android <b>12 or later</b> with an up-to-date Chrome (update Chrome and Android System WebView in the Play Store)'),
+    desktop: L('<b>PC</b>: 최신 <b>Chrome · Edge</b>, macOS 는 <b>Safari 26</b> 이상도 가능 (Firefox 는 141 이상 · Windows)',
+      '<b>PC</b>: a current <b>Chrome or Edge</b>; on a Mac also <b>Safari 26</b> or later (Firefox 141+ on Windows)'),
+  };
+  const pc = os === 'desktop' ? L('<li>브라우저 설정에서 <b>하드웨어 가속</b> 켜기 → 브라우저 재시작 · 그래픽 드라이버 업데이트 · 주소창 <code>chrome://gpu</code> 에서 WebGPU 상태 확인 (Linux Chrome 은 <code>chrome://flags/#enable-unsafe-webgpu</code>)</li>',
+    '<li>Turn on <b>hardware acceleration</b> in the browser settings and restart it · update the graphics driver · check WebGPU at <code>chrome://gpu</code> (Linux Chrome: <code>chrome://flags/#enable-unsafe-webgpu</code>)</li>') : '';
+  return `<p>${L('이 게임은 <b>WebGPU</b> 가 필요합니다.', 'This game needs <b>WebGPU</b>.')}</p><ul><li>${T[os]}</li>${pc}${['ios', 'android', 'desktop'].filter(k => k !== os).map(k => `<li style="opacity:.7">${T[k]}</li>`).join('')}</ul>`;
 };
 
 /* ───────── 품질 프리셋 ───────── */
@@ -181,7 +235,9 @@ fn fogAt(col: vec3f, P: vec3f) -> vec3f { // 대기 원근: 채널별 소광(파
   let dy = rd.y * d / 1200.0; // 대기 규모 높이 1200m
   let hf = exp(-max(g.cam.y, 0.0) / 1200.0) * select((1.0 - exp(-dy)) / dy, 1.0 - dy * .5, abs(dy) < 1e-3);
   let T = exp(-g.fog.x * (1.0 + 2.0 * g.fog.z) * d * hf * vec3f(.8, 1.0, 1.3));
-  return min(col * T + skyBase(normalize(vec3f(rd.x, abs(rd.y) * .25 + .015, rd.z))) * (1.0 - T), vec3f(40.0));
+  let c = col * T + skyBase(normalize(vec3f(rd.x, abs(rd.y) * .25 + .015, rd.z))) * (1.0 - T);
+  // NaN → 0 (비트 판별: Metal relaxed/fast math 에서는 min() 이 NaN 을 걸러 준다는 보장이 없음), 나머지는 40 으로 상한
+  return select(min(c, vec3f(40.0)), vec3f(0.0), (bitcast<vec3u>(c) & vec3u(0x7fffffffu)) > vec3u(0x7f800000u));
 }
 fn shadowAt(P: vec3f, N: vec3f) -> f32 { // 1 = 햇빛, 0 = 그림자 (3x3 PCF, 깊이 범위 900m)
   if (g.sunCol.w < .5) { return 1.0; }
@@ -229,6 +285,7 @@ fn pointLights(P: vec3f, N: vec3f) -> vec3f { // 폭발 섬광 등 동적 점광
 G.WGSL_LINES = G.WGSL.split('\n').length - 1;
 G.shader = (code, label = 'shader', common = true) => {
   const m = G.dev.createShaderModule({ label, code: (common ? G.WGSL : '') + code });
+  G.wdReset && G.wdReset(); // 새 셰이더 = 곧 파이프라인 컴파일 (감시견이 긴 컴파일을 장치 멈춤으로 오해하지 않게)
   m.getCompilationInfo().then(i => { for (const x of i.messages) if (x.type === 'error') G.err(`[WGSL ${label}] L${x.lineNum - (common ? G.WGSL_LINES : 0)}: ${x.message}`); }, () => { });
   return m;
 };
@@ -276,6 +333,7 @@ G.setQuality = (name, manual) => {
   }; G.bindGlobals();
   G.resize(1);
   if (G.ready) { hook('onQuality', Q); hook('onResize'); }
+  G.wdReset && G.wdReset(); // 파이프라인 재컴파일로 GPU 가 잠시 늦게 답해도 감시견이 오해하지 않게
 };
 
 /* ───────── 카메라 / 전역 유니폼 ───────── */
@@ -323,6 +381,17 @@ const depthResolve = (enc, view) => { // MSAA 깊이 → 단일 샘플 깊이 (�
 };
 let tsBusy = 0;
 G.gpuMs = 0; // GPU 프레임 시간(ms, 평활) — timestamp-query 지원 시에만 갱신
+/* GPU 타이머 검증: 값이 0·음수·터무니없음이 계속되거나 (0.3ms 이상인데) 120번 연속 똑같으면 믿지 않음 → 타이머를 끄고 FPS 방식 동적 해상도로.
+   (프레임 시간과 맞지 않는 값은 gpu 모듈이 1초 단위로 보고 G.tsOff 를 부름) */
+const tsS = { n: 0, bad: 0, same: 0, last: -1 };
+G.tsOff = why => { if (!G.ts) return; G.ts = null; G.gpuMs = 0; G.tsWhy = why; console.info('[SKW] GPU 타이머 사용 안 함:', why); };
+const tsFeed = m => {
+  tsS.n++;
+  if (!(m > 0 && m < 500)) { if (++tsS.bad >= 30 && tsS.bad * 2 > tsS.n) G.tsOff('invalid ' + m); return; }
+  tsS.same = m === tsS.last && m >= .3 ? tsS.same + 1 : 0; tsS.last = m;
+  if (tsS.same >= 120) return G.tsOff('constant ' + m);
+  G.gpuMs += (m - G.gpuMs) * (G.gpuMs ? .1 : 1);
+};
 G.tick = dt => {
   if (G.dead) return;
   const dev = G.dev, T = G.targets, Q = G.Q, ms = Q.msaa > 1, ts = G.ts;
@@ -361,10 +430,11 @@ G.tick = dt => {
     tsBusy = 1;
     ts.rb.mapAsync(GPUMapMode.READ).then(() => {
       const a = new BigInt64Array(ts.rb.getMappedRange()), m = Number(a[1] - a[0]) / 1e6; ts.rb.unmap(); tsBusy = 0;
-      if (m > 0 && m < 500) G.gpuMs += (m - G.gpuMs) * (G.gpuMs ? .1 : 1);
+      if (G.ts === ts) tsFeed(m); // 그사이 타이머를 껐으면 무시
     }, () => { tsBusy = 0; });
   }
 };
+G.tsFeed = tsFeed; // 시험용: 가짜 타이머 값 넣기
 /* 검증용(?step): 루프 대신 G.test.run(n, dt) 로 결정적 스텝 → 오프스크린 결과를 읽어 2D 캔버스에 표시(헤드리스 캡처 가능) */
 G.test = {
   async run(n = 1, dt = 1 / 30) { for (let i = 0; i < n; i++) G.tick(dt); await G.test.snap(); return G.errors; },
@@ -383,24 +453,40 @@ G.test = {
 
 /* ───────── 부트 ───────── */
 G.boot = async () => {
-  const tip = `<p>이 게임은 <b>WebGPU</b> 로 동작합니다. 아래를 확인해 주세요.</p><ul>
-<li>PC: <b>Chrome / Edge 113 이상</b> 최신 버전 (Windows · macOS · ChromeOS)</li><li>Safari 26 이상, Firefox 141 이상(Windows), Android Chrome 121 이상</li>
-<li>브라우저 설정에서 <b>하드웨어 가속</b>(그래픽 가속) 켜기 → 브라우저 재시작</li><li>그래픽 드라이버 최신 업데이트, 주소창 <code>chrome://gpu</code> 에서 WebGPU 상태 확인</li>
-<li>Linux Chrome 은 <code>chrome://flags/#enable-unsafe-webgpu</code> 활성화 필요</li></ul>`;
+  const tip = G.gpuTips();
   try {
     if (!navigator.gpu || G.params.has('nogpu'))
-      return G.fatal('WebGPU 를 사용할 수 없습니다', (isSecureContext ? '' : '<p><b>보안 연결(https 또는 localhost)</b>에서만 WebGPU 가 켜집니다.</p>') + tip);
+      return G.fatal(G.L('WebGPU 를 사용할 수 없습니다', 'WebGPU is not available'), (isSecureContext ? '' : G.L('<p><b>보안 연결(https 또는 localhost)</b>에서만 WebGPU 가 켜집니다.</p>', '<p>WebGPU only works over a <b>secure connection (https or localhost)</b>.</p>')) + tip, navigator.gpu ? 'nogpu' : 'navigator.gpu undefined');
     const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' }) || await navigator.gpu.requestAdapter();
-    if (!adapter) return G.fatal('사용 가능한 GPU 어댑터가 없습니다', tip);
+    if (!adapter) return G.fatal(G.L('사용 가능한 GPU 어댑터가 없습니다', 'No usable GPU adapter found'), tip, 'requestAdapter() → null');
     const hasTS = adapter.features.has('timestamp-query');
     const dev = G.dev = await adapter.requestDevice({ requiredFeatures: hasTS ? ['timestamp-query'] : [] }); G.adapter = adapter;
     dev.addEventListener('uncapturederror', e => G.err('[GPU] ' + e.error.message));
-    dev.lost.then(i => { // 드라이버 재시작·절전 복귀 등으로 장치를 잃으면 한 번은 자동으로 새로고침 (30초 안에 또 끊기면 안내만 표시)
-      if (i.reason === 'destroyed') return;
-      G.fatal('GPU 장치 연결이 끊어졌습니다', `<p>${i.message || ''}</p><p>페이지를 새로고침(F5) 해 주세요.</p>`);
-      const t = Date.now(), go = () => { if (!document.hidden) { sessionStorage.skw_r = t; location.reload(); } };
-      try { if (!(t - sessionStorage.skw_r < 3e4)) { go(); addEventListener('visibilitychange', go); } } catch (e) { }
-    });
+    /* 장치 잃음: 드라이버 재시작 · 절전 복귀 · (iOS) GPU 프로세스 종료 등. 페이지를 떠나는 중(pagehide)이 아니면 사유('destroyed' 포함)와 관계없이 진짜로 보고
+       한 번은 자동 새로고침, 30초 안에 또 끊기면 안내만. 뒤로/앞으로 캐시에서 되살아난 페이지(pageshow persisted)는 장치가 죽어 있을 수 있어 새로고침 */
+    let leaving = 0;
+    addEventListener('pagehide', () => { leaving = 1; });
+    addEventListener('pageshow', e => { leaving = 0; if (e.persisted) location.reload(); });
+    G.lost = why => {
+      if (leaving || G.lostWhy) return; G.lostWhy = String(why || '?');
+      // 자동화 브라우저(헤드리스 시험 도구): 실시간 루프 모드에서 SwiftShader 가 캔버스 표시 직후 장치를 'destroyed' 로 끊어 버림 → 예전처럼 콘솔에만 남김 (?losttest 로 실제 처리 시험)
+      if (navigator.webdriver && !G.params.has('losttest')) return console.warn('[SKW] GPU 장치 잃음 (자동화 브라우저라 무시):', G.lostWhy);
+      G.fatal(G.L('GPU 장치 연결이 끊어졌습니다', 'Lost the connection to the GPU'), G.os === 'desktop'
+        ? G.L('<p>아래 <b>다시 시작</b>을 누르거나 페이지를 새로고침(F5) 해 주세요.</p>', '<p>Press <b>Reload</b> below or reload the page (F5).</p>')
+        : G.L('<p>아래 <b>다시 시작</b>을 눌러 주세요. 그래도 안 되면 브라우저(앱)를 완전히 닫았다가 다시 열어 주세요.</p>', '<p>Tap <b>Reload</b> below. If that does not help, close the browser (app) completely and open it again.</p>'), G.lostWhy);
+      const t = Date.now(); let prev = 0;
+      try { prev = +sessionStorage.skw_r || 0; } catch (e) { }
+      try { prev = Math.max(prev, +(history.state && history.state.skw_r) || 0); } catch (e) { } // 저장소가 막힌 iframe 대비
+      if (t - prev < 3e4) return;
+      const go = () => {
+        if (document.hidden) return; // 보이지 않으면 돌아올 때 (visibilitychange)
+        try { sessionStorage.skw_r = t; } catch (e) { }
+        try { history.replaceState(Object.assign({}, history.state, { skw_r: t }), ''); } catch (e) { }
+        location.reload();
+      };
+      go(); addEventListener('visibilitychange', go);
+    };
+    dev.lost.then(i => G.lost(`device.lost ${i.reason}${i.message ? ': ' + i.message : ''}`));
     const cv = G.canvas = document.getElementById('c'); G.ctx = cv.getContext('webgpu'); G.fmt = navigator.gpu.getPreferredCanvasFormat();
     G.ctx.configure({ device: dev, format: G.fmt, alphaMode: 'opaque' });
     const U = GPUTextureUsage, S = GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT | GPUShaderStage.COMPUTE;
@@ -429,16 +515,31 @@ G.boot = async () => {
     G.setQuality(G.PRESETS[q] ? q : G.gpuInfo.tier, !!G.PRESETS[q]);
     for (const m of G.order) m.init && await m.init();
     G.ready = true; hook('onQuality', G.Q); hook('onResize');
-    addEventListener('resize', () => { G.dead || G.resize(); });
+    // 크기 변경: 실시간 루프에서는 프레임당 한 번만 (회전 · iframe 최대화 때 연달아 오는 resize 마다 타깃 전부를 다시 만들지 않게)
+    let rz = 0; const step = G.params.has('step');
+    addEventListener('resize', () => { if (step) G.dead || G.resize(); else rz = 1; });
+    G.params.has('debug') && errSoon();
     await new Promise(r => setTimeout(r, 0));
-    if (G.params.has('step')) return;
+    if (step) return;
+    /* 감시견: GPU 가 제출한 작업에 응답하지 않으면 (보이는 동안 onSubmittedWorkDone 이 오래 안 끝남) 장치 잃음과 같은 처리.
+       시간이 아니라 2초 간격 확인 횟수로 센다 (메인 스레드가 멈췄다 풀린 직후 한 번에 '12초 지남' 으로 오해하지 않게).
+       숨겨진 동안은 세지 않는다. 셰이더 컴파일이 몰리는 때(부트 직후 · 품질 전환 · 새 셰이더 = G.shader)에는 GPU 가 한 번 답할 때까지 60초까지 기다림
+       — 느린 PC·안드로이드에서 첫 컴파일이 12초를 넘는다고 새로고침·실행 불가 화면이 뜨지 않게. 한 번 답한 뒤부터는 12초 */
+    let wp = 0, wn = 0, armed = 0, gen = 0; // gen: 재설정 전에 보낸 확인이 늦게 끝나도 컴파일 뒤의 응답으로 치지 않게
+    G.wdReset = () => { wn = 0; armed = 0; gen++; };
+    setInterval(() => {
+      if (G.dead || document.hidden) { wn = 0; return; }
+      if (!wp) { wp = 1; wn = 0; const my = gen; dev.queue.onSubmittedWorkDone().then(() => { wp = 0; armed = armed || +(my === gen); }, () => { wp = 0; }); }
+      else if (++wn > (armed ? 6 : 30)) G.lost(`watchdog: onSubmittedWorkDone >${wn * 2}s${armed ? '' : ' (compile)'}`);
+    }, 2000);
     let last = performance.now();
     const loop = t => {
       if (G.dead) return; requestAnimationFrame(loop);
       const raw = (t - last) / 1000; last = t; if (raw <= 0) return;
       G.fps += (1 / raw - G.fps) * .06;
+      if (rz) { rz = 0; try { G.resize(); } catch (e) { G.err(e.stack || e); } }
       try { G.tick(Math.min(raw, .05)); } catch (e) { G.err(e.stack || e); }
     };
     requestAnimationFrame(loop);
-  } catch (e) { console.error(e); G.fatal('초기화 실패', `<p><code>${e.message || e}</code></p>` + tip); }
+  } catch (e) { console.error(e); G.fatal(G.L('초기화 실패', 'Initialization failed'), G.L('<p>계속되면 이 화면을 캡처해서 보내 주세요.</p>', '<p>If this keeps happening, please send a screenshot of this screen.</p>') + tip, e && (e.stack || e.message) || e); }
 };
