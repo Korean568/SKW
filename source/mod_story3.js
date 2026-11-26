@@ -603,14 +603,14 @@
     init(){
       try {const m=knifeMesh();if(G.addMesh){G.addMesh('s3knife',m.k);G.addMesh('s3kedge',m.e);G.addMesh('s3kstk',m.s);G.addMesh('s3kglint',m.g);}} catch (e){G.err('[story3] knife ' + e);}
       G.css(`#s3o,#s3h,#s3p,#s3m,#s3t,#s3f,#s3d{position:absolute}
-#s3o{left:5vw;top:13vh;font:600 2.1vh system-ui;letter-spacing:.06em;color:#f2e6c4;text-shadow:0 1px 5px #000;opacity:0;transition:opacity .6s}
-#s3h{left:5vw;top:17vh;font:400 1.6vh system-ui;color:#c8d0d8;text-shadow:0 1px 4px #000;opacity:0;transition:opacity 1s}
-#s3p{left:50%;top:60%;transform:translateX(-50%);padding:.35em 1.1em;font:600 2.1vh system-ui;letter-spacing:.08em;color:#fff;background:#000b;border:1px solid #fff5;border-radius:4px;display:none}
-#s3m{transform:translate(-50%,-100%);text-align:center;font:600 1.4vh system-ui;color:#f2e6c4cc;text-shadow:0 1px 3px #000;display:none}
+#s3o{left:5vw;top:13vh;font:600 max(13px,2.1vh) system-ui;letter-spacing:.06em;color:#f2e6c4;text-shadow:0 1px 5px #000;opacity:0;transition:opacity .6s}
+#s3h{left:5vw;top:17vh;font:400 max(11px,1.6vh) system-ui;color:#c8d0d8;text-shadow:0 1px 4px #000;opacity:0;transition:opacity 1s}
+#s3p{left:50%;top:60%;transform:translateX(-50%);padding:.35em 1.1em;font:600 max(13px,2.1vh) system-ui;letter-spacing:.08em;color:#fff;background:#000b;border:1px solid #fff5;border-radius:4px;display:none}
+#s3m{transform:translate(-50%,-100%);text-align:center;font:600 max(11px,1.4vh) system-ui;color:#f2e6c4cc;text-shadow:0 1px 3px #000;display:none}
 .s3km{position:absolute;display:none;width:9px;height:9px;margin:-6px;border:2px solid #f2e6c4;border-radius:2px;transform:rotate(45deg);box-shadow:0 0 4px #000,inset 0 0 3px #fff8;pointer-events:none}
 #s3m i{display:block;width:.8vh;height:.8vh;margin:0 auto .5vh;border:2px solid #f2e6c4aa;transform:rotate(45deg)}
 #s3t{inset:0;display:grid;place-content:center;text-align:center;color:#ebe4d8;opacity:0;transition:opacity 1.4s}
-#s3t small{font:400 1.9vh system-ui;letter-spacing:.55em;color:#a9a196}#s3t b{display:block;font:800 6.4vh system-ui;letter-spacing:.14em;margin:.4em 0;color:#fff}
+#s3t small{font:400 max(11px,1.9vh) system-ui;letter-spacing:.55em;color:#a9a196}#s3t b{display:block;font:800 6.4vh system-ui;letter-spacing:.14em;margin:.4em 0;color:#fff}
 #s3f{inset:0;display:none;color:#fff;font-family:system-ui,sans-serif;text-shadow:0 1px 3px #000c}
 #s3x{position:absolute;left:50%;top:50%;width:4px;height:4px;margin:-2px;border-radius:50%;background:#fffc;box-shadow:0 0 2px #000}
 #s3hm{position:absolute;left:50%;top:50%;width:18px;height:18px;margin:-9px;border:2px solid #fff;border-width:0 2px;transform:rotate(45deg);opacity:0;clip-path:polygon(0 0,35% 0,35% 100%,0 100%,0 0,100% 0,100% 100%,65% 100%,65% 0)}

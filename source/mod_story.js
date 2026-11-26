@@ -362,16 +362,16 @@
 #ov{inset:0;display:grid;align-content:center;justify-items:start;padding:0 7vw;background:linear-gradient(90deg,#000d,#0007 45%,#0000 78%);pointer-events:auto;color:#dfe8f2}
 #ov .tb{margin:0 0 1.1em;padding:.25em .9em .3em;font:600 max(11px,.95vw) system-ui;letter-spacing:.28em;color:#dfe8f2;text-decoration:none;border:1px solid #fff5;border-radius:999px;background:#0006}#ov .tb b{color:#fff}#ov .tb:hover{color:#fff;border-color:#fff}
 #ov h1{margin:0;font:800 6.2vw/.95 system-ui;letter-spacing:.05em;color:#fff}#ov h1 i{display:block;font-style:normal;color:#fff}
-#ov p{margin:.35em 0;font-size:1.6vw}
-#ov .ch{margin-top:.4em}#ov .ch>div{margin:.5em 0;padding:.1em 0 .1em 1em;border-left:3px solid #fff3;opacity:.5;cursor:pointer;pointer-events:auto;transition:opacity .3s,border-color .3s}#ov .ch>div.on{opacity:1;border-color:#fff}#ov .ch p{margin:.2em 0;font-size:1.35vw}#ov .ch p+p{font-size:1.05vw;color:#aebccb}#ov .k{font-size:max(11px,1.05vw);color:#9fb1c4;line-height:1.7;margin-top:1.4em}#ov .k b{color:#dfe8f2;font-weight:600}
-#ov button,#end button{margin:1.1em 0 .2em;padding:.5em 2.4em;font:700 1.9vw system-ui;letter-spacing:.3em;color:#0b0f14;background:#fff;border:0;border-radius:6px;cursor:pointer;box-shadow:0 6px 30px #fff4;pointer-events:auto}
-#dl{left:50%;bottom:6vh;transform:translateX(-50%);width:min(820px,88vw);padding:.7em 1.4em .8em;background:#0a0e14d8;border-radius:8px;font:500 2.4vh/1.45 system-ui;color:#f2f4f7;text-align:center;opacity:0;transition:opacity .35s}
+#ov p{margin:.35em 0;font-size:max(15px,1.6vw)}
+#ov .ch{margin-top:.4em}#ov .ch>div{margin:.5em 0;padding:.1em 0 .1em 1em;border-left:3px solid #fff3;opacity:.5;cursor:pointer;pointer-events:auto;transition:opacity .3s,border-color .3s}#ov .ch>div.on{opacity:1;border-color:#fff}#ov .ch p{margin:.2em 0;font-size:max(13px,1.35vw)}#ov .ch p+p{font-size:max(11px,1.05vw);color:#aebccb}#ov .k{font-size:max(11px,1.05vw);color:#9fb1c4;line-height:1.7;margin-top:1.4em}#ov .k b{color:#dfe8f2;font-weight:600}
+#ov button,#end button{margin:1.1em 0 .2em;padding:.5em 2.4em;font:700 max(18px,1.9vw) system-ui;letter-spacing:.3em;color:#0b0f14;background:#fff;border:0;border-radius:6px;cursor:pointer;box-shadow:0 6px 30px #fff4;pointer-events:auto}
+#dl{left:50%;bottom:6vh;transform:translateX(-50%);width:min(820px,88vw);padding:.7em 1.4em .8em;background:#0a0e14d8;border-radius:8px;font:500 max(14px,2.4vh)/1.45 system-ui;color:#f2f4f7;text-align:center;opacity:0;transition:opacity .35s}
 #dl b{display:block;font-size:.66em;letter-spacing:.12em;margin-bottom:.2em}
-#cap{left:50%;top:12vh;transform:translateX(-50%);width:min(860px,84vw);text-align:center;font:italic 400 2.5vh/1.7 serif;color:#fff;text-shadow:0 0 14px #000;transition:opacity 1.2s;opacity:0}
-#ttl{left:5vw;top:7vh;font:300 2vh system-ui;letter-spacing:.35em;color:#fff;border-left:3px solid #e03b3b;padding:.2em .8em;opacity:0;transition:opacity 1s;text-shadow:0 1px 4px #000}
+#cap{left:50%;top:12vh;transform:translateX(-50%);width:min(860px,84vw);text-align:center;font:italic 400 max(15px,2.5vh)/1.7 serif;color:#fff;text-shadow:0 0 14px #000;transition:opacity 1.2s;opacity:0}
+#ttl{left:5vw;top:7vh;font:300 max(12px,2vh) system-ui;letter-spacing:.35em;color:#fff;border-left:3px solid #e03b3b;padding:.2em .8em;opacity:0;transition:opacity 1s;text-shadow:0 1px 4px #000}
 #vl{inset:0;background:radial-gradient(#fff0 20%,#e8eef4);opacity:0}#bk{inset:0;background:#000;opacity:0}
 #sk{right:2vw;bottom:2vh;padding:.3em .9em;font:12px system-ui;color:#cdd6e0;background:#0008;border:1px solid #fff3;border-radius:4px;pointer-events:auto;display:none}
-#end{inset:0;display:none;place-content:center;justify-items:center;text-align:center;background:radial-gradient(#000a,#000e);color:#e6ecf2;font:2vh system-ui;pointer-events:auto}
+#end{inset:0;display:none;place-content:center;justify-items:center;text-align:center;background:radial-gradient(#000a,#000e);color:#e6ecf2;font:max(12px,2vh) system-ui;pointer-events:auto}
 #end h2{margin:0 0 .4em;font:800 5vw system-ui;letter-spacing:.08em}#end h2.r{color:#e03b3b}#end .c{font-style:italic;color:#aab8c6}`);
       const nh=G.params.has('nohud');
       ui.vl=G.el('div',{id:'vl'});ui.bk=G.el('div',{id:'bk'});

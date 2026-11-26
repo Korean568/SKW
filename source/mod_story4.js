@@ -363,8 +363,8 @@
     init(){
       G.css(`#s4t,#s4h{position:absolute}
 #s4t{inset:0;display:grid;place-content:center;text-align:center;color:#ebe4d8;opacity:0;transition:opacity 1.4s}
-#s4t small{font:400 1.9vh system-ui;letter-spacing:.55em;color:#a9a196}#s4t b{display:block;font:800 6.4vh system-ui;letter-spacing:.14em;margin:.4em 0;color:#fff}
-#s4h{left:5vw;top:17vh;font:400 1.6vh system-ui;color:#c8d0d8;text-shadow:0 1px 4px #000;opacity:0;transition:opacity 1s}
+#s4t small{font:400 max(11px,1.9vh) system-ui;letter-spacing:.55em;color:#a9a196}#s4t b{display:block;font:800 6.4vh system-ui;letter-spacing:.14em;margin:.4em 0;color:#fff}
+#s4h{left:5vw;top:17vh;font:400 max(11px,1.6vh) system-ui;color:#c8d0d8;text-shadow:0 1px 4px #000;opacity:0;transition:opacity 1s}
 #dl .s4r{display:inline-block;margin-left:.6em;padding:0 .45em;font:700 .8em system-ui;font-style:normal;letter-spacing:.1em;color:#0b0f14;background:#ff8b7acc;border-radius:3px;vertical-align:.1em}
 #dl .s4q{color:#ffe2db;letter-spacing:.02em;text-shadow:0 0 6px #ff8b7a55}`);
       ui.t=G.el('div',{id:'s4t',innerHTML:'<small>스토리 4</small><b>폐허가 된 서강 : 고혁명의 배신</b><small>대한민국편</small>'});

@@ -380,16 +380,16 @@
   G.register('story2',{
     init(){
       G.css(`#s2o,#s2h,#s2p,#s2m,#s2c,#s2t,#s2v{position:absolute}
-#s2o{left:5vw;top:13vh;font:600 2.1vh system-ui;letter-spacing:.06em;color:#f2e6c4;text-shadow:0 1px 5px #000;opacity:0;transition:opacity .6s}
-#s2h{left:5vw;top:17vh;font:400 1.6vh system-ui;color:#c8d0d8;text-shadow:0 1px 4px #000;opacity:0;transition:opacity 1s}
-#s2p{left:50%;top:60%;transform:translateX(-50%);padding:.35em 1.1em;font:600 2.1vh system-ui;letter-spacing:.08em;color:#fff;background:#000b;border:1px solid #fff5;border-radius:4px;display:none}
-#s2m{transform:translate(-50%,-100%);text-align:center;font:600 1.4vh system-ui;color:#f2e6c4cc;text-shadow:0 1px 3px #000;display:none}
+#s2o{left:5vw;top:13vh;font:600 max(13px,2.1vh) system-ui;letter-spacing:.06em;color:#f2e6c4;text-shadow:0 1px 5px #000;opacity:0;transition:opacity .6s}
+#s2h{left:5vw;top:17vh;font:400 max(11px,1.6vh) system-ui;color:#c8d0d8;text-shadow:0 1px 4px #000;opacity:0;transition:opacity 1s}
+#s2p{left:50%;top:60%;transform:translateX(-50%);padding:.35em 1.1em;font:600 max(13px,2.1vh) system-ui;letter-spacing:.08em;color:#fff;background:#000b;border:1px solid #fff5;border-radius:4px;display:none}
+#s2m{transform:translate(-50%,-100%);text-align:center;font:600 max(11px,1.4vh) system-ui;color:#f2e6c4cc;text-shadow:0 1px 3px #000;display:none}
 #s2m i{display:block;width:.8vh;height:.8vh;margin:0 auto .5vh;border:2px solid #f2e6c4aa;transform:rotate(45deg)}
 #s2c{left:50%;bottom:13vh;transform:translateX(-50%);display:none;gap:5vw;pointer-events:auto}
-#s2c button{min-width:14vw;padding:.6em 1.8em .5em;font:800 3.6vh system-ui;letter-spacing:.5em;text-indent:.5em;color:#ece6dc;background:#0b0d10d0;border:1px solid #ffffff4d;border-radius:6px;cursor:pointer;transition:background .4s,border-color .4s}
-#s2c button:hover{background:#3a0e0ed8;border-color:#ff9a8a99}#s2c small{display:block;font:400 1.4vh system-ui;letter-spacing:.2em;color:#8f989f;margin-top:.4em}
+#s2c button{min-width:14vw;padding:.6em 1.8em .5em;font:800 max(22px,3.6vh) system-ui;letter-spacing:.5em;text-indent:.5em;color:#ece6dc;background:#0b0d10d0;border:1px solid #ffffff4d;border-radius:6px;cursor:pointer;transition:background .4s,border-color .4s}
+#s2c button:hover{background:#3a0e0ed8;border-color:#ff9a8a99}#s2c small{display:block;font:400 max(11px,1.4vh) system-ui;letter-spacing:.2em;color:#8f989f;margin-top:.4em}
 #s2t{inset:0;display:grid;place-content:center;text-align:center;color:#ebe4d8;opacity:0;transition:opacity 1.4s}
-#s2t small{font:400 1.9vh system-ui;letter-spacing:.55em;color:#a9a196}#s2t b{display:block;font:800 6.4vh system-ui;letter-spacing:.14em;margin:.4em 0;color:#fff}
+#s2t small{font:400 max(11px,1.9vh) system-ui;letter-spacing:.55em;color:#a9a196}#s2t b{display:block;font:800 6.4vh system-ui;letter-spacing:.14em;margin:.4em 0;color:#fff}
 #s2v{inset:0;background:radial-gradient(ellipse at 50% 45%,#0000 40%,#000d);opacity:0;transition:opacity 2.5s}
 html[lang=en] #s2c button{letter-spacing:.18em;text-indent:.18em}html[lang=en] #s2t small{letter-spacing:.3em}html[lang=en] #s2t b{font-size:min(6.4vh,4vw);letter-spacing:.06em}`);
       ui.v=G.el('div',{id:'s2v'});ui.o=G.el('div',{id:'s2o'});ui.h=G.el('div',{id:'s2h',textContent:'WASD 이동 · 마우스 둘러보기 · Shift 달리기 · E 상호작용'});
