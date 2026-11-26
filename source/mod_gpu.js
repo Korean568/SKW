@@ -30,7 +30,7 @@
     const s = ' ' + n.toLowerCase().replace(/\(r\)|\(tm\)|[®™]/g, '').replace(/\s+/g, ' ') + ' '; let m;
     if (/swiftshader|llvmpipe|softpipe|software|basic render|warp/.test(s)) return 0;
     const lap = /laptop|mobile|max-q|notebook/.test(s), mq = /max-q/.test(s) ? .85 : 1;
-    if (/apple\s*a\d|adreno|mali|immortalis|powervr|xclipse|maleoon|videocore|tegra|imagination/.test(s)) return 1; // 휴대폰 · 태블릿 (Snapdragon X 노트북 포함) → Very Low
+    if (/apple\s*a\d|adreno|mali|immortalis|powervr|xclipse|maleoon|videocore|tegra|imagination|img-tec|\barm\b|valhall|bifrost|midgard/.test(s)) return 1; // 휴대폰 · 태블릿 (Snapdragon X 노트북 포함; Android Chrome 의 Mali 는 이름 대신 'arm valhall') → Very Low
     if ((m = s.match(/rtx\s*pro\s*(\d{4})/)) && NV['pro' + m[1]]) return NV['pro' + m[1]];
     if ((m = s.match(/rtx\s*a(\d{4})/)) && NV['a' + m[1]]) return NV['a' + m[1]];
     if ((m = s.match(/rtx\s*(\d{4})\s*ada/)) && NV[m[1] + 'ada']) return NV[m[1] + 'ada'];
@@ -58,14 +58,16 @@
     return -1; // 'nvidia' · 'amd' 처럼 이름만 있는 경우 포함 → 벤치마크
   };
   const classify = n => tierOfScore(score(n)); // 이름 → 등급 1..10 (모르면 -1)
-  // WebGL 로 실제 제품명 확보
+  // WebGL 로 실제 제품명 확보. Firefox 는 실제 이름 대신 세대별 대표 이름 + ', or similar' 를 줌 (RTX 4090 도 'GeForce GTX 980, or similar') → glSim = 1: 이름으로 판별하지 않음
+  let glSim = 0;
   const glName = () => {
     try {
       const gl = document.createElement('canvas').getContext('webgl'), x = gl.getExtension('WEBGL_debug_renderer_info');
       let r = gl.getParameter(x ? x.UNMASKED_RENDERER_WEBGL : gl.RENDERER) || '';
       const lc = gl.getExtension('WEBGL_lose_context'); lc && lc.loseContext(); // 이름만 읽고 바로 반납
+      glSim = /,?\s*or similar\s*$/i.test(r) ? 1 : 0; r = r.replace(/,?\s*or similar\s*$/i, '');
       const m = r.match(/^ANGLE \((?:[^,]+, )?(.+?)(?:,[^,]*)?\)$/); if (m) r = m[1];
-      return r.replace(/^ANGLE Metal Renderer: /, '').replace(/\s*\(0x[0-9a-f]+\)/i, '').replace(/\s*(Direct3D|OpenGL|vs_\d|ps_\d).*$/i, '').replace(/, or similar$/, '').trim();
+      return r.replace(/^ANGLE Metal Renderer: /, '').replace(/\s*\(0x[0-9a-f]+\)/i, '').replace(/\s*(Direct3D|OpenGL|vs_\d|ps_\d).*$/i, '').trim();
     } catch (e) { return ''; }
   };
   // 벤치마크: 1024² 프래그먼트 + 26만 원소 컴퓨트 = 1단위, 부하 보정 뒤 10프레임 측정
@@ -130,8 +132,9 @@
       const name = desc || (same && gl) || [vendor, arch, i.device].filter(Boolean).join(' ') || gl || '알 수 없는 GPU';
       const soft = i.isFallbackAdapter || adapter.isFallbackAdapter || /swiftshader/.test(arch);
       let sc = soft ? 0 : score(name + ' ' + vendor + ' ' + arch);
+      if (glSim && name === gl && sc > 1) sc = -1; // Firefox 의 대표 이름: 휴대폰 · 내장(1 이하)만 믿고 나머지는 벤치마크로
       // 이름으로 모르는 Apple GPU (Safari 는 'apple' 만 알려 줌): iPhone·iPad (터치 · WebKit) 는 Very Low 로 시작, Mac 은 벤치마크로 고르되 Medium 까지 (보수적으로)
-      const apple = sc < 0 && (vendor === 'apple' || /^apple gpu$/i.test(gl)), mobile = apple && (G.os === 'ios' || navigator.maxTouchPoints > 1);
+      const apple = sc < 0 && (vendor === 'apple' || /^apple gpu$/i.test(gl) || (glSim && /^apple/i.test(gl))), mobile = apple && (G.os === 'ios' || navigator.maxTouchPoints > 1);
       if (mobile) sc = 1;
       const nameT = tierOfScore(sc);
       let b = { ms: 0, frames: [], score: 0, tier: 4 };
@@ -165,6 +168,8 @@
       el.onclick = e => { const q = e.target.dataset.q; q !== undefined ? this.pick(q) : el.classList.toggle('op'); };
       // F2: 자동 → Very Low → Low → … → Ultra → 자동
       addEventListener('keydown', e => { if (e.code === 'F2') { e.preventDefault(); this.pick(G.qManual ? TIERS[G.Q.tier] || '' : TIERS[0]); } });
+      // 감지 등급 = detect 뒤 다른 모듈이 고친 값까지 반영 (휴대폰 모듈은 모바일·이름 모르는 기기를 gpuInfo.tier = 'LOW' 로 바꿈) → '자동' 을 눌러도 그보다 위로 가지 않음
+      const d0 = G.tierOf(g.tier); if (d0) g.detN = g.tierN = d0.tier;
       const s = store(), sq = G.tierOf(s); if (!G.params.get('q') && sq) G.setQuality(sq.name, true); // 지난번 수동 선택 유지 (예전 LOW/MEDIUM/HIGH 저장값도)
     },
     pick(q) { // q = '' (자동: 감지 등급으로 돌아감) | 등급 이름 · 번호 · 예전 이름

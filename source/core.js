@@ -145,7 +145,7 @@ G.TIER_NAMES = ['Very Low', 'Low', 'Medium Low', 'Medium', 'Medium High', 'Mediu
 G.TIERS = (() => {
   const K = 'scale dprCap maxPx msaa shadowRes pcf shadowDist cloudSteps cloudDiv cloudMap bloomLv particles lights aniso ocean refract'.split(' ');
   return [ //  scale dpr  maxPx  msaa shRes pcf shD  cStp cDiv cMap bLv  parts  lt an oc rf
-    [.6,   1,    .9e6,  1,    0,    0,  1,    10,  4,   0,   0,   300,   2, 1, 0, 0], // 1 Very Low — 휴대폰 · 내장 그래픽 · GTX 1080 미만
+    [.75,  1,    1.4e6, 1,    0,    0,  1,    10,  4,   0,   0,   300,   2, 1, 0, 0], // 1 Very Low (= 예전 LOW 의 0.75 배율 · 1.4M 화소: 계약 v3, 휴대폰 모듈 상한 ≈960×540 기준) — 휴대폰 · 내장 그래픽 · GTX 1080 미만
     [.8,   1,    1.5e6, 1,    0,    0,  1,    14,  3,   0,   3,   800,   3, 2, 0, 0], // 2 Low — GTX 1080 ~ RTX 5050 미만
     [.9,   1.25, 2e6,   4,    1024, 1,  1,    18,  3,   256, 4,   2000,  4, 4, 1, 0], // 3 Medium Low — RTX 5050 ~ 2080 미만
     [1,    1.5,  2.4e6, 4,    2048, 1,  1,    22,  3,   256, 5,   3000,  4, 4, 1, 0], // 4 Medium (= 예전 MEDIUM) — RTX 2080 ~ 5060 미만
@@ -336,7 +336,8 @@ G.resize = quiet => {
   const dev = G.dev, Q = G.Q, T = G.targets, cv = G.canvas, dpr = Math.min(devicePixelRatio || 1, Q.dprCap);
   const cw = Math.max(16, Math.round(innerWidth * dpr)), ch = Math.max(16, Math.round(innerHeight * dpr));
   if (cv.width !== cw || cv.height !== ch) { cv.width = cw; cv.height = ch; }
-  const s = Math.min(Q.scale, Math.sqrt(Q.maxPx / (cw * ch))) * G.dyn;
+  const mt = (dev.limits && dev.limits.maxTextureDimension2D) || 8192; // 초표본 등급(scale > 1)이라도 텍스처 한도는 넘지 않게
+  const s = Math.min(Q.scale * G.dyn, Math.sqrt(Q.maxPx / (cw * ch)) * G.dyn, mt / cw, mt / ch);
   const w = Math.max(16, Math.round(cw * s) & ~1), h = Math.max(16, Math.round(ch * s) & ~1);
   for (const k of ['hdr', 'depth', 'hdrCopy', 'depthCopy', 'ms', 'msDepth']) { T[k] && T[k].destroy(); T[k] = null; }
   const U = GPUTextureUsage, RT = U.RENDER_ATTACHMENT | U.TEXTURE_BINDING, mk = (format, usage, sampleCount = 1) => dev.createTexture({ size: [w, h], format, usage, sampleCount });
