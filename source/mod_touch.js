@@ -213,7 +213,7 @@ html[lang=en] #tc .b{font-size:11px;letter-spacing:.02em}html[lang=en] #tc .b[da
 #tcj{position:absolute;left:-58px;top:-58px;width:116px;height:116px;border-radius:50%;border:2px solid #fff7;background:#0b101744;display:none;will-change:transform}#tck{position:absolute;left:31px;top:31px;width:50px;height:50px;border-radius:50%;background:#fffb;box-shadow:0 2px 8px #0008}
 #tch{position:absolute;left:calc(8vw + var(--sl));bottom:calc(11vh + var(--sb));width:96px;height:96px;border-radius:50%;border:2px dashed #fff4;display:none}#tch:after{content:'';position:absolute;inset:27px;border-radius:50%;background:#fff3}#tc.mv #tch{display:block}
 html.touch #lk,html.touch #s2h,html.touch #s3h,html.touch #s4h,html.touch #s3n,html.touch #ov .k,html.touch #fd button+small,html.touch #s3d button+small,html.touch #s2c small{display:none!important}
-html.touch #ov{grid-template-columns:auto minmax(0,1fr);column-gap:4vw;align-items:center;align-content:safe center;overflow-y:auto;padding:calc(10px + var(--st)) calc(5vw + var(--sr)) calc(10px + var(--sb)) calc(5vw + var(--sl));background:linear-gradient(90deg,#000d,#000a 60%,#0007)}
+html.touch #ov{grid-template-columns:auto minmax(0,1fr);column-gap:4vw;align-items:center;align-content:safe center;overflow-y:auto;padding:calc(36px + var(--st)) calc(5vw + var(--sr)) calc(10px + var(--sb)) calc(5vw + var(--sl));background:linear-gradient(90deg,#000d,#000a 60%,#0007)}
 html.touch #ov .tb{grid-column:1;grid-row:1;margin:0 0 .9em;font-size:11px}html.touch #ov h1{grid-column:1;grid-row:2;font-size:clamp(32px,5.2vw,84px)}
 html.touch #ov>button{grid-column:1;grid-row:3;margin:.8em 0 .1em;padding:.6em 2.2em;font-size:clamp(17px,2vw,26px)}html.touch #ov .dkb{grid-column:1;grid-row:4}html.touch #ov .dkb button{min-height:44px;padding:.6em 1.4em;font-size:clamp(13px,1.3vw,17px)}
 html.touch #ov .tk{grid-column:1;grid-row:5;margin-top:.9em;max-width:42vw;font-size:clamp(11px,1.25vw,15px);line-height:1.6;color:#9fb1c4}html.touch #ov .tk b{color:#dfe8f2;font-weight:600}
@@ -243,7 +243,7 @@ html.touch #dk .g{gap:.45em 1.4em;margin-top:.6em}html.touch #dk .g button{min-w
 html.touch #dk .bk{position:absolute;top:calc(12px + var(--st));right:calc(6vw + var(--sr));min-height:46px;margin:0;padding:.6em 1.8em;font-size:1.05em}
 @media(max-height:520px){html.touch #dk .tb{display:none}html.touch #ov .ch>div{margin:.15em 0;padding:.3em 0 .3em .9em}}
 #tc[data-s=s4] .b[data-a=aim]{right:calc(26px + var(--sr))!important;bottom:calc(66px + var(--sb))!important;width:68px!important;height:68px!important}
-html.touch #dk{background:linear-gradient(90deg,#000f,#000e 50%,#000d)}`);
+html.touch #dk{background:linear-gradient(90deg,#000f,#000f 50%,#000e)}`);
         const root = G.el('div', { id: 'tc' }), mk = (a, txt, s, css, id) => { const b = G.el('div', { className: 'b', textContent: txt }, root); b.dataset.a = a; b.dataset.s = s; b.style.cssText = css; id && (b.id = id); return b; };
         ui = { root, b: [] };
         for (const [a, txt, s, r, y, sz] of BTN) {

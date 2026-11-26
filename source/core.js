@@ -465,6 +465,8 @@ G.boot = async () => {
     addEventListener('pageshow', e => { leaving = 0; if (e.persisted) location.reload(); });
     G.lost = why => {
       if (leaving || G.lostWhy) return; G.lostWhy = String(why || '?');
+      // 자동화 브라우저(헤드리스 시험 도구): 실시간 루프 모드에서 SwiftShader 가 캔버스 표시 직후 장치를 'destroyed' 로 끊어 버림 → 예전처럼 콘솔에만 남김 (?losttest 로 실제 처리 시험)
+      if (navigator.webdriver && !G.params.has('losttest')) return console.warn('[SKW] GPU 장치 잃음 (자동화 브라우저라 무시):', G.lostWhy);
       G.fatal(G.L('GPU 장치 연결이 끊어졌습니다', 'Lost the connection to the GPU'), G.os === 'desktop'
         ? G.L('<p>아래 <b>다시 시작</b>을 누르거나 페이지를 새로고침(F5) 해 주세요.</p>', '<p>Press <b>Reload</b> below or reload the page (F5).</p>')
         : G.L('<p>아래 <b>다시 시작</b>을 눌러 주세요. 그래도 안 되면 브라우저(앱)를 완전히 닫았다가 다시 열어 주세요.</p>', '<p>Tap <b>Reload</b> below. If that does not help, close the browser (app) completely and open it again.</p>'), G.lostWhy);
