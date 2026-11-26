@@ -3,6 +3,8 @@
      window.skwDesktop(Electron preload) 이 있거나 주소에 ?desktop 이 있을 때만 켜짐. 아니면 아무 것도 하지 않음 (웹판 그대로). */
   const D = window.skwDesktop;
   if (D || G.params.has('desktop')) {
+    // 브라우저판(itch.io HTML5 · web/web-shim.js, platform 'web'): "게임 종료" 없음 · 전체 화면은 되는 곳에서만(iPhone 안 됨) · F11 은 브라우저 몫
+    const web = !!(D && D.platform === 'web'), canQuit = !web, canFs = !web || !!D.canFullscreen;
     const KEY = 'skw-desktop-settings', PKEY = 'skw-progress', TITLE = 'Second Korean Wars · 제 2차 한국전쟁';
     const ls = (k, v) => { try { if (v === undefined) return JSON.parse(localStorage.getItem(k)); localStorage.setItem(k, JSON.stringify(v)); } catch (e) { return null; } };
     // 설정: q 그래픽('auto'|LOW|MEDIUM|HIGH) · scale 렌더 배율(0 = 자동 동적 해상도, 50~100 수동) · fs 전체 화면 · vol 소리 · sens 마우스 감도 · sub 자막(s|m|l)
@@ -77,11 +79,17 @@
       if (document.pointerLockElement) document.exitPointerLock();
       show('pause');
     }
-    function resume() { show(''); G.paused = false; G.keys = {}; vol(); }
+    function resume() { show(''); G.paused = false; G.keys = {}; vol(); held = 0; }
+    // 메뉴 없이 잠깐 멈춤 (mod_touch: 휴대폰을 세로로 돌렸을 때 "가로로 돌려 주세요" 화면 뒤에서) — 같은 G.paused 경로. 풀 때 메뉴가 열려 있으면 그대로 둠
+    let held = 0;
+    function hold(v) {
+      if (v) { if (held || menu || G.paused || !story()) return; held = 1; G.paused = true; vol(); if (document.pointerLockElement) document.exitPointerLock(); }
+      else if (held) { held = 0; if (!menu) { G.paused = false; G.keys = {}; vol(); } }
+    }
     function settings(f) { from = f; show('set'); }
     function back() { from === 'pause' ? show('pause') : show(''); }
     function toTitle() {
-      show(''); G.paused = false; G.keys = {}; vol();
+      show(''); G.paused = false; G.keys = {}; held = 0; vol();
       try { G.fps && G.fps.on && G.fps.stop(); } catch (e) { G.err('[desktop] ' + e); }
       try { G.story && G.story.title && G.story.title(); } catch (e) { G.err('[desktop] ' + e); }
       for (const l of ['engine', 'cabin', 'missile', 'wind', 'siren', 'sea']) G.sfx && G.sfx.loop && G.sfx.loop(l, 0); // 스토리 1 의 지속음도 정리 (처음 실행한 타이틀과 같게)
@@ -113,7 +121,7 @@
 
     /* ── 입력 ── */
     addEventListener('keydown', e => {
-      if (e.code === 'F11') { e.preventDefault(); e.stopPropagation(); if (!e.repeat) fsGet().then(v => { cfg.fs = !v; save(); fsSet(cfg.fs); }); return; }
+      if (e.code === 'F11' && !web) { e.preventDefault(); e.stopPropagation(); if (!e.repeat) fsGet().then(v => { cfg.fs = !v; save(); fsSet(cfg.fs); }); return; }
       if (e.code === 'Escape' && (menu || story())) { // 타이틀(진행 중인 스토리 없음)에서는 아무 일 없음
         e.preventDefault(); e.stopPropagation();
         if (menu === 'set') back();
@@ -135,7 +143,7 @@
       if (!prog && !menu && story() && !G.paused) pause(); // 브라우저가 Esc 로 고정을 푼 경우 · 창 전환 → 바로 메뉴
     });
 
-    G.desktop = { cfg, pause, resume, settings, back, toTitle, get menu() { return menu; }, progress: () => done.slice(), finish };
+    G.desktop = { cfg, pause, resume, settings, back, toTitle, hold, get held() { return held; }, get menu() { return menu; }, progress: () => done.slice(), finish, web };
 
     G.register('desktop', {
       init() {
@@ -157,7 +165,7 @@
 #ov .dkd{margin-left:.55em;color:#a8e0a2;font-weight:700}#ov .dkv{position:absolute;right:2vw;bottom:2vh;font:11px ui-monospace,monospace;letter-spacing:.08em;color:#9fb1c4;opacity:.75}`);
         const root = G.el('div', { id: 'dk' });
         root.innerHTML = `<div class=p><div class=tb>SECOND <b>KOREAN</b> WARS</div><h2>일시 정지</h2><div class=st></div>
-<div class=m><div data-a=resume>계속하기</div><div data-a=set>설정</div><div data-a=title>처음 화면으로</div><div data-a=quit>게임 종료</div></div>
+<div class=m><div data-a=resume>계속하기</div><div data-a=set>설정</div><div data-a=title>처음 화면으로</div>${canQuit ? '<div data-a=quit>게임 종료</div>' : ''}</div>
 <div class=h><b>Esc</b> 계속하기 · <b>↑ ↓</b> 선택 · <b>Enter</b> 확인</div></div>
 <div class=s><div class=tb>SECOND <b>KOREAN</b> WARS</div><h2>설정</h2><div class=g>
 <span>그래픽</span><div data-k=q><button data-v=auto>자동</button><button data-v=LOW>LOW</button><button data-v=MEDIUM>MEDIUM</button><button data-v=HIGH>HIGH</button></div>
@@ -167,12 +175,12 @@
 <span>마우스 감도</span><div data-k=sens><input type=range min=.3 max=3 step=.1><output></output></div>
 <span>자막 크기</span><div data-k=sub><button data-v=s>작게</button><button data-v=m>보통</button><button data-v=l>크게</button></div>
 ${G.i18n ? '<span>언어</span><div data-k=lang><button data-v=ko data-i18n-skip>한국어</button><button data-v=en data-i18n-skip>English</button></div>' : ''}
-</div><button class=bk data-a=back>돌아가기</button><div class=h><b>Esc</b> 돌아가기 · <b>F11</b> 전체 화면</div></div>`;
+</div><button class=bk data-a=back>돌아가기</button><div class=h><b>Esc</b> 돌아가기${web ? '' : ' · <b>F11</b> 전체 화면'}</div></div>`;
         ui = { root, p: root.querySelector('.p'), s: root.querySelector('.s'), st: root.querySelector('.st'), sub: G.el('style', {}, document.head) };
-        if (touch()) { // 터치: 전체 화면 줄은 뜻이 없고(앱은 늘 전체 화면) 감도는 손가락 시점 감도
+        if (touch() || !canFs) { // 터치: 전체 화면 줄은 뜻이 없고(앱은 늘 전체 화면) 감도는 손가락 시점 감도 · 브라우저판: 전체 화면이 안 되는 곳(iPhone · 허락 없는 iframe)
           const f = root.querySelector('[data-k=fs]'); f.style.display = f.previousElementSibling.style.display = 'none';
-          root.querySelector('[data-k=sens]').previousElementSibling.textContent = '시점 감도';
         }
+        if (touch()) root.querySelector('[data-k=sens]').previousElementSibling.textContent = '시점 감도';
         G.i18n && G.i18n.onChange(() => { menu === 'set' && sync(); }); // 처음 화면 버튼 등 다른 곳에서 바꿔도 설정 표시 맞춤
         root.addEventListener('click', e => { const a = e.target.closest('[data-a]'); if (a) return ACT[a.dataset.a](); const b = e.target.closest('[data-k] button'); b && onSet(b.parentNode.dataset.k, b.dataset.v); });
         root.addEventListener('input', e => { const k = e.target.parentNode.dataset.k; k && onSet(k, e.target.value, 1); });
@@ -183,7 +191,7 @@ ${G.i18n ? '<span>언어</span><div data-k=lang><button data-v=ko data-i18n-skip
           const start = o.querySelector('button'), bar = G.el('div', { className: 'dkb' }, o);
           start && start.after(bar);
           G.el('button', { textContent: '설정', onclick: () => settings('title') }, bar);
-          G.el('button', { textContent: '게임 종료', onclick: quit }, bar);
+          canQuit && G.el('button', { textContent: '게임 종료', onclick: quit }, bar);
           G.el('div', { className: 'dkv', textContent: D ? 'v' + (D.gameVersion || D.version) : 'dev · browser' }, o);
           const a = o.querySelector('a.tb');
           if (a && D && D.openExternal) a.addEventListener('click', e => { e.preventDefault(); quiet(D.openExternal(a.href)); });
@@ -193,7 +201,7 @@ ${G.i18n ? '<span>언어</span><div data-k=lang><button data-v=ko data-i18n-skip
         sub();
         if (!G.params.get('q') && (cfg.q === 'auto' ? G.qManual : G.PRESETS[cfg.q] && (!G.qManual || cfg.q !== G.Q.name))) quality(cfg.q);
         if (cfg.scale) scale();
-        if (cfg.fs !== null && D && !touch()) fsSet(cfg.fs);
+        if (cfg.fs !== null && D && !web && !touch()) fsSet(cfg.fs); // 브라우저는 사용자 입력 없이 전체 화면을 켤 수 없다
         vol();
       },
       onQuality(Q) { if (!G.params.get('q')) { cfg.q = G.qManual ? Q.name : 'auto'; save(); } menu === 'set' && sync(); }, // F2 · 성능 알약으로 바꾼 것도 기억

@@ -17,6 +17,9 @@
       '사격': 'FIRE', '조준': 'AIM', '장전': 'RELOAD', '앉기': 'CROUCH', '방탄': 'PLATE', '줍기': 'GRAB', '무기': 'WEAPON', '스코프': 'SCOPE', '사용': 'USE', '단검': 'STAB', '투척': 'THROW',
       '조작': 'Controls', '화면 왼쪽을 밀어 이동 · 오른쪽을 밀어 둘러보기': 'Drag the left side to move · drag the right side to look',
       '오른쪽 버튼으로 사격 · 조준 · 줍기': 'Buttons on the right: fire · aim · pick up',
+      /* ── 브라우저판(itch.io) · 휴대폰을 세로로 들었을 때 (mod_touch) ── */
+      '휴대폰을 가로로 돌려 주세요': 'Rotate your phone to landscape',
+      '화면이 돌아가지 않으면 세로 화면 고정(자동 회전) 설정을 확인해 주세요': 'If the screen does not turn, check the rotation lock (auto-rotate) setting',
       '자막 크기': 'Subtitle Size', '작게': 'Small', '보통': 'Medium', '크게': 'Large',
       '언어': 'Language', '돌아가기': 'Back', '돌아가기 ·': 'Back ·',
       /* ── 성능 알약 ── */
