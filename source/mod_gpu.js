@@ -207,7 +207,8 @@
       }
       // 자동 모드 하향: 해상도를 다 낮춰도(또는 해상도와 무관하게) 4초 넘게 느리면 한 등급씩 내림 (자동으로 올리지는 않음 — 감지 등급이 상한)
       low = !G.qManual && G.Q.tier > 1 && vis && (G.dyn < .56 ? f < tgt * .47 : nores && f < 26) ? low + dt : 0;
-      if (low > 4) { low = 0; last = null; nores = 0; G.dyn = 1; G.gpuInfo.tier = TIERS[G.Q.tier - 2]; G.gpuInfo.auto = '↓'; G.setQuality(G.gpuInfo.tier, false); }
+      // 내린 뒤 목표 FPS 는 60 으로 되돌림: 해상도와 무관한 느림(nores)을 '상한' 으로 기억한 채면 (tgt = 그 FPS) 다시 시험하지 않아 한 단계만 내리고 멈춤. 진짜 상한(30 등)은 다음 시험이 다시 찾음
+      if (low > 4) { low = 0; last = null; nores = 0; tgt = 60; G.dyn = 1; G.gpuInfo.tier = TIERS[G.Q.tier - 2]; G.gpuInfo.auto = '↓'; G.setQuality(G.gpuInfo.tier, false); }
       if ((acc += dt) < .25) return; acc = 0;
       const Q = G.Q, T = G.targets;
       el.firstChild.innerHTML = `<i>${G.gpuInfo.name}</i><b class="t${Q.level}">${Q.name}</b> · ${f.toFixed(0)} FPS`;

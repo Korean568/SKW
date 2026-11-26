@@ -167,12 +167,12 @@ G.TIERS = (() => {
 G.PRESETS = {}; // 이름 → 프리셋. 예전 이름 LOW/MEDIUM/HIGH 는 같은 객체를 가리키는 별칭 (열거되지 않음)
 G.TIERS.forEach(p => G.PRESETS[p.name] = p);
 [['LOW', 1], ['MEDIUM', 4], ['HIGH', 7]].forEach(([k, t]) => Object.defineProperty(G.PRESETS, k, { value: G.TIERS[t - 1], enumerable: false }));
-/* 이름·번호 → 프리셋 (없으면 null): 7 · '7' · 'ultra' · 'Medium High' · 'medium_high' · 'MEDIUM' (= Medium) · 'LOW' (= Very Low) · 'HIGH' (= High) */
+/* 이름·번호 → 프리셋 (없으면 null): 7 · '7' · 'ultra' · 'Medium High' · 'medium_high' · 'Low'/'low' (= 2단계 Low) · 대문자 예전 이름 'LOW' (= Very Low) · 'MEDIUM' (= Medium) · 'HIGH' (= High) */
 G.tierOf = q => {
   if (q && typeof q === 'object' && q.tier) return G.TIERS[q.tier - 1];
   const s = String(q ?? '').trim(); if (!s) return null;
   if (/^\d+$/.test(s)) return G.TIERS[+s - 1] || null;
-  if (G.PRESETS[s.toUpperCase()] && /^(low|medium|high)$/i.test(s)) return G.PRESETS[s.toUpperCase()];
+  if (/^(LOW|MEDIUM|HIGH)$/.test(s)) return G.PRESETS[s]; // 예전 이름은 대문자 그대로일 때만 ('Low' · 'low' = 새 2단계 Low, 'LOW' = Very Low)
   const k = s.toLowerCase().replace(/[\s_-]+/g, '');
   return G.TIERS.find(p => p.name.toLowerCase().replace(/\s+/g, '') === k) || ({ med: G.TIERS[3], vlow: G.TIERS[0], max: G.TIERS[8] })[k] || null;
 };
