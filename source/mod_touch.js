@@ -17,7 +17,7 @@
     }
 
     /* ── 성능: 휴대폰은 화면 밀도가 높고 메모리가 적다 → 10단계 모두 내부 해상도(화소 예산 maxPx)를 묶음 (동적 해상도는 그대로 동작)
-          Very Low ≈ 960×540 · Medium ≈ 1280×720 · High ≈ 1740×975 · Ultra ≈ 2160×1215 — 수동으로 Ultra 를 골라도 1000만 화소 버퍼는 만들지 않음.
+          Very Low ≈ 960×540 · Medium ≈ 1280×720 · High ≈ 1740×975 · Ultra ≈ 2270×1280 — 수동으로 Ultra 를 골라도 1000만 화소 버퍼는 만들지 않음.
           dprCap 1.5~2: 낮은 등급도 화면 밀도를 조금 살리고(예전 LOW 와 같은 1.5) 높은 등급도 2 를 넘지 않게. 그림자 맵은 4096² 까지 (8192² 깊이 = 256MB) ── */
     const PX = [5.2e5, 6.2e5, 7.6e5, 9.3e5, 1.1e6, 1.35e6, 1.7e6, 2.1e6, 2.5e6, 2.9e6];
     for (const P of G.TIERS) {
@@ -265,7 +265,7 @@ html.touch #dk{align-content:safe center;overflow-y:auto;padding:calc(10px + var
 html.touch #dk .h{display:none}html.touch #dk h2{font-size:clamp(28px,4.4vw,64px)}html.touch #dk .tb{margin-bottom:.7em;font-size:11px}
 html.touch #dk .m{margin-top:.5em}html.touch #dk .m>div{display:flex;align-items:center;min-height:48px;box-sizing:border-box;margin:.15em 0;padding:.3em 2em .3em 1em;font-size:1.3em}
 html.touch #dk .g{gap:.45em 1.4em;margin-top:.6em}html.touch #dk .g button{min-width:52px;min-height:40px;padding:.5em 1em}html.touch #dk input[type=range]{width:clamp(150px,24vw,300px);height:38px}
-html.touch #dk .bk{position:absolute;top:calc(12px + var(--st));right:calc(6vw + var(--sr));min-height:46px;margin:0;padding:.6em 1.8em;font-size:1.05em}
+html.touch #dk .bk{position:absolute;top:calc(12px + var(--st));right:calc(6vw + var(--sr));min-height:46px;margin:0;padding:.6em 1.8em;font-size:1.05em}html.touch #dk .s h2{min-height:48px}/* 설정 제목 줄 = 오른쪽 위 돌아가기 버튼 높이 (그래픽 10단계 버튼 줄이 그 아래에서 시작) */
 @media(max-height:520px){html.touch #dk .tb{display:none}html.touch #ov .ch>div{margin:.15em 0;padding:.3em 0 .3em .9em}}
 @media(max-height:380px){html.touch #ov{padding-top:calc(30px + var(--st))}html.touch #ov .ch p{font-size:12px;line-height:1.3}html.touch #ov .ch p+p{font-size:10px}html.touch #ov .tk{display:none}html.touch #ov h1{font-size:clamp(28px,4.6vw,40px)}}
 #tc[data-s=s4] .b[data-a=aim]{right:calc(26px + var(--sr))!important;bottom:calc(66px + var(--sb))!important;width:68px!important;height:68px!important}
