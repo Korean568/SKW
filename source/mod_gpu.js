@@ -76,7 +76,9 @@
   const store = v => { try { v === undefined || (v ? localStorage.setItem('skw_q', v) : localStorage.removeItem('skw_q')); return localStorage.getItem('skw_q'); } catch (e) { return null; } };
   let el, low = 0, acc = 0, win = 0, cool = 0, probe = 0;
   // FPS 방식 동적 해상도: tgt = 목표 FPS (60, 프레임 상한이 확인되면 그 값), last = 방금 낮춘 시험 {f: 그때 FPS, d: 그때 배율}, hold = 다시 낮추지 않을 초, tsBad = 타이머 이상 연속 횟수
-  let tgt = 60, last = null, hold = 0, tsBad = 0;
+  // nores = 낮춰 봐도 FPS 가 안 오르는데 26fps 미만 (상한이 아니라 해상도와 무관한 부하: 그림자 · 정점 · CPU) → 자동 모드면 등급을 내림
+  // pa = 마지막 올려 보기 뒤 지난 초, pw = 상한 아래 올려 보기 간격 (올리자마자 다시 느려지면 두 배로: 4→8→…→64초, 해상도가 계속 오르내리지 않게)
+  let tgt = 60, last = null, hold = 0, tsBad = 0, nores = 0, pa = 99, pw = 4;
   G.gpu = { classify, TIERS, get fpsTarget() { return tgt; } };
   G.register('gpu', {
     async detect(adapter, dev) {
@@ -116,7 +118,7 @@
       addEventListener('keydown', e => { if (e.code === 'F2') { e.preventDefault(); this.pick(G.qManual ? TIERS[G.Q.level + 1] || '' : 'LOW'); } });
       const s = store(); if (!G.params.get('q') && G.PRESETS[s]) G.setQuality(s, true); // 지난번 수동 선택 유지
     },
-    pick(q) { store(q || ''); low = 0; last = null; hold = 0; G.dyn = 1; G.setQuality(q || G.gpuInfo.tier, !!q); },
+    pick(q) { store(q || ''); low = 0; last = null; hold = 0; nores = 0; G.dyn = 1; G.setQuality(q || G.gpuInfo.tier, !!q); },
     onQuality() { for (const b of el.querySelectorAll('button')) b.className = (G.qManual ? b.dataset.q === G.Q.name : !b.dataset.q) ? 'on' : ''; low = 0; },
     update(dt) {
       const vis = document.visibilityState === 'visible', f = +G.fps;
@@ -124,9 +126,10 @@
       if ((win += dt) >= 1 && vis && !G.params.has('step') && G.params.get('dyn') !== '0') {
         win = 0; let k = 1; const g = G.gpuMs;
         tgt = f > tgt * 1.15 ? 60 : Math.min(60, Math.max(tgt, f)); // 상한(30fps 등)이 풀리면 (목표보다 15% 넘게 빠름) 다시 60 목표로 — 낮은 상한은 아래 시험이 다시 찾음
+        if (tgt >= 55) pw = 4; pa++;
         if (g > 0) { // 타이머 값이 프레임 간격과 안 맞으면 (간격의 2.5배 초과 · 느린데 간격의 5% 미만) 5초 연속이면 버리고 FPS 방식으로
           const fi = 1000 / Math.max(f, 1);
-          tsBad = g > fi * 2.5 + 2 || (f < 40 && g < fi * .05) ? tsBad + 1 : 0;
+          tsBad = g > fi * 2.5 + 2 || (f < 40 && g < Math.min(fi * .05, .5)) ? tsBad + 1 : 0; // (상한·CPU 병목인 빠른 GPU 는 1ms 안팎도 정상 → 0.5ms 미만만)
           if (tsBad >= 5) { tsBad = 0; G.tsOff && G.tsOff(`gpu ${g.toFixed(2)}ms @ ${f.toFixed(0)}fps`); }
         }
         if (cool > 0) cool--;
@@ -135,16 +138,16 @@
           // FPS 방식: 낮춘 뒤 FPS 가 8% 이상 오르지 않았으면 GPU 부하가 아니라 프레임 상한(Safari 저전력·iframe 30fps, 30Hz 화면 등)이나 CPU 병목
           // → 배율을 되돌리고 그 FPS 를 목표로 삼아 10초 쉼. 목표 근처면 상한 아래에서도 4초마다 배율을 올려 봄 (60fps 목표는 예전처럼 20초)
           const t = last; last = null;
-          if (t && G.dyn < t.d && f < t.f * 1.08) { tgt = Math.max(t.f, f); hold = 10; G.dyn = t.d; G.resize(); cool = 2; }
+          if (t && G.dyn < t.d && f < t.f * 1.08) { tgt = Math.max(t.f, f); hold = 10; G.dyn = t.d; G.resize(); cool = 2; nores = f < 26; }
           else if (hold > 0) hold--;
-          else if (f < tgt * .87) { last = { f, d: G.dyn }; k = .9; }
-          else if (++probe > (tgt < 55 && f >= tgt * .95 ? 4 : 20)) { probe = 0; k = 1.08; }
+          else if (f < tgt * .87) { last = { f, d: G.dyn }; k = .9; if (pa < 6) pw = Math.min(pw * 2, 64); }
+          else if (++probe > (tgt < 55 && f >= tgt * .95 ? pw : 20)) { probe = 0; k = 1.08; pa = 0; }
         }
         const d = G.clamp(G.dyn * k, .5, 1);
         if (Math.abs(d - G.dyn) > .03) { G.dyn = d; G.resize(); cool = 2; } else if (k < 1) last = null; // 더 못 낮추면 시험할 것도 없음
       }
-      low = !G.qManual && G.Q.level > 0 && G.dyn < .56 && f < tgt * .47 && vis ? low + dt : 0;
-      if (low > 4) { low = 0; last = null; G.dyn = 1; G.gpuInfo.tier = TIERS[G.Q.level - 1]; G.gpuInfo.auto = '↓'; G.setQuality(G.gpuInfo.tier, false); }
+      low = !G.qManual && G.Q.level > 0 && vis && (G.dyn < .56 ? f < tgt * .47 : nores && f < 26) ? low + dt : 0;
+      if (low > 4) { low = 0; last = null; nores = 0; G.dyn = 1; G.gpuInfo.tier = TIERS[G.Q.level - 1]; G.gpuInfo.auto = '↓'; G.setQuality(G.gpuInfo.tier, false); }
       if ((acc += dt) < .25) return; acc = 0;
       const Q = G.Q, T = G.targets;
       el.firstChild.innerHTML = `<i>${G.gpuInfo.name}</i><b class="t${Q.level}">${Q.name}</b> · ${f.toFixed(0)} FPS`;

@@ -100,8 +100,10 @@ const errBox = () => { // 오류 목록 (G.errors) 을 왼쪽 위 작은 상자�
 };
 const errSoon = () => { ebT || (ebT = setTimeout(errBox, 60)); };
 // 잡히지 않은 예외 · 프라미스 거부도 G.err 로 (사용자 제스처가 필요한 API 의 흔한 거부는 무시: 포인터 잠금 · 전체 화면 · 재생)
-const benign = x => !!x && (/^(AbortError|NotAllowedError|SecurityError|WrongDocumentError)$/.test(x.name) || /pointer ?lock|exited the lock|fullscreen|ResizeObserver loop|^Script error\.?$/i.test(x.message || x));
-addEventListener('error', e => { if (e.message && !benign(e.error) && !benign(e)) G.err(`${e.message} @${String(e.filename || '').split('/').pop()}:${e.lineno}:${e.colno}`); });
+// 브라우저 확장 프로그램(지갑 · 번역 · 광고 차단 등)이 페이지에 넣은 스크립트의 오류도 게임 오류가 아니므로 무시
+const ext = s => /(^|[\s(@])(chrome|moz|safari(-web)?|ms-browser)-extension:|webkit-masked-url:/.test(String(s || ''));
+const benign = x => !!x && (/^(AbortError|NotAllowedError|SecurityError|WrongDocumentError)$/.test(x.name) || /pointer ?lock|exited the lock|fullscreen|ResizeObserver loop|^Script error\.?$/i.test(x.message || x) || ext(x.stack));
+addEventListener('error', e => { if (e.message && !benign(e.error) && !benign(e) && !ext(e.filename)) G.err(`${e.message} @${String(e.filename || '').split('/').pop()}:${e.lineno}:${e.colno}`); });
 addEventListener('unhandledrejection', e => { const r = e.reason; if (!benign(r)) G.err('[promise] ' + (r && (r.stack || r.message) || r)); });
 // 게임 모드: 기본 'story'(스토리 1 — 여객기), '?mode=naval' = 해상 반격 임무. 세 번째 인자가 있으면 그 모드에서만 등록 (API 객체는 그대로 남음)
 G.mode = new URLSearchParams(location.search).get('mode') === 'naval' ? 'naval' : 'story';
@@ -283,6 +285,7 @@ fn pointLights(P: vec3f, N: vec3f) -> vec3f { // 폭발 섬광 등 동적 점광
 G.WGSL_LINES = G.WGSL.split('\n').length - 1;
 G.shader = (code, label = 'shader', common = true) => {
   const m = G.dev.createShaderModule({ label, code: (common ? G.WGSL : '') + code });
+  G.wdReset && G.wdReset(); // 새 셰이더 = 곧 파이프라인 컴파일 (감시견이 긴 컴파일을 장치 멈춤으로 오해하지 않게)
   m.getCompilationInfo().then(i => { for (const x of i.messages) if (x.type === 'error') G.err(`[WGSL ${label}] L${x.lineNum - (common ? G.WGSL_LINES : 0)}: ${x.message}`); }, () => { });
   return m;
 };
@@ -518,16 +521,16 @@ G.boot = async () => {
     G.params.has('debug') && errSoon();
     await new Promise(r => setTimeout(r, 0));
     if (step) return;
-    /* 감시견: GPU 가 제출한 작업에 응답하지 않으면 (보이는 동안 12초 넘게 onSubmittedWorkDone 이 안 끝남) 장치 잃음과 같은 처리.
-       숨겨진 동안은 재지 않고, 품질 전환(셰이더 재컴파일) 직후에는 처음부터 다시 잰다 */
-    let wp = 0, wt = 0;
-    G.wdReset = () => { wt = 0; };
+    /* 감시견: GPU 가 제출한 작업에 응답하지 않으면 (보이는 동안 onSubmittedWorkDone 이 오래 안 끝남) 장치 잃음과 같은 처리.
+       시간이 아니라 2초 간격 확인 횟수로 센다 (메인 스레드가 멈췄다 풀린 직후 한 번에 '12초 지남' 으로 오해하지 않게).
+       숨겨진 동안은 세지 않는다. 셰이더 컴파일이 몰리는 때(부트 직후 · 품질 전환 · 새 셰이더 = G.shader)에는 GPU 가 한 번 답할 때까지 60초까지 기다림
+       — 느린 PC·안드로이드에서 첫 컴파일이 12초를 넘는다고 새로고침·실행 불가 화면이 뜨지 않게. 한 번 답한 뒤부터는 12초 */
+    let wp = 0, wn = 0, armed = 0, gen = 0; // gen: 재설정 전에 보낸 확인이 늦게 끝나도 컴파일 뒤의 응답으로 치지 않게
+    G.wdReset = () => { wn = 0; armed = 0; gen++; };
     setInterval(() => {
-      if (G.dead || document.hidden) { wt = 0; return; }
-      const now = performance.now();
-      if (!wp) { wp = 1; wt = now; dev.queue.onSubmittedWorkDone().then(() => { wp = 0; }, () => { wp = 0; }); }
-      else if (!wt) wt = now;
-      else if (now - wt > 12e3) G.lost(`watchdog: onSubmittedWorkDone ${((now - wt) / 1e3).toFixed(0)}s`);
+      if (G.dead || document.hidden) { wn = 0; return; }
+      if (!wp) { wp = 1; wn = 0; const my = gen; dev.queue.onSubmittedWorkDone().then(() => { wp = 0; armed = armed || +(my === gen); }, () => { wp = 0; }); }
+      else if (++wn > (armed ? 6 : 30)) G.lost(`watchdog: onSubmittedWorkDone >${wn * 2}s${armed ? '' : ' (compile)'}`);
     }, 2000);
     let last = performance.now();
     const loop = t => {

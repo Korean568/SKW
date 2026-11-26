@@ -244,6 +244,7 @@ html.touch #dk .m{margin-top:.5em}html.touch #dk .m>div{display:flex;align-items
 html.touch #dk .g{gap:.45em 1.4em;margin-top:.6em}html.touch #dk .g button{min-width:52px;min-height:40px;padding:.5em 1em}html.touch #dk input[type=range]{width:clamp(150px,24vw,300px);height:38px}
 html.touch #dk .bk{position:absolute;top:calc(12px + var(--st));right:calc(6vw + var(--sr));min-height:46px;margin:0;padding:.6em 1.8em;font-size:1.05em}
 @media(max-height:520px){html.touch #dk .tb{display:none}html.touch #ov .ch>div{margin:.15em 0;padding:.3em 0 .3em .9em}}
+@media(max-height:380px){html.touch #ov{padding-top:calc(30px + var(--st))}html.touch #ov .ch p{font-size:12px;line-height:1.3}html.touch #ov .ch p+p{font-size:10px}html.touch #ov .tk{display:none}html.touch #ov h1{font-size:clamp(28px,4.6vw,40px)}}
 #tc[data-s=s4] .b[data-a=aim]{right:calc(26px + var(--sr))!important;bottom:calc(66px + var(--sb))!important;width:68px!important;height:68px!important}
 html.touch #dk{background:linear-gradient(90deg,#000f,#000f 50%,#000e)}`);
         const root = G.el('div', { id: 'tc' }), mk = (a, txt, s, css, id) => { const b = G.el('div', { className: 'b', textContent: txt }, root); b.dataset.a = a; b.dataset.s = s; b.style.cssText = css; id && (b.id = id); return b; };
