@@ -91,18 +91,20 @@ jobs:
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: desktop-v${{ steps.v.outputs.v }}
-          name: Second Korean Wars PC ${{ steps.v.outputs.l }}
+          name: Second Korean Wars ${{ steps.v.outputs.l }}
           target_commitish: ${{ github.sha }}
           make_latest: true
           files: artifacts/*
           body: |
-            Second Korean Wars (제 2차 한국전쟁) PC 다운로드판 ${{ steps.v.outputs.l }}
+            Second Korean Wars (제 2차 한국전쟁) ${{ steps.v.outputs.l }}
 
-            - Windows: SecondKoreanWars-${{ steps.v.outputs.l }}-win-x64.zip (압축을 풀고 Second Korean Wars.exe 실행) 또는 -portable.exe (바로 실행)
+            - Windows: SecondKoreanWars-${{ steps.v.outputs.l }}-win-x64.zip (압축을 풀고 Second Korean Wars.exe 실행) 또는 -win-x64-portable.exe (바로 실행)
             - macOS: -mac-arm64.zip (Apple 실리콘) / -mac-x64.zip (인텔). 처음 열 때 우클릭 → 열기
             - Linux: .AppImage 또는 .tar.gz (안 켜지면 --no-sandbox)
+            - Android: SecondKoreanWars-${{ steps.v.outputs.l }}-android.apk (Android 12 이상. '출처를 알 수 없는 앱' 설치 허용 후 설치. 시험판 서명이라 새 버전은 앱을 지우고 설치)
+            - 브라우저 (아이폰 · 안드로이드 · PC, 설치 없이): https://korean568.github.io/SKW/play/ (아이폰은 iOS 26 이상 Safari)
 
-            WebGPU 를 지원하는 그래픽 카드와 최신 드라이버가 필요합니다 (Windows 10/11 DX12, macOS 13+, Linux Vulkan).
+            WebGPU 를 지원하는 그래픽 카드와 최신 드라이버가 필요합니다 (Windows 10/11 DX12, macOS 13+, Linux Vulkan, Android 12+).
 
   itch:
     needs: build
