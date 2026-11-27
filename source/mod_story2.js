@@ -66,6 +66,52 @@
  };
   const off=(p,u,a,v,b)=>[p[0] + u[0]*a + v[0]*b,0,p[2] + u[2]*a + v[2]*b];
 
+  /* ── 무기 (G.arms 어댑터 §3.2): 방아쇠는 언제나 안전 (Q2) · 대본 인물은 맞지 않음 · 붙잡은 뒤로는 대본의 AKM (Q3/R8) ── */
+  const AR=()=>G.arms&&G.arms.bind?G.arms:null;
+  const DROP2={akm:40,k7:6,rpg7:4,m134:3,k14:4,k2:3,k2c1:3,k2c:3,k2a:3,m16:3,aug:3};// Q7: 북한 마을이라 AKM 위주
+  const free=()=>!!(S.on&&S.cm==='fp'&&S.walk&&S.bk<.5&&S.g!=='choice'&&!S.drag&&!S.lock&&!S.pr&&G.people.fp.on);
+  const fwd3=()=>[sin(me.yaw)*Math.cos(me.pit),sin(me.pit),cos(me.yaw)*Math.cos(me.pit)];
+  function adapter(){
+    return{story:2,hits:'safe',hud:'lite',onHit:null,onBlast:null,hurtSelf:null,
+      eye:()=>[me.p[0],me.p[1] + 1.62,me.p[2]],fwd:fwd3,
+      solid:(o,d,m)=>{const t=vc('ray',o,d,m);return Number.isFinite(t)?t:m;},
+      ground:(x,z,y)=>col([x,y||0,z],.01)[1],collide:(p,r)=>col(p,r),
+      me:()=>({p:me.p,yaw:me.yaw,pit:me.pit,mv:S.v||0,cr:0,run:S.run||0,air:0}),
+      recoil:(dp,dy)=>{me.pit=cl(me.pit + dp,-1.3,1.3);me.yaw+=dy;},
+      allow:()=>{const f=free()?1:0;return{free:f,fire:0,ads:f,sw:f,use:f,rl:f};},// 쏘기는 언제나 막힘 → 딸깍 + '지금은 쏠 수 없다'
+      busyE:()=>!!S.itE,// 이야기의 E (문 · 끌기) 가 이긴다 (R6)
+      people:()=>PP.list.map(P=>P.p.slice())};
+ }
+  function drops2(){// 바닥 총 §4.4: 집 A 1 · 집 B 1 (숨은 곳 1.6 m 밖) · 걷는 길 옆 2 — 인물 · 문턱 · 처형장 · 이동 경로 제외
+    const a=AR();if(!a||!a.drops) return;
+    const k=K(),hA=hs(iA()),hB=hs(iB()),x=line(),hd=hB.hide||hB.inside,jit=q=>[q[0] + (R() - .5)*1.2,0,q[2] + (R() - .5)*1.2];
+    const pts=(h,i,f)=>{const c=[];for(const r of rooms(h)) for(let j=0;j<10;j++){const q=jit(r);if(inside(q)===i&&(!f||f(q))) c.push([q[0],col(q,.01)[1],q[2]]);}return c;};
+    const cA=pts(hA,iA()),cB=pts(hB,iB(),q=>dxz(q,hd)>=1.6),cR=[];
+    for(const [s0,s1] of [[k.start,out(hA,1)],[out(hA,1.4),out(hB,1.4)]]){
+      const d=[s1[0] - s0[0],s1[2] - s0[2]],n=H(d[0],d[1])||1,v=[d[1]/n,-d[0]/n];
+      for(let t=.1;t<.95;t+=.08) for(const sd of [-1,1]){const r=sd*(1 + R()*1.5),q=[s0[0] + d[0]*t + v[0]*r,0,s0[2] + d[1]*t + v[1]*r];if(inside(q)===-1) cR.push([q[0],col(q,.01)[1],q[2]]);}
+   }
+    const away=[[k.officer[0],0,k.officer[2],6],...k.crowd.map(q=>[q[0],0,q[2],2]),...k.guards.map(q=>[q[0],0,q[2],2]),[x.l[0],0,x.l[2],5],[x.w[0],0,x.w[2],5],
+      ...k.houses.flatMap(h=>[out(h,1.2),out(h,-1.2)]).map(q=>[q[0],0,q[2],1.2]),[hd[0],0,hd[2],2.4]];
+    for(const P of PP.list) away.push([P.p[0],0,P.p[2],P===W.vic?2.4:1.2]);// 대본 인물 아래에는 놓지 않는다 (숨은 사람 포함)
+    const o2=at(off(x.l,x.u,1.6,x.v,2.6)),g2=at(off(x.l,x.u,.2,x.v,-2.8));
+    const path=[[k.start,out(hA,1)],[out(hA,1.4),out(hB,1.4)],[out(hB,1.6),x.l],[out(hB,0),out(hB,-1.4)],[out(hB,-1.3),hd],[x.l,x.w,5],
+      [W.ko?W.ko.p:k.ko,out(hB,1.4)],[k.officer,o2],[out(hB,1.4),g2],...W.pairs.map(r=>[out(hs(r.h),1.4),r.q])];
+    const o={cnt:{},hs:{n:0,cap:1},caps:{k14:1},away,path,gap:1.6};
+    a.drops.scatter(cA,1,DROP2,o);a.drops.scatter(cB,1,DROP2,o);a.drops.scatter(cR,2,DROP2,o);
+ }
+  function armsOn(n){// 시작 · 다시 하기 · 장면 점프: 새 장비(AKM 30+90) · 새 바닥 배치 (이월 없음 Q6)
+    const a=AR();if(!a) return;
+    try {a.bind(adapter());a.kit(2);S.pr=n>=5?1:0;S.itE=null;drops2();G.params.get('drops')==='all'&&a.drops.all();} catch (e){G.err('[story2] arms ' + (e.stack||e));}
+ }
+  function armsStep(dt){// 자유 보행이 아니면 무기 입력은 모두 무시 (숫자 · 휠 · 클릭 · E)
+    const a=AR();if(!a||!a.bound) return;
+    a.present(S.pr||S.drag?'akm':null);
+    const f=free();
+    if(!f||S.bot){a.bot=true;if(!f) for(const q in a.inp) a.inp[q]=0;} else a.bot=false;
+    a.step(dt);
+ }
+
   /* ── 인물 ── */
   const add=(k,o)=>PP.add(k,Object.assign({pose:'stand',gun:0},o));
   function walk(P,pts,sp,done,pose){P.wp=pts.map(q=>q.slice());P.sp=sp;P.done=done;P.wpose=pose||'walk';P.pose=P.wpose;P.vis=true;P.stk=0;}
@@ -208,7 +254,7 @@
   function interact(){// [E] 상호작용 후보
     if(!S.walk) return null;
     if(S.g==='door'&&dxz(me.p,out(hs(iA()),.9))<1.8) return ['[E] 문 부수기',()=>{door(iA(),1);S.f.door=1;me.kick=1;G.sfx.play('door');}];
-    if(S.g==='grab'&&W.vic&&W.vic.vis&&dxz(me.p,W.vic.p)<2.4) return ['[E] 끌고 가기',()=>{S.drag=1;W.vic.pose='drag';W.vic.look=null;S.fix=null;G.sfx.play('hit',{gain:.15,rate:.4});}];
+    if(S.g==='grab'&&W.vic&&W.vic.vis&&dxz(me.p,W.vic.p)<2.4) return ['[E] 끌고 가기',()=>{S.drag=1;S.pr=1;W.vic.pose='drag';W.vic.look=null;S.fix=null;G.sfx.play('hit',{gain:.15,rate:.4});}];
     return null;
  }
   function choose(c){if(S.g!=='choice'||S.choice) return;S.choice=c;ui.c.style.display='none';G.sfx.play('click',{gain:.4,rate:.5});}
@@ -224,10 +270,11 @@
   function stepMe(dt){
     const k=G.keys;let f=0,s=0;
     if(S.bot) f=bot(dt);else {f=(k.KeyW||k.ArrowUp?1:0) - (k.KeyS||k.ArrowDown?1:0);s=(k.KeyD||k.ArrowRight?1:0) - (k.KeyA||k.ArrowLeft?1:0);}
-    const n=H(f,s)||1,sp=(S.drag?1.2:k.ShiftLeft&&!S.bot?3.3:1.75)/n,vx=(sin(me.yaw)*f - cos(me.yaw)*s)*sp,vz=(cos(me.yaw)*f + sin(me.yaw)*s)*sp;
+    const a=AR(),V=a&&a.bound&&!S.pr?a.view:null,run=!S.drag&&k.ShiftLeft&&!S.bot&&!(V&&(V.nosprint||a.inp.ads))&&f>0;// 총마다 속도 배율 (R10) · 조준 중 Shift 는 숨 참기
+    const n=H(f,s)||1,sp=(S.drag?1.2:run?3.3:1.75)*(V?V.mv*(1 - .35*V.ads):1)/n,vx=(sin(me.yaw)*f - cos(me.yaw)*s)*sp,vz=(cos(me.yaw)*f + sin(me.yaw)*s)*sp;
     const p0=me.p.slice(),m=Math.ceil(dt/.034),h=dt/m;
     for(let i=0;i<m;i++) me.p=col([me.p[0] + vx*h,me.p[1],me.p[2] + vz*h],.3);
-    const v=dt>0?dxz(me.p,p0)/dt:0,b0=Math.floor(me.bob/PI);
+    const v=dt>0?dxz(me.p,p0)/dt:0,b0=Math.floor(me.bob/PI);S.v=v;S.run=run?1:0;
     me.bob+=v*dt*4.2;me.bA+=((v>.3?1:0) - me.bA)*mn(1,dt*7);
     if(Math.floor(me.bob/PI)!==b0&&me.bA>.3) G.sfx.play('click',{gain:.55,rate:.18 + R()*.05});// 발소리
     if(S.drag&&W.vic){// 끌려가는 사람: 0.8 m 앞
@@ -272,10 +319,13 @@
       me.yaw+=wrap(Math.atan2(d[0],d[2]) - me.yaw)*mn(1,dt*r);me.pit+=(cl(Math.atan2(d[1],H(d[0],d[2])),-1,1) - me.pit)*mn(1,dt*r);
    }
     S.mv-=dt;me.kick=Math.max(0,me.kick - dt*2.2);me.aim+=(me.aimT - me.aim)*mn(1,dt*1.3);
-    const kk=me.kick*me.kick,yw=me.yaw + kk*.03*sin(t*31),pt=me.pit + kk*.09 + (S.lock?.004*sin(t*.7):0);
+    const a=AR(),V=a&&a.bound?a.view:null;// 무기 시점 (R10): 시야 배율 · 반동 — 대본 조준(me.aim)은 그대로
+    const kk=me.kick*me.kick,yw=me.yaw + kk*.03*sin(t*31),pt=me.pit + kk*.09 + (S.lock?.004*sin(t*.7):0) + (V?V.kick:0);
     T[0]=ey[0] + sin(yw)*cos(pt);T[1]=ey[1] + sin(pt);T[2]=ey[2] + cos(yw)*cos(pt);
-    c.pos=ey;c.target=T.slice();c.up=[0,1,0];c.near=.08;c.fov=1.12 - .25*me.aim;
-    const F=G.people.fp;F.kind='nk';F.gun='ak';F.aim=me.aim;F.kick=me.kick*.6;F.bob=me.bob;
+    c.pos=ey;c.target=T.slice();c.up=[0,1,0];c.near=.08;c.fov=(1.12 - .25*me.aim)*(V?V.fovK:1);
+    const F=G.people.fp;F.kind='nk';F.bob=me.bob;// 총 · 조준 · 반동 · 장전은 G.arms 가 쓴다 (붙잡은 뒤로는 present('akm') + 대본 조준)
+    if(!V){F.gun='ak';F.aim=me.aim;F.kick=me.kick*.6;}
+    else if(S.pr){F.gun=G.gunModels&&G.gunModels.akm&&Array.isArray(PP.props)?'akm':'ak';F.aim=me.aim;F.kick=me.kick*.6;F.hide=F.scope=F.reload=0;}// 붙잡은 그 프레임부터
     me.sw[0]*=.9;me.sw[1]*=.9;F.sway=me.sw;
  }
   function npc(dt){// 인물 이동 (경로점 · 따라 걷기) · 말하기 · 시선
@@ -343,6 +393,7 @@
     if(n>=6&&n<8){S.lock=1;S.fix=line().w;}
     if(n>=8){S.cm='x';S.e0=at(line().l,1.62);S.t0=at(W.ok.p,1.5);}
     if(n===9){S.fireT=1;const vs=VL().S;vs&&(vs.fire=1);S.cm=S.choice==='refuse'?'out':'pull';S.ct=20;}
+    armsOn(n);
  }
   function init2(){// 공통 시작 상태
     const ov=$('ov');ov&&(ov.style.display='none');
@@ -360,6 +411,7 @@
     G.village&&(G.village.on=false);const vs=VL().S;vs&&(vs.fire=0);
     for(const k of ['c','p','m']) ui[k]&&(ui[k].style.display='none');ui.v&&(ui.v.style.opacity=0);ui.bk&&(ui.bk.style.opacity=0);
     G.sfx.loop('sea',0);G.sfx.loop('wind',0);
+    const a=AR();if(a&&a.bound){a.present(null);a.bot=false;a.unbind();}
  }
   function update(dt){
     if(!S.on) return;
@@ -367,7 +419,9 @@
       const sd=dt*((G.keys.Space||G.keys.Tab)&&!S.walk&&S.g!=='choice'?4:1);// Space: 컷신 빨리 감기
       run(sd);npc(sd);
       if(S.walk&&S.cm==='fp') stepMe(dt);
+      if(!S.walk) S.v=0,S.run=0;
       const it=S.cm==='fp'&&S.bk<.5?interact():null;
+      S.itE=it;armsStep(dt);
       ui.p.style.display=it&&!S.bot?'block':'none';if(it) ui.p.textContent=it[0];
       if(it&&(S.eq||S.bot)) it[1]();
       S.eq=0;
@@ -401,13 +455,14 @@ html[lang=en] #s2c button{letter-spacing:.18em;text-indent:.18em}html[lang=en] #
       addEventListener('keydown',e=>{
         if(!S.on) return;
         if(e.code==='KeyE') S.eq=1;
-        if(e.code==='Digit1'||e.code==='Numpad1') choose('execute');
-        if(e.code==='Digit2'||e.code==='Numpad2') choose('refuse');
+        const d1=e.code==='Digit1'||e.code==='Numpad1',d2=e.code==='Digit2'||e.code==='Numpad2';
+        if(!d1&&!d2||e.repeat||S.g!=='choice'||S.t - S.gt<.6) return;// R7: 누르고 있던 1 · 자동 반복 · 선택지가 뜬 직후 .6초는 무시 (숫자는 무기 교체에도 쓰임)
+        choose(d1?'execute':'refuse');
      });
       G.canvas.addEventListener('click',()=>{S.on&&S.beat!=='end'&&S.g!=='choice'&&G.canvas.requestPointerLock&&G.canvas.requestPointerLock();});
       addEventListener('mousemove',e=>{
         if(!S.on||S.cm!=='fp'||!(document.pointerLockElement===G.canvas||e.buttons)) return;
-        const k=S.lock?.0009:.0022;me.yaw-=e.movementX*k;me.pit=cl(me.pit - e.movementY*k,-1.3,1.3);S.mv=2.5;
+        const a=AR(),k=(S.lock?.0009:.0022)*(a&&a.bound&&!S.pr?a.view.sens:1);me.yaw-=e.movementX*k;me.pit=cl(me.pit - e.movementY*k,-1.3,1.3);S.mv=2.5;
         me.sw[0]=cl(me.sw[0] - e.movementX*.002,-.3,.3);me.sw[1]=cl(me.sw[1] + e.movementY*.002,-.3,.3);
      });
       const sk=$('sk');sk&&sk.addEventListener('click',()=>{if(S.on&&!S.walk){S.nx=Math.min(S.nx,S.t);S.lineEnd=S.t;}});

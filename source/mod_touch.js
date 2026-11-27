@@ -68,7 +68,7 @@
     };
     function release(all) { // 손을 뗀 것으로 — all: 메뉴가 열릴 때(전부) · 아니면 장면이 바뀔 때(사격·조준·앉기만, 조이스틱은 이동이 이어지면 유지)
       if (firing) { firing = 0; mev('mouseup', { button: 0 }); }
-      setAim(0); tog.crouch = 0; key('KeyC', 0); taps = taps.filter(p => (key(p[0], 0), 0));
+      setAim(0); tog.crouch = 0; key('KeyC', 0); taps = taps.filter(p => (key(p[0], 0), 0)); wpn.on = 0; wpn.open && picker(0);
       if (all || !C.move) { for (const k of MOVE) key(k, 0); if (joy) { joy.role = 'none'; joy = null; } ui && (ui.joy.style.display = 'none'); }
       if (all) { for (const k in held) held[k] && key(k, 0); for (const s of tt.values()) { s.el && s.el.classList.remove('dn'); s.role = 'none'; } }
     }
@@ -96,8 +96,9 @@
 
     /* ── 버튼: [이름, 글자, 보이는 장면, 오른쪽, 아래(또는 t = 위), 크기] ── */
     const BTN = [
-      ['fire', '사격', 'fps', 22, 48, 82], ['aim', '조준', 'fps s4', 116, 20, 62], ['reload', '장전', 'fps', 120, 92, 58], ['crouch', '앉기', 'fps', 26, 142, 58],
-      ['plate', '방탄', 'fps', 100, 162, 58], ['use', '줍기', 'fps', 192, 58, 62], ['weapon', '무기', 'fps', 142, 't40', 56], ['scope', '스코프', 'fps', 206, 't40', 56],
+      ['fire', '사격', 'fps', 22, 48, 82], ['aim', '조준', 'fps s2 s4', 116, 20, 62], ['reload', '장전', 'fps s2 s4', 120, 92, 58], ['crouch', '앉기', 'fps', 26, 142, 58],
+      ['plate', '방탄', 'fps', 100, 162, 58], ['use', '줍기', 'fps s4', 192, 58, 62], ['weapon', '무기', 'fps s2 s4', 132, 't40', 52], ['scope', '스코프', 'fps', 188, 't40', 52],
+      ['mode', '모드', 'fps', 244, 't40', 52], // 사격 모드 (B) — 스토리 2·4 는 방아쇠가 늘 잠김(쏠 수 없음) → 사격 · 모드 버튼 없음
       ['act', '사용', 's2', 26, 60, 78], ['stab', '단검', 's3f', 22, 48, 82], ['toss', '투척', 's3f', 118, 24, 64], ['grab', '줍기', 's3 s3f', 122, 100, 60],
     ];
     const DOWN = { // 누를 때
@@ -105,10 +106,32 @@
       stab() { mev('mousedown', { button: 0, buttons: 1 }); mev('mouseup', { button: 0 }); },
       aim() { setAim(!tog.aim); }, crouch() { setCrouch(!tog.crouch); },
       reload() { tap('KeyR'); }, use() { tap('KeyE'); }, act() { tap('KeyE'); }, grab() { tap('KeyE'); }, plate() { tap('KeyF'); }, scope() { tap('KeyT'); }, toss() { tap('KeyQ'); },
-      weapon() { (G.canvas || document).dispatchEvent(new WheelEvent('wheel', { deltaY: 100, bubbles: true })); },
+      mode() { tap('KeyB'); },
+      weapon() { wpn.t0 = now(); wpn.on = 1; }, // 무기: 뗄 때 정함 — 짧게(.35초 안) = 다음 무기(휠) · 누르고 있기(.45초) = 4칸 고르기
+      ws1() { pickSlot(1); }, ws2() { pickSlot(2); }, ws3() { pickSlot(3); }, ws4() { pickSlot(4); },
       pause() { G.desktop && G.desktop.pause(); sync(); },
     };
-    const UP = { fire() { if (firing) { firing = 0; mev('mouseup', { button: 0 }); } } };
+    const UP = {
+      fire() { if (firing) { firing = 0; mev('mouseup', { button: 0 }); } },
+      weapon(s) {
+        wpn.on = 0;
+        if (wpn.open) { const c = s && s.over; if (c) pickSlot(+c.dataset.a.slice(2)); return; } // 고르기가 열린 채 손가락을 칸 위에서 떼면 그 칸 (아니면 열어 둠 → 칸을 톡)
+        if (now() - wpn.t0 < 350) (G.canvas || document).dispatchEvent(new WheelEvent('wheel', { deltaY: 100, bubbles: true }));
+      },
+    };
+    /* ── 무기 고르기 (4칸: 1 주무기 · 2 보조 · 3 주무기 B · 4 중화기) — 무기 버튼을 .45초 누르면 그 아래에 열림, 칸을 누르면 Digit1~4 ── */
+    const wpn = { on: 0, t0: 0, open: 0, t: 0 };
+    const armsW = () => G.arms && G.arms.bound && G.arms.inv ? G.arms : null;
+    function picker(v) {
+      if (!ui || !ui.wp) return; v = v ? 1 : 0;
+      if (v) { // 칸 이름은 짧은 이름(K2C1 · RPG-7 …, 한글 없음) — 빈 칸은 '빈 칸'
+        const A = armsW(); if (!A) v = 0;
+        else ui.ws.forEach((b, i) => { const k = A.inv.slot[i], w = k && A.W[k]; b.firstChild.textContent = String(i + 1); b.lastChild.textContent = w ? w.sh : '빈 칸'; b.classList.toggle('on', i === A.inv.cur); b.classList.toggle('no', !w); });
+      }
+      wpn.open = v; wpn.t = now(); ui.wp.classList.toggle('v', !!v); ui.weapon.classList.toggle('on', !!v);
+      if (!v) for (const b of ui.ws) b.classList.remove('dn');
+    }
+    function pickSlot(n) { const A = armsW(); if (A && A.inv.slot[n - 1]) tap('Digit' + n); picker(0); }
     const DRAG = { fire: 1, stab: 1 }; // 누른 손가락을 밀면 시점도 같이 움직임
 
     /* ── 터치 추적 (여러 손가락: 이동 + 시점 + 사격 동시) ── */
@@ -117,7 +140,8 @@
     function tstart(e) {
       lastT = now(); let used = 0;
       for (const t of e.changedTouches) {
-        const el = t.target, b = el.closest && el.closest('#tc [data-a]'), pk = el.closest && el.closest('#pr,#pa,#s2p,#s3p');
+        const el = t.target, b = el.closest && el.closest('#tc [data-a]'), pk = el.closest && el.closest('#pr,#pa,#s2p,#s3p,#whp');
+        if (wpn.open && !(b && /^(ws\d|weapon)$/.test(b.dataset.a))) picker(0); // 고르기 밖을 누르면 닫힘
         const s = { x: t.clientX, y: t.clientY, role: '' };
         if (b) { s.role = 'btn'; s.a = b.dataset.a; b.classList.add('dn'); s.el = b; DOWN[s.a] && DOWN[s.a](); }
         else if (el.id === 'sk') { s.role = 'skip'; s.el = el; el.classList.add('dn'); key('Space', 0); key('Space', 1); } // 한 번 = 건너뛰기, 누르고 있으면 빨리 감기
@@ -140,6 +164,9 @@
           if (len > R * 1.35) { const k = (len - R * 1.35) / len; s.x += dx * k; s.y += dy * k; dx = t.clientX - s.x; dy = t.clientY - s.y; len = R * 1.35; ui.joy.style.transform = `translate(${s.x}px,${s.y}px)`; } // 손가락을 따라옴
           const c = Math.min(1, R / (len || 1)); ui.knob.style.transform = `translate(${dx * c}px,${dy * c}px)`;
           ctx().move ? stick(dx, dy, len) : stick(0, 0, 0);
+        } else if (s.role === 'btn' && s.a === 'weapon' && wpn.open) { // 누른 채 칸 위로 밀기
+          const o = document.elementFromPoint(t.clientX, t.clientY), c = o && o.closest && o.closest('#tcw [data-a]');
+          if (s.over !== c) { s.over && s.over.classList.remove('dn'); s.over = c; c && c.classList.add('dn'); }
         } else if (s.role === 'look' || s.role === 'btn' && DRAG[s.a]) { s.d = (s.d || 0) + Math.hypot(t.clientX - s.x, t.clientY - s.y); if (ctx().look) look(t.clientX - s.x, t.clientY - s.y); s.x = t.clientX; s.y = t.clientY; }
         else if (s.pk) { s.d += Math.hypot(t.clientX - s.x, t.clientY - s.y); s.x = t.clientX; s.y = t.clientY; }
       }
@@ -153,7 +180,7 @@
       for (const t of e.changedTouches) {
         const s = tt.get(t.identifier); if (!s) continue; tt.delete(t.identifier); used = 1;
         if (s.role === 'joy') { joy = null; ui.joy.style.display = 'none'; for (const k of MOVE) key(k, 0); }
-        if (s.role === 'btn') { s.el.classList.remove('dn'); UP[s.a] && UP[s.a](); }
+        if (s.role === 'btn') { s.el.classList.remove('dn'); UP[s.a] && UP[s.a](s); }
         if (s.role === 'skip') { s.el.classList.remove('dn'); key('Space', 0); }
         if (s.pk && e.type === 'touchend' && s.d < 14 && now() - s.t0 < 600 && !ctx().menu) tap(s.pk);
       }
@@ -181,12 +208,12 @@
     let lastSet = null, lastMenu = 0, raiseT = 0, tried = 0, noRaise = 0;
     const KEYP = /\s*\[([A-Z])\]\s*/, strip = s => s.replace(KEYP, (m, k, i) => i && i + m.length < s.length ? ' ' : '');
     function prompts() {
-      for (const id of ['pr', 'pa', 's2p', 's3p']) {
+      for (const id of ['pr', 'pa', 's2p', 's3p', 'whp']) {
         const e = $(id), n = e && e.firstChild; if (!e) continue;
         const m = n && n.nodeType === 3 && n.nodeValue.match(KEYP);
         let k = '';
-        if (m) { k = 'Key' + m[1]; n.nodeValue = strip(n.nodeValue); e._tv = n.nodeValue; e._tk = k; }
-        else if (n && n.nodeType === 3 && n.nodeValue === e._tv) k = e._tk; // HUD 가 이번 프레임에 다시 쓰지 않았으면 이미 지운 글자 그대로 → 키 유지 (깜빡임 방지)
+        if (m) { k = 'Key' + m[1]; n.nodeValue = strip(n.nodeValue); e._tv = n.nodeValue; e._tx = G.tr ? G.tr(e._tv) : e._tv; e._tk = k; }
+        else if (n && n.nodeType === 3 && (n.nodeValue === e._tv || n.nodeValue === e._tx)) k = e._tk; // HUD 가 이번 프레임에 다시 쓰지 않았으면 이미 지운 글자 그대로 → 키 유지 (깜빡임 방지) · 영어: 사전이 바꾼 글자도 같은 것
         if ((e.dataset.k || '') !== k) k ? e.dataset.k = k : delete e.dataset.k;
       }
     }
@@ -214,8 +241,21 @@
       ui.pause.classList.toggle('v', !!(C.n && G.desktop && !C.menu));
       const pr = $('pr'), k = pr && C.set === 'fps' && $('fh').style.display !== 'none' ? pr.dataset.k : '', S = C.set === 'fps' ? G.fps.S : null;
       const cls = (a, c, v) => ui[a].classList.toggle(c, !!v);
-      if (C.set === 'fps') { cls('use', 'v', k === 'KeyE'); cls('reload', 'hl', k === 'KeyR'); cls('plate', 'hl', S.plate <= 10 && S.spare > 0); cls('scope', 'on', S.scope && G.people && G.people.fp.gun !== 'pistol'); } // 권총에는 스코프가 없다 → 불 끔
-      if (C.set === 's2') cls('act', 'v', shown($('s2p')));
+      const A = armsW(), W = A && A.cur && A.W[A.cur], wp = $('whp'), wk = shown(wp) && wp.dataset.k || '';
+      if (C.set === 'fps') {
+        cls('use', 'v', k === 'KeyE'); cls('reload', 'hl', k === 'KeyR'); cls('plate', 'hl', S.plate <= 10 && S.spare > 0);
+        cls('scope', 'on', A ? A.view.scope : S.scope); cls('scope', 'dim', W && W.sc !== 1); // T 스코프: 달 수 있는 총(K2 계열 · M16 · AKM)만 밝게 · 단 것은 켜짐
+        cls('mode', 'dim', W && W.md.length < 2); cls('fire', 'lk', A && A.view.lock); // 방아쇠 잠김(죽음 · 방탄판 교체) → 회색
+      }
+      if (C.set === 's2' || C.set === 's4') { // 스토리 2·4: 줍기 · 들기 · 바꾸기 · 조준만 (방아쇠는 늘 잠김 → 사격 버튼 없음). 무기 HUD(#wh)가 보일 때(자유 조작)만
+        const wh = $('wh'), fr = !!(A && W && wh && wh.style.display === 'block');
+        cls('weapon', 'v', fr); cls('reload', 'v', fr); cls('reload', 'hl', wk === 'KeyR');
+        if (C.set === 's2') cls('aim', 'v', fr); // 스토리 4 의 조준은 원래 있던 버튼 (늘 보임)
+        if (C.set === 's4') cls('use', 'v', wk === 'KeyE');
+        if (!fr && wpn.open) picker(0);
+      } else if (C.set !== 'fps' && wpn.open) picker(0);
+      if (wpn.open && now() - wpn.t > 4000 && !wpn.on) picker(0);
+      if (C.set === 's2') cls('act', 'v', shown($('s2p')) || wk === 'KeyE'); // E 버튼은 하나: 이야기의 E(문 · 끌기) 또는 바닥 총 줍기
       if (C.n === 3 && C.set) cls('grab', 'v', shown($('s3p')));
       cls('aim', 'on', tog.aim); cls('crouch', 'on', tog.crouch);
     }
@@ -267,7 +307,15 @@ html.touch #dk .m{margin-top:.5em}html.touch #dk .m>div{display:flex;align-items
 html.touch #dk .g{gap:.45em 1.4em;margin-top:.6em}html.touch #dk .g button{min-width:52px;min-height:40px;padding:.5em 1em}html.touch #dk input[type=range]{width:clamp(150px,24vw,300px);height:38px}
 html.touch #dk .bk{position:absolute;top:calc(12px + var(--st));right:calc(6vw + var(--sr));min-height:46px;margin:0;padding:.6em 1.8em;font-size:1.05em}html.touch #dk .s h2{min-height:48px}/* 설정 제목 줄 = 오른쪽 위 돌아가기 버튼 높이 (그래픽 10단계 버튼 줄이 그 아래에서 시작) */
 @media(max-height:520px){html.touch #dk .tb{display:none}html.touch #ov .ch>div{margin:.15em 0;padding:.3em 0 .3em .9em}}
-@media(max-height:380px){html.touch #ov{padding-top:calc(30px + var(--st))}html.touch #ov .ch p{font-size:12px;line-height:1.3}html.touch #ov .ch p+p{font-size:10px}html.touch #ov .tk{display:none}html.touch #ov h1{font-size:clamp(28px,4.6vw,40px)}}
+@media(max-height:380px){html.touch #am b,html.touch #wh b{font-size:24px}html.touch #am small,html.touch #wh small{font-size:10px;line-height:1.25}html.touch #am u,html.touch #wh u{line-height:1.15}html.touch #am em,html.touch #wh em{font-size:11px}html.touch #ov{padding-top:calc(30px + var(--st))}html.touch #ov .ch p{font-size:12px;line-height:1.3}html.touch #ov .ch p+p{font-size:10px}html.touch #ov .tk{display:none}html.touch #ov h1{font-size:clamp(28px,4.6vw,40px)}}
+#tc .b.dim{opacity:.42}#tc .b.lk,#tc .b.lk.dn{background:#4a4f5699;border-color:#9aa3ad;color:#c4cbd3;transform:none}
+#tcw{position:absolute;right:calc(132px + var(--sr));top:calc(96px + var(--st));display:none;gap:6px;pointer-events:none}#tcw.v{display:flex}
+#tcw .b{position:relative;display:grid;place-content:center;justify-items:center;width:64px;height:42px;border-radius:11px;line-height:1.1;font-size:12px}#tcw .b b{font-size:16px}#tcw .b span{font-size:11px;font-weight:600;letter-spacing:0;white-space:nowrap}
+#tcw .b.on{background:#fe9e;color:#0b0f14;border-color:#fe9}#tcw .b.no{opacity:.45}
+html.touch #wh{right:calc(12px + var(--sr));top:calc(40px + var(--st));bottom:auto;font-size:15px}html.touch #wh small,html.touch #wh u,html.touch #am u{font-size:11px}
+html.touch #am,html.touch #wh{max-width:114px}html.touch #wh u,html.touch #am u{flex-wrap:wrap;gap:1px 6px}
+html.touch #whp{top:66%;padding:.5em 1.1em;border-radius:9px;font-size:clamp(15px,4vh,20px)}html.touch #whp[data-k]{pointer-events:auto;touch-action:none;background:#000b;border:1px solid #fe9a}
+#tc[data-s=s4] .b[data-a=use]{right:calc(120px + var(--sr))!important;bottom:calc(162px + var(--sb))!important}/* 스토리 4 는 대사창이 떠 있는 채 움직임 → 줍기를 장전 위로 */
 #tc[data-s=s4] .b[data-a=aim]{right:calc(26px + var(--sr))!important;bottom:calc(66px + var(--sb))!important;width:68px!important;height:68px!important}
 html.touch #dk{background:linear-gradient(90deg,#000f,#000f 50%,#000e)}
 #rot{position:absolute;inset:0;z-index:60;display:none;place-content:center;justify-items:center;gap:12px;padding:24px calc(24px + var(--sr)) calc(24px + var(--sb)) calc(24px + var(--sl));background:#05080c;color:#dfe8f2;text-align:center;word-break:keep-all;pointer-events:auto;touch-action:none;font:700 clamp(18px,5.4vw,26px)/1.35 system-ui,'Apple SD Gothic Neo','Malgun Gothic',sans-serif}html.rot #rot{display:grid}
@@ -280,6 +328,7 @@ html.touch #dk{background:linear-gradient(90deg,#000f,#000f 50%,#000e)}
           ui.b.push(ui[a] = mk(a, txt, s, `right:calc(${r}px + var(--sr));${top ? `top:calc(${y.slice(1)}px + var(--st))` : `bottom:calc(${y}px + var(--sb))`};width:${sz}px;height:${sz}px`));
         }
         ui.pause = mk('pause', '', '', '', 'tcp');
+        ui.wp = G.el('div', { id: 'tcw' }, root); ui.ws = [1, 2, 3, 4].map(i => { const b = G.el('div', { className: 'b', innerHTML: '<b></b><span></span>' }, ui.wp); b.dataset.a = 'ws' + i; b.dataset.s = ''; return b; });
         // "가로로 돌려 주세요" (영어는 mod_enui 사전)
         const tab = Math.min(screen.width || 0, screen.height || 0) >= 600; // iPad · 태블릿: "휴대폰" 대신 "태블릿"
         if (rotOK) G.el('div', { id: 'rot', innerHTML: `<svg viewBox="0 0 96 96" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><g class=ph><rect x="32" y="14" width="32" height="60" rx="6"/><path d="M44 66h8"/></g><path d="M74 26a32 32 0 0 1 8 22" stroke-width="3.5"/><path d="M82 49l-6-5m6 5l4-7" stroke-width="3.5"/></svg><b>${tab ? '태블릿을' : '휴대폰을'} 가로로 돌려 주세요</b><small>화면이 돌아가지 않으면 세로 화면 고정(자동 회전) 설정을 확인해 주세요</small>` });
@@ -310,6 +359,7 @@ html.touch #dk{background:linear-gradient(90deg,#000f,#000f 50%,#000e)}
         }
       },
       prepare() {
+        if (wpn.on && !wpn.open && now() - wpn.t0 >= 450) picker(1);
         if (taps.length) { const f = G.frame, t = now(); taps = taps.filter(p => f >= p[1] && t >= p[2] ? (key(p[0], 0), 0) : 1); }
         sync();
       }

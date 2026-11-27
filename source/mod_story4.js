@@ -46,6 +46,7 @@
   const yawTo=(a,b)=>Math.atan2(b[0] - a[0],b[2] - a[2]);
   const wrap=a=>Math.atan2(sin(a),cos(a));
   const mix=(a,b,k)=>[a[0] + (b[0] - a[0])*k,a[1] + (b[1] - a[1])*k,a[2] + (b[2] - a[2])*k];
+  const AR=()=>G.arms&&G.arms.bind?G.arms:null;// 무기 (G.arms §3.2): 대치 장면이라 방아쇠는 언제나 안전 (Q2) · 줍기 · 교체 · 조준만
 
   /* ── 폐허 계약 (없으면 대체값) ── */
   const FK={start:[0,0,0,0],squad:[[-1.7,0,.7,0],[1.6,0,.5,0],[-3.1,0,-.5,.2],[3,0,-.4,-.2],[.3,0,-1.7,0]],lz:[0,0,26],meet:[0,0,6.5],
@@ -83,6 +84,39 @@
   function koWalk(P){// 손을 보인 채 빠르게 다가오다가 만남 지점 앞에서 걸음을 늦춘다
     const k=K();S.tl.ground=S.t;P.look=at(k.start,1.6);
     walk(P,[MEET()],1.65,Q=>{S.arr=1;S.tl.arrive=S.t;walk(Q,[at(k.meet)],1.3,R=>{S.tl.stop=S.t;R.pose='handsup';R.yaw=yawTo(R.p,k.start);});});P.free=1;
+ }
+
+  /* ── 무기 어댑터 · 바닥 총 (§4.5: 엄폐 구역 4.5 m 안, 분대 쪽) ── */
+  const DROP4={k2:12,k2c1:3,k2c:12,k2a:12,m16:8,aug:8,akm:6,k7:10,k14:8,rpg7:4,m134:3};
+  const free=()=>!!(S.on&&S.cm==='fp'&&S.bk<.5&&!S.cut&&S.beat!=='end'&&G.people.fp.on);
+  function adapter(){
+    return{story:4,hits:'safe',hud:'lite',onHit:null,onBlast:null,hurtSelf:null,
+      eye:()=>[me.p[0],me.p[1] + 1.6,me.p[2]],fwd:()=>[sin(me.yaw)*cos(me.pit),sin(me.pit),cos(me.yaw)*cos(me.pit)],
+      solid:(o,d,m)=>{const t=rc('ray',o,d,m);return Number.isFinite(t)?t:m;},
+      ground:(x,z)=>gnd(x,z),collide:(p,r)=>col(p,r),
+      me:()=>({p:me.p,yaw:me.yaw,pit:me.pit,mv:S.v||0,cr:0,run:S.run||0,air:0}),
+      recoil:(dp,dy)=>{me.pit=cl(me.pit + dp,-1.3,1.3);me.yaw+=dy;},
+      allow:()=>{const f=free()?1:0;return{free:f,fire:0,ads:f,sw:f,use:f,rl:f};},// 쏘기는 언제나 막힘 → 딸깍 + '지금은 쏠 수 없다'
+      busyE:()=>false,people:()=>PP.list.map(P=>P.p.slice())};
+ }
+  function drops4(){
+    const a=AR();if(!a||!a.drops) return;
+    const k=K(),u=U(),o=me.o,c=[],[,d1]=door(),mt=MEET();
+    for(let i=0;i<90;i++){const g=R()*2*PI,r=1.4 + R()*2.6,x=o[0] + sin(g)*r,z=o[2] + cos(g)*r;if((x - o[0])*u[0] + (z - o[2])*u[2]>.6) continue;c.push([x,gnd(x,z),z]);}// 엄폐선 앞으로는 놓지 않음
+    const away=[...W.sq.map(P=>[P.p[0],0,P.p[2],1.1]),[k.start[0],0,k.start[2],.9]];
+    const path=[[d1,mt,1.5],[mt,at(k.meet),1.5],...W.crew.map(C=>[d1,C.home])];
+    a.drops.scatter(c,3,DROP4,{cnt:{},hs:{n:0,cap:1},caps:{k14:1},away,path,gap:1.6});
+ }
+  function armsOn(){// 시작 · 다시 하기 · 장면 점프: K2C1 30+120 · 새 바닥 배치 (이월 없음 Q6)
+    const a=AR();if(!a) return;
+    try {a.bind(adapter());a.kit(4);drops4();G.params.get('drops')==='all'&&a.drops.all();} catch (e){G.err('[story4] arms ' + (e.stack||e));}
+ }
+  function armsStep(dt){// 자유 조작이 아니면 무기 입력은 모두 무시
+    const a=AR();if(!a||!a.bound) return;
+    const f=free();
+    if(!f||S.bot){a.bot=true;if(!f) for(const q in a.inp) a.inp[q]=0;} else a.bot=false;
+    a.step(dt);
+    for(const it of a.drops.list) it.prop.vis=!S.cut;// 집무실 컷에는 폐허의 바닥 총을 그리지 않는다
  }
 
   /* ── 인물 ── */
@@ -194,14 +228,15 @@
     const k=G.keys;let f=(k.KeyW||k.ArrowUp?1:0) - (k.KeyS||k.ArrowDown?1:0),s=(k.KeyD||k.ArrowRight?1:0) - (k.KeyA||k.ArrowLeft?1:0);
     if(S.bot){const u=S.t % 12;f=u<1.2?.6:u>6&&u<7.2?-.6:0;}// 봇: 한 걸음 나갔다 돌아옴
     if(f||s) S.wk=1.5;
-    const n=H(f,s)||1,sp=(k.ShiftLeft?2.6:1.5)*(1 - .4*me.aim)/n,vx=(sin(me.yaw)*f - cos(me.yaw)*s)*sp,vz=(cos(me.yaw)*f + sin(me.yaw)*s)*sp;
+    const a=AR(),V=a&&a.bound?a.view:null,run=k.ShiftLeft&&!S.bot&&!(V&&(V.nosprint||a.inp.ads))&&f>0;// 총마다 속도 배율 (R10) · 조준 중 Shift 는 숨 참기
+    const n=H(f,s)||1,sp=(run?2.6:1.5)*(V?V.mv*(1 - .4*V.ads):1 - .4*me.aim)/n,vx=(sin(me.yaw)*f - cos(me.yaw)*s)*sp,vz=(cos(me.yaw)*f + sin(me.yaw)*s)*sp;
     const p0=me.p.slice(),m=Math.ceil(dt/.034),h=dt/m;
     for(let i=0;i<m;i++){
       let q=col([me.p[0] + vx*h,me.p[1],me.p[2] + vz*h],.3);const d=dxz(q,me.o);
       if(d>4.5) q=col([me.o[0] + (q[0] - me.o[0])*4.5/d,q[1],me.o[2] + (q[2] - me.o[2])*4.5/d],.3);// 엄폐 구역 밖으로는 나가지 않음
       me.p=q;
    }
-    const v=dt>0?dxz(me.p,p0)/dt:0,b0=Math.floor(me.bob/PI);
+    const v=dt>0?dxz(me.p,p0)/dt:0,b0=Math.floor(me.bob/PI);S.v=v;S.run=run?1:0;
     me.bob+=v*dt*4.2;me.bA+=((v>.3?1:0) - me.bA)*mn(1,dt*7);
     if(Math.floor(me.bob/PI)!==b0&&me.bA>.3) G.sfx.play('click',{gain:.5,rate:.16 + R()*.05});// 발소리 (자갈)
  }
@@ -232,12 +267,13 @@
       if(A){const[ay,ap]=yp(ey,chest(A)),w=A===sp?.5:.32;ty+=cl(wrap(ay - ty)*w,-.5,.5);tp=mn(tp - .04,ap + .26);if(A===sp) r=mn(r,1.2);}
       me.yaw+=wrap(ty - me.yaw)*mn(1,dt*r);me.pit+=(cl(tp,-1,1) - me.pit)*mn(1,dt*r);
    }
-    S.mv-=dt;S.wk-=dt;me.aim+=(me.aimT - me.aim)*mn(1,dt*5);
+    const a=AR(),V=a&&a.bound?a.view:null;// 조준 · 시야 · 반동은 G.arms (R10) — 오른쪽 버튼은 mod_arms 가 읽는다
+    S.mv-=dt;S.wk-=dt;if(V) me.aim=V.ads;else me.aim+=(me.aimT - me.aim)*mn(1,dt*5);
     const hv=RS().heli>.5&&RS().heli<1?(1 - ab(RS().heli - .9)*4)*.004:0,sh=mx(0,hv)*sin(t*37);// 하강풍 진동
-    const yw=me.yaw + sh*.5,pt=me.pit + sh;
+    const yw=me.yaw + sh*.5,pt=me.pit + sh + (V?V.kick:0);
     T[0]=ey[0] + sin(yw)*cos(pt);T[1]=ey[1] + sin(pt);T[2]=ey[2] + cos(yw)*cos(pt);
-    c.pos=ey;c.target=T.slice();c.up=[0,1,0];c.near=.08;c.fov=1.08 - .3*me.aim;
-    const F=G.people.fp;F.kind='rok';F.gun='rifle';F.aim=me.aim;F.kick=0;F.reload=0;F.bob=me.bob;
+    c.pos=ey;c.target=T.slice();c.up=[0,1,0];c.near=.08;c.fov=V?1.08*V.fovK:1.08 - .3*me.aim;
+    const F=G.people.fp;F.kind='rok';F.bob=me.bob;if(!V){F.gun='rifle';F.aim=me.aim;F.kick=0;F.reload=0;}
     me.sw[0]*=.9;me.sw[1]*=.9;F.sway=me.sw;
  }
   function npc(dt){// 인물 이동 · 조준 · 말하기 · 시선
@@ -324,10 +360,11 @@
   function go(b){// 테스트 훅 · 재시작: 해당 장면 상태로 정확히 점프
     let n=BEATS.indexOf(b);if(n<0) n=0,b='intro';
     init4();if(S.cut) cut(0);
-    if(b==='end'){stage(4);S.cm='fp';S.beat='end';end();return;}
+    if(b==='end'){stage(4);S.cm='fp';S.beat='end';armsOn();end();return;}
     stage(n);S.beat=b;S.i=idx(b);S.nx=0;S.cm=n?'fp':'est';S.bk=S.bkT=n?0:1;S.ct=0;
     if(n) stageFp(),S.fixF=0;
     if(n===1) S.hT=.3;
+    armsOn();
  }
   function init4(){// 공통 시작 상태
     const ov=$('ov');ov&&(ov.style.display='none');
@@ -347,13 +384,15 @@
     S.on=0;showDl(0);wait.length=0;G.people.fp.on=0;G.people.fp.kind='rok';G.people.fp.aim=0;
     G.ruins&&(G.ruins.on=false);ui.bk&&(ui.bk.style.opacity=0);ui.t&&(ui.t.style.opacity=0);ui.h&&(ui.h.style.opacity=0);
     for(const l of ['wind','engine','sea','missile']) G.sfx.loop(l,0);
+    const a=AR();if(a&&a.bound){a.bot=false;a.unbind();}
  }
   function update(dt){
     if(!S.on) return;
     try {
       const sd=dt*((G.keys.Space||G.keys.Tab)&&S.beat!=='end'?4:1);// Space: 빨리 감기
       run(sd);npc(sd);
-      if(S.cm==='fp'&&S.bk<.6) stepMe(dt);
+      if(S.cm==='fp'&&S.bk<.6) stepMe(dt);else S.v=S.run=0;
+      armsStep(dt);
       camera(dt);dress(sd);
       ui.sk&&(ui.sk.style.display=S.beat!=='end'?'block':'none');
    } catch (e){G.err('[story4] ' + (e.stack||e));}
@@ -371,12 +410,11 @@
       ui.h=G.el('div',{id:'s4h',textContent:'WASD 이동 · 마우스 둘러보기 · 오른쪽 클릭 조준 · Space 건너뛰기'});
       if(G.params.has('nohud')) ui.h.style.visibility='hidden';
       G.canvas.addEventListener('click',()=>{S.on&&S.beat!=='end'&&G.canvas.requestPointerLock&&G.canvas.requestPointerLock();});
-      addEventListener('mousedown',e=>{if(S.on&&e.button===2) me.aimT=1;});
-      addEventListener('mouseup',e=>{if(e.button===2) me.aimT=0;});
+      // 오른쪽 버튼 조준은 G.arms 가 처리한다 (예전 me.aimT 리스너 제거 — 조준 허용은 adapter.allow)
       addEventListener('contextmenu',e=>S.on&&e.preventDefault());
       addEventListener('mousemove',e=>{
         if(!S.on||S.cm!=='fp'||!(document.pointerLockElement===G.canvas||e.buttons)) return;
-        const k=.0022*(1 - .5*me.aim);me.yaw-=e.movementX*k;me.pit=cl(me.pit - e.movementY*k,-1.3,1.3);S.mv=2.5;
+        const a=AR(),k=.0022*(a&&a.bound?a.view.sens:1 - .5*me.aim);me.yaw-=e.movementX*k;me.pit=cl(me.pit - e.movementY*k,-1.3,1.3);S.mv=2.5;
         me.sw[0]=cl(me.sw[0] - e.movementX*.002,-.3,.3);me.sw[1]=cl(me.sw[1] + e.movementY*.002,-.3,.3);
      });
       const sk=$('sk');sk&&sk.addEventListener('click',()=>{if(S.on){S.nx=mn(S.nx,S.t);S.lineEnd=S.t;}});
