@@ -160,8 +160,9 @@
       if (p) out = bq(LPF, 16000 / (1 + d / 500), .5, to(new StereoPannerNode(c, { pan: G.clamp((dz * Lf[0] - dx * Lf[2]) / (d + 30), -1, 1) * .85 }), v));
       name == 'ping' && v.connect(echo);
       for (const q of f) part(q, now + .01 + Math.min(d / 340, 2.5), out); // 음속 지연
-      V.push({ o: v, g, e: end + .05, s: src });
+      const w = { o: v, g, e: end + .05, s: src }; V.push(w); return w; // 돌려준 보이스는 stop() 으로 끊을 수 있음 (긴 재장전 소리 등)
     },
+    stop(w, k = .03) { if (w && V.includes(w) && w.g < 9) { tgt(w.o.gain, 0, k); kill(w, c.currentTime + Math.max(.08, 6 * k)); } }, // 원샷 보이스 끊기 (짧게 감쇠 → 딸깍 없음)
     loop(name, on, o) {
       let l = LP[name], f = LOOP[name];
       if (on && f) {

@@ -50,13 +50,14 @@
   const ovOf=id=>scoped(id)?'scope':W[id].ov;
   const say=(t,d=1.5)=>{st.msg=t;st.msgT=T+d;};
   const note=t=>{if(T>st.noteT-.5){st.note=t;st.noteT=T+1.5;}}; // 1.5초 · 연타 제한
-  const snd=(n,o)=>{n&&G.sfx&&G.sfx.play(n,o||{});};
+  const snd=(n,o)=>n&&G.sfx?G.sfx.play(n,o||{}):null;
+  const rlCut=()=>{st.rv&&G.sfx&&G.sfx.stop&&G.sfx.stop(st.rv);st.rv=null;}; // 재장전이 끊기면 그 소리도 (탄띠 5초 · 로켓 3초)
 
   /* ── 인벤토리 ── */
   function reset(){
     inv.slot=[null,null,null,null];inv.cur=0;inv.mag={};inv.pool={};inv.mode={};inv.scope={};inv.last={P:0,S:1,H:3};
     Object.assign(st,{cd:0,rl:0,sw:0,bn:0,trig:0,cyc:0,spin:0,acc:0,ft:0,spr:0,kick:0,ads:0,so:0,shake:0,lf:'',lfT:-9,br:2,brk:0,note:'',noteT:0,msg:'',msgT:0});
-    rocketOff();sndOff();
+    rocketOff();sndOff();rlCut();
   }
   function canTake(id){ // 'own' 탄약만 · 'free' 빈 칸 · 'swap' 교체
     if(inv.slot.includes(id))return'own';
@@ -70,7 +71,7 @@
     if(fr==null){ // 칸이 차 있음: 손에 든 같은 분류 총, 아니면 마지막에 쓴 총과 교체 → 발밑에 떨어뜨림 (장전 수 유지)
       s=ss.includes(inv.cur)?inv.cur:ss.includes(inv.last[w.slot])?inv.last[w.slot]:ss[0];
       dropGun(inv.slot[s]);r='swap';
-      if(s===inv.cur){st.sw=st.swT=.4;st.rl=0;st.cd=.4;st.spin=0;st.bn=0;}
+      if(s===inv.cur){rlCut();st.sw=st.swT=.4;st.rl=0;st.cd=.4;st.spin=0;st.bn=0;}
     }
     inv.slot[s]=id;inv.mag[id]=loaded;inv.mode[id]=0;inv.scope[id]=0;addPool(w.cal,res);
     if(r==='free')say(`${w.n} 획득 — [${s+1}] 으로 교체`,2.5);
@@ -101,17 +102,17 @@
   function sw(s){ // 1~4 칸 교체 (빈 칸 무시) · 중화기는 .9초
     const id=inv.slot[s];if(!id||s===inv.cur)return;
     const t=HEAVY(id)||HEAVY(cur())?.9:.45;
-    inv.cur=s;inv.last[W[id].slot]=s;Object.assign(st,{rl:0,cd:t,sw:t,swT:t,bn:0,cyc:0,spin:0,ft:0});snd('swap',{gain:.6});
+    rlCut();inv.cur=s;inv.last[W[id].slot]=s;Object.assign(st,{rl:0,cd:t,sw:t,swT:t,bn:0,cyc:0,spin:0,ft:0});snd('swap',{gain:.6});
   }
   function cycle(dir){const n=inv.slot.length;for(let k=1;k<n;k++){const s=(inv.cur+dir*k+n*4)%n;if(inv.slot[s])return sw(s);}}
   function reload(){
     const id=cur();if(!id)return;const w=W[id],m=inv.mag[id]|0,p=inv.pool[w.cal]|0;
     if(st.rl>0||st.sw>0||p<=0||m>=w.mag+(w.ch&&m>0?1:0))return;
-    st.rc=w.ch&&m>0?1:0;st.rl=st.rlT=w.rl;st.bn=0;st.cyc=0;snd(id==='m134'?'rlb':id==='rpg7'?'rlr':'reload'); // 탄창에 남아 있으면 약실 +1 · 탄띠 6초 · 로켓 4초
+    st.rc=w.ch&&m>0?1:0;st.rl=st.rlT=w.rl;st.bn=0;st.cyc=0;st.rv=snd(id==='m134'?'rlb':id==='rpg7'?'rlr':'reload'); // 탄창에 남아 있으면 약실 +1 · 탄띠 6초 · 로켓 4초
   }
   function reloadDone(){
     const id=cur(),w=W[id],m=inv.mag[id]|0,n=min(w.mag+(st.rc?1:0)-m,inv.pool[w.cal]|0);
-    inv.mag[id]=m+max(0,n);inv.pool[w.cal]-=max(0,n);st.rl=0;
+    inv.mag[id]=m+max(0,n);inv.pool[w.cal]-=max(0,n);st.rl=0;st.rv=null;
   }
 
   /* ── 사격 ── */
@@ -456,10 +457,10 @@
     me:()=>({p:G.cam.pos,yaw:0,pit:0,mv:0,cr:0,run:0,air:0}),hits:'safe',onHit:null,onBlast:null,hurtSelf:null,allow:()=>ON,busyE:()=>false,people:()=>[],hud:'lite',ray:null,frame:null};
   function bind(o){clear();rocketOff();A=Object.assign({},DEF,o);pres=null; // 새 시작 = 새 바닥 배치
    st.k0={};for(const k in D)D[k]=typeof D[k]==='object'?{}:0;ui.wa&&(ui.wa.style.display='block');}
-  function unbind(){clear();rocketOff();sndOff();A=null;pres=null;st.ads=st.so=0;Object.assign(view,{fovK:1,zoom:1,ov:'',ovA:0,kick:0,hide:0,sens:1,mv:1,ads:0,lock:0,scope:0});
+  function unbind(){clear();rocketOff();sndOff();rlCut();A=null;pres=null;st.ads=st.so=0;Object.assign(view,{fovK:1,zoom:1,ov:'',ovA:0,kick:0,hide:0,sens:1,mv:1,ads:0,lock:0,scope:0});
     const fp=PP().fp;if(fp){fp.hide=fp.scope=0;fp.cyc=fp.spin=fp.bip=fp.dot=fp.fire=0;fp.loaded=1;}ui.wa&&(ui.wa.style.display='none');}
 
-  const api=G.arms={W,inv,inp,view,D,drops,CAP,MODE,ID,kit,bind,unbind,step,take,canTake,addPool,give,spread,cancel(){st.rl=0;st.bn=0;},
+  const api=G.arms={W,inv,inp,view,D,drops,CAP,MODE,ID,kit,bind,unbind,step,take,canTake,addPool,give,spread,cancel(){st.rl>0&&rlCut();st.rl=0;st.bn=0;},
     present(id){pres=id&&W[id]?id:null;if(pres){st.ads=st.so=0;}},
     hud:hudHTML,get prompt(){return A?promptText():'';},get quiet(){return!!(st.lf&&W[st.lf].quiet&&T-st.lfT<2);},
     get cur(){return cur();},get mag(){const id=cur();return id?inv.mag[id]|0:0;},get pool(){const id=cur();return id?inv.pool[W[id].cal]|0:0;},

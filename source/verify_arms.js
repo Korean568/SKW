@@ -11,7 +11,7 @@ const AUD = require('fs').readFileSync(__dirname + '/mod_audio.js', 'utf8'); // 
 const SNDN = new Set([...AUD.slice(AUD.indexOf('const SND'), AUD.indexOf('const LOOP')).matchAll(/^\s+(\w+):/gm)].map(m => m[1]).concat(['k2', 'k2a', 'k2c1', 'k2c', 'm16', 'aug', 'akm', 'k7', 'rpg7', 'k5']));
 const LOOPN = new Set([...AUD.slice(AUD.indexOf('const LOOP'), AUD.indexOf('const belt')).matchAll(/^\s+(\w+)\(d\)/gm)].map(m => m[1]));
 // 소리 기록: 프레임 번호와 함께 (L:이름:켜짐 은 지속음)
-const SLOG = `const LOG=[];let FR=0;{const p0=G.sfx.play,l0=G.sfx.loop;G.sfx.play=function(n){LOG.push([FR,n]);return p0.apply(this,arguments)};G.sfx.loop=function(n,on){LOG.push([FR,'L:'+n+':'+(on?1:0)]);return l0.apply(this,arguments)};}
+const SLOG = `const LOG=[];let FR=0;{const p0=G.sfx.play,l0=G.sfx.loop;G.sfx.play=function(n){LOG.push([FR,n]);return p0.apply(this,arguments)};G.sfx.loop=function(n,on){LOG.push([FR,'L:'+n+':'+(on?1:0)]);return l0.apply(this,arguments)};const s0=G.sfx.stop;G.sfx.stop=function(){LOG.push([FR,'X:stop']);return s0.apply(this,arguments)};}
   const ARMS=new Set(['dry','click','mode','swap','pick','reload','rlb','rlr','bolt','rpgl','boom','boomf','ring','explosion']); // 무기 조작 소리 (총성 · NPC · 피격 제외)`;
 (async () => {
   const PORT = await require('./srv.js')();
@@ -19,7 +19,7 @@ const SLOG = `const LOG=[];let FR=0;{const p0=G.sfx.play,l0=G.sfx.loop;G.sfx.pla
   const b = await chromium.launch({ args: FLAGS });
   const open = async q => { const p = await b.newPage({ viewport: { width: 960, height: 540 } }), logs = [];
     p.on('console', m => (m.type() === 'error' || m.type() === 'warning') && !/CONTEXT_LOST|404|Failed to load/.test(m.text()) && logs.push(m.text().slice(0, 200))); p.on('pageerror', e => logs.push('pageerror ' + e.message));
-    await p.goto(`http://localhost:${PORT}/source/dev.html?step&q=LOW&lang=ko&mods=${MODS}${q}`); await p.waitForFunction(() => window.G && (G.ready || G.dead), null, { timeout: 180000 }); return [p, logs]; };
+    await p.goto(`http://localhost:${PORT}/source/dev.html?step${/&q=/.test(q) ? '' : '&q=LOW'}&lang=ko&mods=${MODS}${q}`); await p.waitForFunction(() => window.G && (G.ready || G.dead), null, { timeout: 180000 }); return [p, logs]; };
   const want = k => only.length ? only.includes(k) : !['cost', 'prep'].includes(k);
 
   // 1) 봇 승리 — 장비별 (무기별 처치 수 기록, M134 는 혼자 이겨도 됨: 기록만)
@@ -71,7 +71,9 @@ const SLOG = `const LOG=[];let FR=0;{const p0=G.sfx.play,l0=G.sfx.loop;G.sfx.pla
       const rps=(A.D.shots-s0)/(3-first);G.sfx.play=pl0;const Lf=LOG.length;run(1.5,()=>hold());const lf=LOG.slice(Lf).find(x=>x[1].startsWith('L:m134f:0'));
       out.m134={spinUp:A.D.spinUp,first,rps:+rps.toFixed(1),maxRays:A.D.maxRays,spinAfter:+A.st.spin.toFixed(2),oneShotsPerSec:pk,fOff:!!lf,ok:A.D.spinUp>.45&&A.D.spinUp<.6&&rps>40&&pk<=25&&A.st.spin<.01&&!!lf};
       // 탄띠 교체 소리 'rlb'
-      A.inv.mag.m134=0;L0=LOG.length;run(.3,i=>{hold();I.rl=i<2?1:0;});out.rlb={snd:mine(L0),ok:mine(L0).includes('rlb')};run(6.2,()=>hold());
+      A.inv.mag.m134=0;L0=LOG.length;run(.3,i=>{hold();I.rl=i<2?1:0;});out.rlb={snd:mine(L0),ok:mine(L0).includes('rlb')};
+      // 재장전 중 무기 교체 → 재장전 취소 · 그 소리도 끊김 (G.sfx.stop)
+      run(.5,()=>hold());L0=LOG.length;run(.2,i=>{hold();I.slot=i===0?1:0;});out.rlCut={rl:A.st.rl,cur:A.cur,mag:A.inv.mag.m134,cut:LOG.slice(L0).some(x=>x[1]==='X:stop'),ok:A.st.rl===0&&A.cur===A.inv.slot[0]&&A.inv.mag.m134===0&&LOG.slice(L0).some(x=>x[1]==='X:stop')};
       // RPG: 2 m 앞 벽 → 신관 미작동 · 뒤에 벽 → 후폭풍
       A.give('rpg7');run(1.2,()=>hold());
       const z=-1;pl.p=C.w([-.35,0,z]);const tgt=C.w([1.5,1.2,z]),e=[pl.p[0],pl.p[1]+1.6,pl.p[2]];pl.yaw=Math.atan2(tgt[0]-e[0],tgt[2]-e[2]);pl.pit=0;
@@ -107,7 +109,7 @@ const SLOG = `const LOG=[];let FR=0;{const p0=G.sfx.play,l0=G.sfx.loop;G.sfx.pla
       out.stop={spun,off,last:{m134s:last.m134s,m134f:last.m134f,rocket:last.rocket},bound:A.bound,ok:spun===1&&last.m134s==='0'&&last.m134f==='0'&&last.rocket==='0'&&!A.bound&&off.includes('L:m134f:0')};
       return {out,names:[...new Set(LOG.map(x=>x[1]))],errs:G.errors};})()`);
     for (const k in r.out) say(r.out[k].ok, 'rule ' + k + ': ' + JSON.stringify(r.out[k]));
-    const bad1 = r.names.filter(n => n.startsWith('L:') ? !LOOPN.has(n.split(':')[1]) : !SNDN.has(n));
+    const bad1 = r.names.filter(n => n.startsWith('X:') ? 0 : n.startsWith('L:') ? !LOOPN.has(n.split(':')[1]) : !SNDN.has(n));
     say(!bad1.length, 'sound names exist in mod_audio: ' + JSON.stringify(r.names) + (bad1.length ? ' MISSING ' + JSON.stringify(bad1) : ''));
     say(!r.errs.length && !logs.length, 'rules errors: ' + JSON.stringify(r.errs) + JSON.stringify(logs.slice(0, 3)));
     await p.close();
@@ -166,8 +168,8 @@ const SLOG = `const LOG=[];let FR=0;{const p0=G.sfx.play,l0=G.sfx.loop;G.sfx.pla
   // 6) 로직 프레임 비용 (9 생존 + 22 시신 + 바닥 총 7 + 날아가는 로켓, MEDIUM) — 헤드리스 CPU 시간 (렌더 제외)
   if (want('cost')) {
     const [p, logs] = await open('&god&q=MEDIUM&wep=rpg7');
-    const r = await p.evaluate(`(()=>{G.story.start();G.story.go('fight');for(let i=0;i<400;i++){G.fps.bot=true;${STEP}}
-      const E=G.fps.E(),alive=E.filter(e=>!e.P.dead).length,dead=E.filter(e=>e.P.dead).length;G.fps.bot=false;G.arms.bot=true;
+    const r = await p.evaluate(`(()=>{G.story.start();G.story.go('fight');for(let i=0;i<1500;i++){G.fps.bot=true;${STEP}}
+      const E=G.fps.E(),alive=E.filter(e=>!e.P.dead).length,dead=E.filter(e=>e.P.dead).length;G.fps.bot=false;G.arms.bot=true;G.arms.give('rpg7');
       let t=0,n=0,fly=0;for(let i=0;i<200;i++){if(!G.arms.rocket&&G.arms.inv.mag.rpg7===0)G.arms.inv.mag.rpg7=1;G.arms.inp.fire=i%2;const t0=performance.now();${STEP}t+=performance.now()-t0;n++;G.arms.rocket&&fly++;}
       return {alive,dead,drops:G.arms.drops.list.length,props:(G.people.props||[]).length,rocketFrames:fly,msPerFrame:+(t/n).toFixed(3),errs:G.errors}})()`);
     say(!r.errs.length && !logs.length, 'logic cost MEDIUM: ' + JSON.stringify(r));
@@ -177,7 +179,7 @@ const SLOG = `const LOG=[];let FR=0;{const p0=G.sfx.play,l0=G.sfx.loop;G.sfx.pla
   if (want('prep')) {
     const [p, logs] = await open('&god&q=MEDIUM');
     const r = await p.evaluate(`(()=>{G.story.start();G.story.go('fight');for(let i=0;i<700;i++){G.fps.bot=true;${STEP}}const pr=G.mods.people.prepare,ts=[];
-      for(let i=0;i<200;i++){G.fps.bot=true;const dt=.05;G.time+=dt;G.dt=dt;G.frame++;G.lights.length=0;for(const m of G.order)m.update&&m.update(dt);const t0=performance.now();pr();ts.push(performance.now()-t0);}
+      for(let i=0;i<200;i++){G.fps.bot=true;G.fps.on||G.story.go('fight');const dt=.05;G.time+=dt;G.dt=dt;G.frame++;G.lights.length=0;for(const m of G.order)m.update&&m.update(dt);const t0=performance.now();pr();ts.push(performance.now()-t0);}
       ts.sort((a,b)=>a-b);return {people:G.people.list.filter(P=>P.vis!==false).length,props:(G.people.props||[]).length,mean:+(ts.reduce((a,b)=>a+b)/200).toFixed(3),median:+ts[100].toFixed(3),p90:+ts[180].toFixed(3),max:+ts[199].toFixed(2),errs:G.errors}})()`);
     say(!r.errs.length && !logs.length, 'people.prepare ms/frame (with guns): ' + JSON.stringify(r));
     await p.close();
