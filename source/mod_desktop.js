@@ -71,9 +71,10 @@
       if (m === 'pause') ui.st.textContent = NAMES[story()] || '';
       if (m === 'set') sync();
       const o = ov(); o && (o.style.visibility = m === 'set' && from === 'title' ? 'hidden' : ''); // 타이틀에서 연 설정: 타이틀 글자를 가림
-      sel = 0; hi();
+      sel = m === 'set' ? bk() : 0; hi(); // 설정은 '돌아가기'에서 시작 (Enter · Space = 돌아가기 — 업데이트 버튼이 먼저 눌리지 않게)
     }
     const items = () => [...(menu === 'pause' ? ui.p : ui.s).querySelectorAll('[data-a]')].filter(e => e.offsetParent); // 숨긴 버튼(지금 적용 등)은 건너뜀
+    const bk = () => Math.max(0, items().findIndex(e => e.dataset.a === 'back'));
     const hi = () => items().forEach((e, i) => e.classList.toggle('sel', i === sel));
     function pause() {
       if (menu || !story()) return;
@@ -143,13 +144,14 @@
     const put = (e, t) => { if (e && e._t !== t) { e._t = t; e.textContent = t; } }; // 같은 글자면 다시 쓰지 않음
     function uRow() {
       const r = ui && ui.s.querySelector('[data-k=up]'); if (!r) return;
-      const s = us, st = s && s.state, $ = q => r.querySelector(q);
+      const s = us, st = s && s.state, $ = q => r.querySelector(q), cur = menu === 'set' && items()[sel];
       put($('.us'), uask ? '지금 적용하면 처음 화면으로 돌아갑니다' : uText(s));
       put($('.ue'), st === 'error' && s.error && !shellOld(s) ? '(' + s.error + ')' : '');
       put($('[data-a=upapp]'), uask ? '그래도 적용' : '지금 적용');
       $('[data-a=upapp]').style.display = st === 'ready' ? '' : 'none';
       $('[data-a=upitch]').style.display = st === 'old' || shellOld(s) ? '' : 'none';
       $('[data-a=upchk]').classList.toggle('busy', st === 'checking' || st === 'downloading');
+      if (cur) { sel = items().indexOf(cur); sel < 0 && (sel = bk()); hi(); } // 버튼이 나타나거나 숨어도 고른 것 그대로 (숨으면 '돌아가기')
     }
     const toast = (lines, btn, ms) => { // 처음 화면 오른쪽 아래 (#ov 안)
       const o = ov(); if (!o) return;
@@ -171,7 +173,7 @@
     };
     const uApplied = s => { // 이번 실행에서 새로 받은 게임으로 바뀌었으면 한 번 알림 (같은 버전은 다시 알리지 않음)
       const c = (s && s.current) || {}, v = c.version || G.VERSION;
-      if (s && s.applied && v && ls('skw-upd-told') !== v) { ls('skw-upd-told', v); toast([`새 버전 ${c.label || G.LABEL || v} 으로 업데이트했습니다`], null, 8000); }
+      if (s && s.applied && v && ls('skw-upd-told') !== v) { ls('skw-upd-told', v); tEl || toast([`새 버전 ${c.label || G.LABEL || v} 으로 업데이트했습니다`], null, 8000); } // 이미 뜬 알림(준비됨 · 새 앱 필요)이 더 중요 → 덮지 않음
     };
     const feed = async () => { // 옛 앱: raw → github.io 의 latest.json 을 직접 보고 가장 높은 버전 (받지는 않음 — 앱이 켜질 때 받는다)
       let best = null, err = '';

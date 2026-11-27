@@ -23,10 +23,13 @@ import java.security.NoSuchAlgorithmException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -44,6 +47,7 @@ import javax.net.ssl.SSLException;
  * 게임 자동 업데이트 — PC판(desktop/main.js)과 같은 파일(desktop/update/latest.json + game.gz) · 같은 규칙.
  *
  *  - 모든 주소(BASES)에 latest.json 을 동시에 묻고, 그중 가장 높은 버전을 고른다 (한 주소가 실패하거나 옛것을 알려 줘도 나머지를 본다).
+ *    쓸 수 있는 새 버전을 알려 준 주소가 있으면 나머지는 1초(GRACE_MS)만 더 기다리고 받기 시작한다 (PC판과 같이).
  *  - 이 앱이 띄울 수 있고(minShell ≤ 앱 버전) 지금 게임 · 이미 받아 둔 게임보다 새것일 때만 game.gz 를 받는다 (낮은 버전으로 내려가지 않음).
  *  - 풀어서(gzip) sha256 이 맞을 때만 filesDir/game/ 에 저장: game-<버전>.html 을 먼저 쓰고(임시 파일 → rename),
  *    마지막에 version.json 을 바꿔 가리키게 한다 → 반쯤 받은 파일이 멀쩡한 게임을 덮지 않는다.
@@ -61,7 +65,7 @@ final class Updater {
             "https://raw.githubusercontent.com/Korean568/SKW/main/desktop/update/",
             "https://korean568.github.io/SKW/desktop/update/",
     };
-    static final long LATEST_MS = 10_000, GAME_MS = 90_000, BACKOFF_MS = 1_500;
+    static final long LATEST_MS = 10_000, GAME_MS = 90_000, BACKOFF_MS = 1_500, GRACE_MS = 1_000;
     private static final int MAX_JSON = 64 * 1024, MAX_GZ = 16 << 20, MAX_HTML = 32 << 20; // 게임은 1~2 MB
     private static final int LOG_LINES = 200, LOG_TRIM_BYTES = 16 * 1024;
     private static final Pattern VERSION = Pattern.compile("^\\d{1,6}(\\.\\d{1,6}){0,3}$");
@@ -113,7 +117,7 @@ final class Updater {
 
     final File dir, gameDir, logFile;
     final String shell, bundledVersion, bundledLabel;
-    long latestMs = LATEST_MS, gameMs = GAME_MS, backoffMs = BACKOFF_MS; // 시험할 때만 줄인다
+    long latestMs = LATEST_MS, gameMs = GAME_MS, backoffMs = BACKOFF_MS, graceMs = GRACE_MS; // 시험할 때만 줄인다
     private final String[] bases;
     private final Listener listener;
     private final ExecutorService worker = Executors.newSingleThreadExecutor(daemon("skw-update"));
@@ -354,28 +358,49 @@ final class Updater {
         Game cur = current;
         String curV = cur != null ? cur.version : bundledVersion, curL = cur != null ? cur.label : bundledLabel;
         log("확인 (" + why + "): 지금 게임 " + curV + " · 앱 " + shell);
+        Game have;
+        synchronized (lock) {
+            have = ready; // 확인 중에는 state 가 ready 가 아니라 apply() 가 되지 않는다 → 끝까지 그대로
+        }
+        String haveV = have != null && newer(have.version, curV) ? have.version : curV;
 
-        // 1) 모든 주소에 동시에 latest.json
-        List<Future<Manifest>> asks = new ArrayList<>();
-        for (String b : bases) asks.add(net.submit(() -> manifest(b)));
-        List<Manifest> got = new ArrayList<>();
+        // 1) 모든 주소에 동시에 latest.json — 온 순서대로 본다. 쓸 수 있는 새 버전이 오면 나머지는 graceMs 만 더 기다린다
+        //    (한 주소가 말없이 막혀도(학교 와이파이 등) 그 주소의 시간 제한 · 다시 시도(약 21초)를 다 기다리지 않고 받기 시작)
+        ExecutorCompletionService<Manifest> cs = new ExecutorCompletionService<>(net);
+        Map<Future<Manifest>, Integer> asks = new LinkedHashMap<>();
+        for (int i = 0; i < bases.length; i++) {
+            String b = bases[i];
+            asks.put(cs.submit(() -> manifest(b)), i);
+        }
+        Manifest[] ans = new Manifest[bases.length];
         LinkedHashSet<String> errs = new LinkedHashSet<>();
-        for (int i = 0; i < asks.size(); i++) {
+        long end = System.currentTimeMillis() + latestMs * 2 + backoffMs + 5000;
+        boolean found = false;
+        for (long w; !asks.isEmpty() && (w = end - System.currentTimeMillis()) > 0; ) {
+            Future<Manifest> f = cs.poll(w, TimeUnit.MILLISECONDS);
+            if (f == null) break;
+            int i = asks.remove(f);
             String h = host(bases[i]);
             try {
-                Manifest m = asks.get(i).get(latestMs * 2 + backoffMs + 5000, TimeUnit.MILLISECONDS);
-                got.add(m);
+                Manifest m = ans[i] = f.get();
                 log(h + " latest.json: " + m.version + (m.label.isEmpty() ? "" : " (" + m.label + ")") + " · minShell " + m.minShell);
+                if (!found && !newer(m.minShell, shell) && newer(m.version, haveV)) {
+                    found = true;
+                    end = Math.min(end, System.currentTimeMillis() + graceMs);
+                }
             } catch (ExecutionException e) {
                 String r = reason(e.getCause());
                 errs.add(r);
                 log(h + " latest.json 실패: " + r);
-            } catch (TimeoutException e) {
-                asks.get(i).cancel(true);
-                errs.add("timeout");
-                log(h + " latest.json 실패: timeout");
             }
         }
+        for (Map.Entry<Future<Manifest>, Integer> e : asks.entrySet()) { // 시간 안에 답하지 않은 주소
+            e.getKey().cancel(true);
+            errs.add("timeout");
+            log(host(bases[e.getValue()]) + " latest.json " + (found ? "아직 답이 없음 → 기다리지 않고 받기 시작 (다음 확인 때 다시)" : "실패: timeout"));
+        }
+        List<Manifest> got = new ArrayList<>();
+        for (Manifest m : ans) if (m != null) got.add(m);
 
         // 2) 가장 높은 버전 (이 앱이 띄울 수 있는 것 중) — 같으면 앞의 주소
         Manifest best = null, blocked = null;
@@ -384,11 +409,6 @@ final class Updater {
                 if (blocked == null || newer(m.version, blocked.version)) blocked = m;
             } else if (best == null || newer(m.version, best.version)) best = m;
         }
-        Game have;
-        synchronized (lock) {
-            have = ready;
-        }
-        String haveV = have != null && newer(have.version, curV) ? have.version : curV;
 
         if (best != null && newer(best.version, haveV)) {
             // 3) 받기: 그 버전을 알려 준 주소부터, 안 되면 같은 버전 · 같은 sha256 을 알려 준 다른 주소
