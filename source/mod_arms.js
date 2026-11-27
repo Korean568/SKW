@@ -41,6 +41,7 @@
 
   const props=()=>Array.isArray(PP().props)?PP().props:(api._props||(api._props=[]));
   const cur=()=>inv.slot[inv.cur];
+  const fpOff=()=>{const f=PP().fp;return!!f&&f.on===0&&!f.hide;}; // 1인칭 모델 꺼짐 (컷신) — 스코프로 숨긴 것은 제외
   const mkey=id=>{const gm=G.gunModels;return gm&&gm[id]&&Array.isArray(PP().props)?id:W[id]?W[id].fb:id;}; // 모델 없으면 'ak'/'rifle'/'pistol'
   const addPool=(c,n)=>{const h=inv.pool[c]|0,v=min(CAP[c],h+max(0,n));inv.pool[c]=v;return v-h;};
   const scoped=id=>W[id].sc===1&&inv.scope[id]; // T 로 단 스코프
@@ -92,7 +93,7 @@
     const K={1:[['k2c1',30,120],['k7',30,60]],2:[['akm',30,90]],4:[['k2c1',30,120]]}[story]||[];
     for(const[id,m,r]of K){const s=SLOTS[W[id].slot].find(i=>!inv.slot[i]);inv.slot[s]=id;inv.mag[id]=m;inv.mode[id]=0;inv.scope[id]=0;addPool(W[id].cal,r);}
     inv.cur=max(0,inv.slot.findIndex(Boolean));
-    if(G.params.get('arms')==='all'){for(const id of['k2c1','k7','akm','rpg7'])if(!inv.slot.includes(id)&&!inv.slot[SLOTS[W[id].slot].find(i=>!inv.slot[i])??9])give(id);for(const c in CAP)inv.pool[c]=CAP[c];inv.cur=0;}
+    if(G.params.get('arms')==='all'){for(const id of['k2c1','k7','akm','rpg7']){const s=SLOTS[W[id].slot].find(i=>!inv.slot[i]);if(s!=null&&!inv.slot.includes(id)){inv.slot[s]=id;inv.mag[id]=W[id].mag;inv.mode[id]=0;inv.scope[id]=0;}}for(const c in CAP)inv.pool[c]=CAP[c];}
     const wp=G.params.get('wep');W[wp]&&give(wp,0);
     st.msg='';
   }
@@ -105,8 +106,7 @@
   function reload(){
     const id=cur();if(!id)return;const w=W[id],m=inv.mag[id]|0,p=inv.pool[w.cal]|0;
     if(st.rl>0||st.sw>0||p<=0||m>=w.mag+(w.ch&&m>0?1:0))return;
-    if(w.ch&&m>=w.mag+1)return;
-    st.rc=w.ch&&m>0?1:0;st.rl=st.rlT=w.rl;st.bn=0;st.cyc=0;snd(id==='m134'?'reload':'reload',{rate:id==='m134'?.7:1}); // 탄창에 남아 있으면 약실 +1
+    st.rc=w.ch&&m>0?1:0;st.rl=st.rlT=w.rl;st.bn=0;st.cyc=0;snd('reload',{rate:id==='m134'?.7:1}); // 탄창에 남아 있으면 약실 +1
   }
   function reloadDone(){
     const id=cur(),w=W[id],m=inv.mag[id]|0,n=min(w.mag+(st.rc?1:0)-m,inv.pool[w.cal]|0);
@@ -126,7 +126,7 @@
     const m=PP().muzzle(PP().fp);return[m[0],m[1],m[2]];
   }
   function recoil(w,id){
-    const me=A.me(),bip=id==='k14'&&(me.cr||0)>.5&&(me.mv||0)<.3?.5:1,k=w.kick*(st.ads>.5?(scoped(id)||w.zm>1?.4:.6):1)*bip,dy=(R()-.5)*w.kick*.7;
+    const me=A.me(),bip=id==='k14'&&(me.cr||0)>.5&&(me.mv||0)<.3?.5:1,k=w.kick*(st.ads>.5?(scoped(id)||w.zm>1?.4:.6):1)*bip*(id==='m134'?R()-.4:1),dy=(R()-.5)*w.kick*.7;
     if(A.recoil)A.recoil(k,dy);else{me.pit=min(1.2,(me.pit||0)+k);me.yaw=(me.yaw||0)+dy;}
   }
   function shoot(id,rays=1){ // 한 발 (M134 는 프레임당 광선 4개까지)
@@ -137,10 +137,9 @@
     recoil(w,id);
     const sp=spread(),a=R()*2*PI,r=sp*sqrt(R()),d=nrm(v3(v3(f,rt,cos(a)*r),up,sin(a)*r));
     const mo=muzzle(eye,f,up);
-    if(w.fl)G.fx.burst('muzzle',mo,{size:w.fl,dir:d});
-    if(id!=='m134'||D.shots%3===0)G.addLight(v3(eye,f,.9),[1,.78,.45],w.quiet?.66:2.2,4,.05);
-    if(id==='m134'){if(T>st.lt){st.lt=T+.05;G.addLight(v3(eye,f,.9),[1,.75,.42],2.6,4,.06);}}
-    else snd(w.snd,{gain:w.quiet?.35:1});
+    if(w.fl&&(id!=='m134'||D.shots%2))G.fx.burst('muzzle',mo,{size:w.fl,dir:d});
+    if(id==='m134'){if(T>st.lt){st.lt=T+.05;G.addLight(v3(eye,f,.9),[1,.75,.42],2.6,4,.06);}} // M134: 탄마다가 아니라 빛 하나를 계속 갱신 (R14)
+    else{G.addLight(v3(eye,f,.9),[1,.78,.45],w.quiet?.66:2.2,4,.05);snd(w.snd,{gain:w.quiet?.35:1});}
     if(!rays){if(w.tr&&D.shots%w.tr===0)G.fx.tracer(mo,d,380,.01);return;}
     const t=A.solid(eye,d,150);let h=ray(eye,d,t),end=h?h.t:t;
     if(h){
@@ -171,8 +170,8 @@
   function rocketOff(){if(rk.prop){const L=props(),i=L.indexOf(rk.prop);i>=0&&L.splice(i,1);}rk.prop=null;rk.on=0;G.sfx&&G.sfx.loop('rocket',0);}
   function rocket(dt){
     if(!rk.on)return;
-    for(let n=0,h=min(dt,.02);n<4&&rk.on;n++){
-      if(n*h>=dt)break;
+    const ns=min(6,Math.ceil(dt/.02)),h=dt/ns;
+    for(let n=0;n<ns&&rk.on;n++){
       rk.t+=h;const sp=hypot(...rk.v),u=V3.mul(rk.v,1/sp);
       if(rk.t>.12&&sp<150)rk.v=v3(rk.v,u,min(150-sp,237*h)); // 모터 점화 (0.12초) → 0.5초에 150 m/s
       rk.v[1]-=3*h;
@@ -240,14 +239,14 @@
         if(w.sc===1){inv.scope[id]^=1;st.cd=st.sw=st.swT=.45;snd('click',{gain:1.4});}
         else say(w.sc===2?'조준경 일체형':`${w.n}에는 스코프를 달 수 없다`);
       }
-      if(!w){outView(dt,al,me);return;}
+      if(!w){pick(al,me);outView(dt,al,me);return;}
       // 재장전 (수동만)
       if(st.rl>0){st.rl-=dt;if(st.rl<=0)reloadDone();}
       if(inp.rl&&al.rl&&!pres)reload();
       // 조준 (M134: 오른쪽 버튼 = 회전 유지)
-      const adsOK=inp.ads&&al.ads&&!me.run&&st.rl<=0&&!w.noads&&!pres&&PP().fp&&PP().fp.on!==0;
-      st.ads=adsOK?min(1,st.ads+dt*(zoomOf(id)>1?8:11)*(w.as||1)*(1-st.ads)+dt*.6):max(0,st.ads-dt*(al.ads?9:20));
-      if(!al.ads||pres)st.ads=0;
+      const adsOK=inp.ads&&al.ads&&!me.run&&st.rl<=0&&!w.noads&&!pres&&!fpOff();
+      st.ads+=((adsOK?1:0)-st.ads)*min(1,dt*(zoomOf(id)>1?8:11)*(w.as||1));
+      if(!al.ads||pres||fpOff())st.ads=0; // 조준 금지 · 1인칭 꺼짐 → 즉시 해제 (겹침도 꺼짐)
       st.so=ovOf(id)&&ovOf(id)!=='dot'?cl((st.ads-.6)*4,0,1):0;
       // K14 숨 참기 · 흔들림 (양각대: 웅크리고 멈춤 → 없음)
       if(id==='k14'&&st.so>.5){
@@ -268,18 +267,17 @@
         st.spin=want?min(1,st.spin+dt/.5):max(0,st.spin-dt/1.2);
         if(want&&st.spin>=1&&!D.spinUp)D.spinUp=T-st.sT0;
         st.spa+=st.spin*40*dt;
-        if(inp.fire&&!live&&press){D.blocked++;D.dry++;snd('dry')||snd('click',{rate:.8});note('지금은 쏠 수 없다');}
+        if(inp.fire&&!live&&press){D.blocked++;D.dry++;snd('click',{rate:.8});note('지금은 쏠 수 없다');}
         if(inp.fire&&live&&st.spin>=1&&st.rl<=0){
           if((inv.mag[id]|0)<=0){if((st.dryT-=dt)<=0){st.dryT=.18;snd('click',{rate:1.3,gain:.5});D.dry++;}}
-          else{st.acc+=dt;let n=0;while(st.acc>=w.rate&&inv.mag[id]>0){st.acc-=w.rate;shoot(id,n<4?1:0);n++;}D.maxRays=max(D.maxRays,min(n,4));firing=n>0||st.acc>0;st.ft+=dt;
-            const me2=A.me();if(A.recoil)A.recoil(0,0);else me2.pit=min(1.2,me2.pit+(R()-.45)*.004);st.shake=max(st.shake,.25);}
+          else{st.acc+=dt;let n=0;while(st.acc>=w.rate&&inv.mag[id]>0){st.acc-=w.rate;shoot(id,n<4?1:0);n++;}D.maxRays=max(D.maxRays,min(n,4));firing=1;st.ft+=dt;st.shake=max(st.shake,.25);}
         }else{st.acc=0;st.ft=max(0,st.ft-dt*2);}
         loops(st.spin,firing&&inv.mag[id]>0);
       }else{
         loops(0,0);
         const md=w.md[inv.mode[id]|0],m=inv.mag[id]|0;
         if(press&&!live){D.blocked++;D.dry++;snd('click',{rate:.8});note('지금은 쏠 수 없다');}
-        else if(live&&!busy&&!rk.on){
+        else if(live&&!busy&&!(id==='rpg7'&&rk.on)){
           if(md==='burst'&&press&&st.cd<=0&&st.bn<=0)st.bn=3;
           const want=md==='auto'?inp.fire:md==='burst'?st.bn>0:press;
           if(want&&st.cd<=0){
@@ -287,14 +285,13 @@
             else{
               shoot(id);st.cd=w.rate;firing=1;
               if(md==='burst'){st.bn--;if(st.bn<=0)st.cd=max(w.rate,.3);}
-              if(md==='bolt'){st.cyc=.001;setTimeout(()=>snd('bolt'),120);}
+              if(md==='bolt'){st.cyc=.001;snd('bolt');} // 노리쇠 조작 .95초 (사격의 일부)
             }
           }
         }
         if(!inp.fire&&md!=='burst')st.bn=0;
       }
       rocket(dt);
-      if(rk.on===0&&rk.prop)rocketOff();
       pick(al,me);
       outView(dt,al,me,firing);
     }catch(e){G.err('arms: '+(e.stack||e));}
@@ -304,7 +301,7 @@
   function outView(dt,al,me,firing){
     const id=cur(),fp=PP().fp,base=1.13,shown=pres||id;
     const z=id&&!pres?1+(zoomOf(id)-1)*st.ads:1;
-    view.zoom=z;view.ads=st.ads;view.ov=id&&!pres?ovOf(id):'';view.ovA=fp&&fp.on===0&&!view.hide?0:st.so;view.hide=st.so>.3?1:0;
+    view.zoom=z;view.ads=st.ads;view.ov=id&&!pres?ovOf(id):'';view.ovA=st.so;view.hide=st.so>.3?1:0;
     view.fovK=z>1.01?2*atan(tan(base/2)/z)/base:1-(1-(id?W[id].fv:1))*st.ads;
     view.sens=z>1.01?1/z:1-st.ads*.4;view.mv=id?W[id].mv:1;view.nosprint=id==='m134'?1:0;
     view.kick=st.kick*.012+(st.shake>0?(R()-.5)*st.shake*.02:0);view.lock=A&&(A.hits!=='enemy'||!al.fire)?1:0;view.scope=id&&scoped(id)?1:0;
@@ -325,7 +322,7 @@
   }
   function add(id,p,yaw,loaded,res,o={}){
     const it={id,p:p.slice(),yaw,roll:o.roll??(R()<.5?1:-1)*PI/2,loaded,res,pl:o.pl?1:0,F:o.F||(A&&A.frame?A.frame(p):null),seen:0};
-    it.M=dmat(it);it.prop={id:mkey(id),M:it.M,vis:true,spin:0,loaded:1,bip:0,_arms:1};
+    it.M=dmat(it);it.prop={id:mkey(id),M:it.M,vis:true,spin:0,loaded:id!=='rpg7'||loaded>0?1:0,bip:0,_arms:1};
     props().push(it.prop);drops.list.push(it);
     if(drops.list.length>24){const o2=drops.list.find(x=>x.pl&&x!==it);o2&&remove(o2);}
     return it;
@@ -349,7 +346,7 @@
     return !o.ok||o.ok(p);
   }
   function scatter(cands,n,tab,o={}){ // 후보를 섞어 검사를 통과한 자리에 n 개 (표의 가중치 · 상한 · 중화기 1개)
-    const c=cands.slice(),acc=[],cnt={},caps=Object.assign({k14:1},o.caps),heavy={n:0,cap:o.heavy??1},gap=o.gap||2.5;
+    const c=cands.slice(),acc=[],cnt=o.cnt||{},caps=Object.assign({k14:1},o.caps),heavy=o.hs||{n:0,cap:o.heavy??1},gap=o.gap||2.5; // cnt · hs 를 넘기면 여러 번 뿌려도 상한 공유
     for(let i=c.length-1;i>0;i--){const j=(R()*(i+1))|0;[c[i],c[j]]=[c[j],c[i]];}
     for(const q of c){
       if(acc.length>=n)break;
@@ -412,12 +409,12 @@
     if(scoped(id))s+='<span>스코프</span>';
     s+='</small>';
     if(id==='m134')s+=`<em><span>탄띠</span>${st.spin>.05?`<span>회전 중</span> ${'▮'.repeat(1+st.spin*4|0)}`:''}</em>`;
-    else if(id==='rpg7')s+=`<em><span>로켓</span> ${m+(rk.on?0:0)} / ${p}</em>`;
+    else if(id==='rpg7')s+=`<em><span>로켓</span> ${m} / ${p}</em>`;
     s+='<u>'+inv.slot.map((k,i)=>`<i${i===inv.cur?' class=on':''}>${i+1} ${k?W[k].sh:'—'}</i>`).join('')+'</u>';
     return s;
   }
   function markers(){ // ▼ 표지: 6 m 안 · 시야 안 · 가려지지 않은 것 3개까지
-    const on=A&&!pres&&(A.allow()||ON).free&&PP().fp&&PP().fp.on!==0;let j=0;
+    const on=A&&!pres&&(A.allow()||ON).free&&!fpOff();let j=0;
     if(on){
       const me=A.me(),eye=A.eye(),chk=T>mkT;if(chk)mkT=T+.2;
       const L=drops.list.map(it=>[hypot(it.p[0]-me.p[0],it.p[2]-me.p[2]),it]).filter(a=>a[0]<6).sort((a,b)=>a[0]-b[0]);
@@ -425,7 +422,7 @@
         if(j>=ui.mk.length)break;
         const t=v3(it.p,[0,.1,0]),q=G.project(v3(t,[0,.2,0]));if(!q||q[2]<=0||q[0]<0||q[1]<0||q[0]>innerWidth||q[1]>innerHeight)continue;
         if(chk){const dv=V3.sub(t,eye),l=hypot(...dv);it.seen=A.solid(eye,nrm(dv),l)>=l-.25;}
-        if(!it.seen)continue;
+        if(!it.seen||it===drops.near)continue; // 줍기 안내가 뜬 총은 표지 생략 (글자와 겹침)
         const e=ui.mk[j++];e.style.display='block';e.style.transform=`translate(${q[0]|0}px,${q[1]|0}px)`;e.style.opacity=d<1.8?1:.55;
         if(e._t!==W[it.id].sh){e._t=W[it.id].sh;e.firstChild.textContent=e._t;}
       }
@@ -453,7 +450,8 @@
   /* ── 바인딩 (스토리 어댑터 §3.2) ── */
   const DEF={story:0,eye:()=>G.cam.pos,fwd:()=>nrm(V3.sub(G.cam.target,G.cam.pos)),solid:(o,d,m)=>m,ground:()=>0,collide:p=>p,
     me:()=>({p:G.cam.pos,yaw:0,pit:0,mv:0,cr:0,run:0,air:0}),hits:'safe',onHit:null,onBlast:null,hurtSelf:null,allow:()=>ON,busyE:()=>false,people:()=>[],hud:'lite',ray:null,frame:null};
-  function bind(o){A=Object.assign({},DEF,o);pres=null;st.k0={};ui.wa&&(ui.wa.style.display='block');}
+  function bind(o){clear();rocketOff();A=Object.assign({},DEF,o);pres=null; // 새 시작 = 새 바닥 배치
+   st.k0={};for(const k in D)D[k]=typeof D[k]==='object'?{}:0;ui.wa&&(ui.wa.style.display='block');}
   function unbind(){clear();rocketOff();loops(0,0);A=null;pres=null;st.ads=st.so=0;Object.assign(view,{fovK:1,zoom:1,ov:'',ovA:0,kick:0,hide:0,sens:1,mv:1,ads:0,lock:0,scope:0});
     const fp=PP().fp;if(fp){fp.hide=fp.scope=0;fp.cyc=fp.spin=fp.bip=fp.dot=fp.fire=0;fp.loaded=1;}ui.wa&&(ui.wa.style.display='none');}
 
@@ -498,7 +496,7 @@
         glint();markers();
         const a=view.ovA,ov=view.ov;
         ui.sc.style.opacity=ov==='scope'?a:0;ui.rg.style.opacity=ov==='ring'?a:0;ui.pg.style.opacity=ov==='pgo'?a:0;
-        const lite=A.hud==='lite',fp=PP().fp,show=lite&&(A.allow()||ON).free&&!pres&&fp&&fp.on!==0;
+        const lite=A.hud==='lite',fp=PP().fp,show=lite&&(A.allow()||ON).free&&!pres&&fp&&!fpOff();
         ui.wh.style.display=show?'block':'none';
         if((hudT-=dt)<=0){hudT=.2;if(show)ui.wh.innerHTML=hudHTML();}
         const pr=show?promptText():'';

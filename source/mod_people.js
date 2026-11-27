@@ -1,24 +1,27 @@
 'use strict';
 /* PEOPLE — 절차 생성 스키닝 인체: 링 로프트 메시 · 2가중치 LBS · 분석적 포즈 + 2뼈 IK · 1인칭 뷰모델 */
 {
- const NB=19,MAXP=96,PI=Math.PI,sin=Math.sin,cos=Math.cos,H=Math.hypot,cl=G.clamp,L=G.lerp,abs=Math.abs;
+ const NB=20,MAXP=128,PI=Math.PI,sin=Math.sin,cos=Math.cos,H=Math.hypot,cl=G.clamp,L=G.lerp,abs=Math.abs;
  const ss=(a,b,x)=>{x=cl((x-a)/(b-a),0,1);return x*x*(3-2*x);};
  // 관절(바인드 자세, m): 0 골반 1 허리 2 가슴 3 목 4 머리 5-7 왼팔 8-10 오른팔 11-13 왼다리 14-16 오른다리 17 무기
  const J=[0,.93,0,0,1.05,0,0,1.24,0,0,1.49,0,0,1.57,.005,.172,1.42,0,.172,1.13,0,.172,.87,0,-.172,1.42,0,-.172,1.13,0,-.172,.87,0,
   .09,.93,0,.09,.5,0,.09,.09,0,-.09,.93,0,-.09,.5,0,-.09,.09,0,0,0,0];
- const KIND={rok:0,mask:1,nk:2,civ:3,nko:4,nkf:5,vil:6,suit:7},GUN={ak:1,rifle:2,pistol:3,knife:5,radio:6},SIT={sit:1,sleep:1,brace:1,sitchair:2},BD={kneel:.8,cower:.6,handsup:.45,point:.45,grip:.4,sitchair:.6,salute:.45},NA=46;
+ const KIND={rok:0,mask:1,nk:2,civ:3,nko:4,nkf:5,vil:6,suit:7},SIT={sit:1,sleep:1,brace:1,sitchair:2},BD={kneel:.8,cower:.6,handsup:.45,point:.45,grip:.4,sitchair:.6,salute:.45},NA=52;
+ // 총 레지스트리 (mod_guns): 옛 NPC 별칭 'ak'→akm · 'rifle'→k2c1 · 'pistol'→k5. 묶음 0 몸 · 1 조준경 · 2 단검 · 3 무전기 · 4+2i 총 i 상세 · 5+2i LOD
+ G.gunModels=G.gunModels||{};const GM=G.gunModels,ALIAS={ak:'akm',rifle:'k2c1',pistol:'k5'},GI={},GN=[],LG={rifle:1,bullpup:1,smg:1,shoulder:1,hip:1};
+ const gid=g=>g&&(GM[g]?g:GM[ALIAS[g]]?ALIAS[g]:0),gm=g=>{const k=gid(g);return k?GM[k]:null;};
 
  /* ───── 메시: 링 [y, rx, rz, dx, dz] 을 Y 축으로 이어 붙인 로프트 (양 끝은 반지름 0 링으로 막음) ───── */
  let V,I;
  // jt = [[관절 y, 위 뼈, 아래 뼈, 블렌드 폭]..] → 높이로 2가중치 자동 배정. mt(y) = 재질. mir 좌우 반전, rot = Y→Z (총기), fn 정점 변형, aw 각도 왜곡(앞쪽 촘촘)
- const loft=(R,n,x0,z0,jt,mt,mir,rot,fn,aw=1)=>{
+ const loft=(R,n,x0,z0,jt,mt,mir,rot,fn,aw=1,ex=.85)=>{
   const b=V.length/10,m=mir?-1:1,e=R[R.length-1];
   R=[[R[0][0],0,0,R[0][3],R[0][4]],...R,[e[0],0,0,e[3],e[4]]];
   for(const[y,rx,rz=rx,dx=0,dz=0]of R){
    let j=jt[0];for(const q of jt)if(abs(y-q[0])<abs(y-j[0]))j=q;
    for(let i=0;i<n;i++){
     const t=i/n*2-1,a=PI*Math.sign(t)*abs(t)**aw,s=sin(a),c=cos(a);
-    let p=[x0+m*(dx+rx*Math.sign(s)*abs(s)**.85),y,z0+dz+rz*Math.sign(c)*abs(c)**.85];
+    let p=[x0+m*(dx+rx*Math.sign(s)*abs(s)**ex),y,z0+dz+rz*Math.sign(c)*abs(c)**ex];
     if(fn)fn(p);
     if(rot)p=[p[0],-p[2],p[1]];
     V.push(...p,0,0,0,j[1],j[2],ss(j[0]+j[3],j[0]-j[3],y),mt(y));
@@ -96,7 +99,7 @@
  const scope=()=>{ // 조준경 (총 뼈, 리시버 위): 대물 벨 · 25 mm 튜브 · 접안 벨 · 마운트 링 2
   const z=(R,m,y=-.105)=>loft(R.map(r=>[r[0],r[1],r[1],0,y]),10,0,0,[[9,17,17,1]],()=>m,0,1);
   z([[.19,.022],[.162,.022],[.132,.0135],[-.005,.0135],[-.035,.018],[-.068,.018]],13);
-  for(const q of[.1,.012])z([[q+.011,.0165],[q-.011,.0165]],10),z([[q+.008,.011],[q-.008,.011]],10,-.08);
+  for(const q of[.1,.012])z([[q+.011,.0165],[q-.011,.0165]],37),z([[q+.008,.011],[q-.008,.011]],37,-.08); // 37 = 강철 링 (조준경 묶음과 함께 이동)
  };
  const W17=[[9,17,17,1]];
  const knife=()=>{ // 전투 단검 (무기 뼈, 원점 = 손잡이 가운데, 날 +Z, 칼등 위): 손가락 홈 검은 손잡이 · 강철 폼멜 · 손가락 가드 · 17 cm 클립 포인트 새틴 날
@@ -112,10 +115,17 @@
  };
  const WGSL=/*wgsl*/`
 struct VI{@location(0)p:vec3f,@location(1)n:vec3f,@location(2)b:vec4f,@location(3)i:u32};
-struct VO{@builtin(position)c:vec4f,@location(0)w:vec3f,@location(1)n:vec3f,@location(2)b:vec3f,@location(3)@interpolate(flat)m:vec4f,@location(4)@interpolate(flat)q:vec4f,@location(5)@interpolate(flat)e:vec4f};
-@group(1)@binding(0)var<storage,read>pal:array<mat4x4f>; // 사람마다 19칸: 뼈 18 + 파라미터
+struct VO{@builtin(position)c:vec4f,@location(0)w:vec3f,@location(1)n:vec3f,@location(2)b:vec3f,@location(3)@interpolate(flat)m:vec4f,@location(4)@interpolate(flat)q:vec4f,@location(5)@interpolate(flat)e:vec4f,@location(6)@interpolate(flat)u:vec4f};
+@group(1)@binding(0)var<storage,read>pal:array<mat4x4f>; // 사람마다 20칸: 뼈 18 + 파라미터 + 총 파라미터
+// 총 움직이는 부품 (재질로 고름, 스키닝 전 뼈 공간): 31 M134 총열 회전 · 35 K14 양각대 펼침 · 36 K14 노리쇠 · 13/37 조준경 위치. w = 1 위치 / 0 법선
+fn gx(m:f32,v:vec3f,Y:mat4x4f,w:f32)->vec3f{var p=v;
+if(m==31.0){let a=Y[0].x;let c=cos(a);let s=sin(a);let q=vec2f(p.x,p.y-.02*w);p=vec3f(c*q.x-s*q.y,s*q.x+c*q.y+.02*w,p.z);}
+else if(m==35.0){let t=Y[0].z*1.45;let c=cos(t);let s=sin(t);let q=vec2f(p.y-.035*w,p.z-.38*w);let y2=c*q.x-s*q.y;p=vec3f(p.x+w*sign(p.x)*max(-y2,0.0)*.36*Y[0].z,y2+.035*w,s*q.x+c*q.y+.38*w);}
+else if(m==36.0){let k=Y[0].y;let t=-1.05*ss(0.0,.22,k)*(1.0-ss(.78,1.0,k));let c=cos(t);let s=sin(t);let q=vec2f(p.x,p.y-.07*w);p=vec3f(c*q.x-s*q.y,s*q.x+c*q.y+.07*w,p.z-w*.08*ss(.22,.4,k)*(1.0-ss(.6,.78,k)));}
+else if(m==13.0||m==37.0){p+=w*vec3f(0.0,Y[0].w,Y[1].x);}
+return p;}
 fn wp(i:VI)->vec4f{ // 스키닝한 월드 위치 (w = 보임 여부)
-let o=i.i*19u;let X=pal[o+18u];let m=i.b.w;var p=i.p;let mx=max(i.b.x,i.b.y);let kd=X[0].x;let sg=sign(p.x);let hy=p.y-${YC};
+let o=i.i*20u;let X=pal[o+18u];let m=i.b.w;var p=i.p;if(m>12.5){p=gx(m,p,pal[o+19u],1.0);}let mx=max(i.b.x,i.b.y);let kd=X[0].x;let sg=sign(p.x);let hy=p.y-${YC};
 if(m==8.0&&kd>3.5&&kd<5.5&&hy>.07){let s=1.0+(.15-.05*X[3].x)*ss(.078,.106,hy);p.x*=s;p.z=.008+(p.z-.008)*s;p.y+=.012*ss(.078,.13,hy);} // 장교 정모: 높고 넓은 테
 if(m>2.5&&m<4.5&&mx>10.5){let c=sg*.09;var kx=1.0;var kz=1.0; // 다리: 장교 승마바지 · 장화 / 인민·정장 바짓단
  if(kd>3.5&&kd<4.5){let f=gs((p.y-.74)/.1,0.0);kx=1.0+.32*f*step(0.0,(p.x-c)*sg)-.05*ss(.47,.42,p.y)*ss(.25,.3,p.y);kz=1.0+.1*f;}
@@ -135,18 +145,18 @@ else if(m<3.5){p+=normalize(i.n)*(X[2].y+select(0.0,.009,kd>5.5&&kd<6.5&&m>1.5&&
 if(m>.5&&m<1.5&&p.y<.79&&X[2].w>.01){ // 손가락 말아 쥠: 손바닥 쪽(몸 안쪽)으로 R 만큼 떨어진 축을 감싸며 굽힘 (총·칼을 잡으면 손잡이를 감싼 주먹)
 let k=sign(p.x);let R=.026/X[2].w;let s=.79-p.y;let t=(k*.172-p.x)*k;let th=min(s/R,4.2);let ex=s-th*R;
 let q=vec2f(k*(.172-R),.79)+(R-t)*vec2f(k*cos(th),-sin(th))+ex*vec2f(-k*sin(th),-cos(th));p=vec3f(q,p.z);}
-let pm=u32(X[3].y);let pb=select(select(select(select(0u,8u,m==16.0),4u,m==14.0),2u,m==15.0),1u,m==5.0); // 선택 부품: 1 방탄판 · 2 치마 · 4 쪽머리 · 8 권총집
+let pm=u32(X[3].y);let pb=select(select(select(select(select(select(0u,64u,m==38.0||m==39.0),16u,m==26.0||m==34.0),8u,m==16.0),4u,m==14.0),2u,m==15.0),1u,m==5.0); // 선택 부품: 1 방탄판 · 2 치마 · 4 쪽머리 · 8 권총집 · 16 로켓(장전) · 64 K2C 도트
 let hd=(m>5.5&&m<9.5&&abs(m-X[0].w)>.5)||((pm&pb)!=pb)||(X[2].x>.5&&(mx<4.5||(mx>10.5&&mx<16.5)));
 let w=mix(pal[o+u32(i.b.x)]*vec4f(p,1.0),pal[o+u32(i.b.y)]*vec4f(p,1.0),i.b.z);
 return vec4f(w.xyz,select(1.0,0.0,hd));
 }
 @vertex fn vs(i:VI)->VO{
-let o=i.i*19u;let X=pal[o+18u];let w=wp(i);
-let n=normalize(mix(pal[o+u32(i.b.x)]*vec4f(i.n,0.0),pal[o+u32(i.b.y)]*vec4f(i.n,0.0),i.b.z).xyz);
+let o=i.i*20u;let X=pal[o+18u];let Y=pal[o+19u];let w=wp(i);var n0=i.n;if(i.b.w>30.5){n0=gx(i.b.w,n0,Y,0.0);}
+let n=normalize(mix(pal[o+u32(i.b.x)]*vec4f(n0,0.0),pal[o+u32(i.b.y)]*vec4f(n0,0.0),i.b.z).xyz);
 var c=g.viewProj*vec4f(w.xyz,1.0);
 if(X[2].x>.5){c.z=c.w*.9+c.z*.1;} // 1인칭: 깊이를 카메라 쪽으로 압축 → 벽에 파묻히지 않음
 if(w.w<.5){c=vec4f(0.0,0.0,2.0,1.0);}
-return VO(c,w.xyz,n,i.p,vec4f(i.b.w,X[0].xyz),X[1],vec4f(X[3].xyz,max(i.b.x,i.b.y)+select(0.0,32.0,X[2].x>.5)));
+return VO(c,w.xyz,n,i.p,vec4f(i.b.w,X[0].xyz),X[1],vec4f(X[3].xyz,max(i.b.x,i.b.y)+select(0.0,32.0,X[2].x>.5)),vec4f(Y[1].y,Y[1].z,Y[1].w,Y[2].x));
 }
 @vertex fn vsS(i:VI)->@builtin(position)vec4f{let w=wp(i);var c=g.shadowVP*vec4f(w.xyz,1.0);if(w.w<.5){c=vec4f(0.0,0.0,2.0,1.0);}return c;}
 fn ss(a:f32,b:f32,x:f32)->f32{let t=clamp((x-a)/(b-a),0.0,1.0);return t*t*(3.0-2.0*t);}
@@ -173,7 +183,27 @@ var N=normalize(i.n);if(!ff){N=-N;}let E=normalize(g.cam.xyz-i.w);let Ls=g.sun.x
 let hh=hgt(b,m);let dwx=dpdx(i.w);let dwy=dpdy(i.w);let dhx=dpdx(hh);let dhy=dpdy(hh);
 var al=vec3f(.03);var gl=.5;var tc=vec3f(0.0);var sk=0.0;var ao=1.0;var hi=0.0;var cf=0.0;
 let hc=vec3f(.022,.018,.016);
-if(m>16.5){if(m<17.5){ // 단검 날: 새틴 강철 (길이 방향 헤어라인 · 밝은 날 연마면 · 주변 반사)
+if(m>18.5){ // 총 재질 19–40 (뼈 공간 b 로 무늬; px 로 무늬를 흐림)
+ let fa=clamp(1.0-px*400.0,0.0,1.0);let st=.85+.3*n3(b*900.0);gl=.3;
+ if(m<19.5||m==38.0){al=vec3f(.024,.024,.026)*st;}                                  // 19 무광 수지 · 38 도트 몸통
+ else if(m<20.5||m==35.0||m==36.0||m==37.0){al=vec3f(.034,.035,.038)*(.9+.2*n3(b*vec3f(80.0,80.0,900.0)));gl=.45;if(m==36.0){al*=1.4;gl=.6;}} // 20 파커라이징 · 35 양각대 · 36 노리쇠 · 37 링
+ else if(m<21.5){al=vec3f(.028,.03,.036);gl=.6;al*=1.0-.45*fa*step(.5,fract(b.z*105.0))*step(.004,abs(fract(b.y*70.0)-.5));} // 21 레일 (가로 홈)
+ else if(m<22.5){al=vec3f(.017,.017,.018);gl=.15;cf=.2;}                                   // 22 고무
+ else if(m<23.5){al=vec3f(.085,.083,.058)*(.92+.16*n3(b*600.0));gl=.32;}                    // 23 AUG 올리브
+ else if(m<24.5){let r=fract(b.y*95.0);al=mix(vec3f(.2,.1,.025),vec3f(.32,.2,.06),fa*ss(.3,.7,r)*step(b.y,-.06));gl=.75;tc=vec3f(.05,.025,.004)*ss(.4,1.0,1.0-abs(dot(N,E)));} // 24 호박색 탄창 (탄 줄)
+ else if(m<25.5){al=vec3f(.22,.09,.035)*(.65+.55*n3(b*vec3f(420.0,420.0,18.0)));gl=.55;}   // 25 RPG 목재 니스
+ else if(m<26.5){al=vec3f(.3,.27,.12)*(.85+.25*n3(b*200.0));gl=.4;}                      // 26 탄두 카키
+ else if(m<27.5||m==31.0){al=vec3f(.06,.062,.066)*st;gl=.55;}                              // 27 · 31 건메탈
+ else if(m<28.5){al=vec3f(.45,.32,.1);gl=.8;}                                              // 28 황동
+ else if(m<29.5){al=vec3f(.07,.075,.045)*(.9+.2*n3(b*500.0));gl=.08;cf=.8;}                // 29 멜빵
+ else if(m<30.5){al=vec3f(.07,.03,.025)*st;gl=.38;}                                        // 30 자두색 손잡이
+ else if(m<32.5){al=vec3f(.35,.02,.02);gl=.5;}                                             // 32 빨간 단추
+ else if(m==34.0){al=vec3f(.08,.08,.085);gl=.5;}                                           // 34 로켓 강철
+ else if(m==40.0){al=vec3f(.09,.09,.095)*st;gl=.45;}                                       // 40 밝은 회색 STANAG
+ else{al=vec3f(.004);gl=.9;tc=mix(vec3f(.02,.05,.03),vec3f(.07,.03,.1),abs(N.x))*.5;     // 33 · 39 렌즈 (코팅 반사)
+  if(m==39.0&&fpv&&i.u.x>.3){if(b.z<.05||length(b.xy-vec2f(0.0,.155))>.0016){discard;}al=vec3f(0.0);tc=vec3f(6.0,.15,.08);}} // K2C 정조준: 렌즈는 비우고 빨간 점만
+ if(i.m.y<-.5&&i.u.y>.001){tc+=vec3f(1.0,.93,.8)*i.u.y*60.0*ss(.02,0.0,length(b-vec3f(0.0,i.u.z,i.u.w)));} // 바닥 총 반짝임
+}else if(m>16.5){if(m<17.5){ // 단검 날: 새틴 강철 (길이 방향 헤어라인 · 밝은 날 연마면 · 주변 반사)
  al=vec3f(.15,.155,.16)*(.94+.06*sin(b.y*1900.0)*clamp(1.0-px*900.0,0.0,1.0));gl=.62;al=mix(al,vec3f(.3,.31,.32),ss(.0016,.0006,abs(b.x)));
  tc=(ambAt(reflect(-E,N))*.55+pointLights(i.w,reflect(-E,N))*.1)*al*1.5;}
 else{al=vec3f(.085,.095,.058)*(.85+.3*n3(b*300.0));gl=.32;cf=.15; // 무전기: 짙은 올리브 수지, 바깥 면에 스피커 홈
@@ -274,7 +304,7 @@ else if(m==7.0){al=vec3f(.07,.085,.045);gl=.4;} // 철모
 else if(m==9.0||m==14.0){al=hc;gl=.35;if(i.e.z>.5){al=scf(sd);gl=.06;cf=1.0;}} // 머리카락 · 쪽 / 머릿수건
 else if(m==10.0){al=vec3f(.035,.036,.04);gl=.65;} // 총: 강철 · 목재 · 수지
 else if(m==13.0){al=vec3f(.022,.022,.025);gl=.55;if(abs(b.z-.06)>.124&&length(b.xy-vec2f(0.0,.105))<.0185){al=vec3f(.002);gl=.8;tc=mix(vec3f(.01,.03,.02),vec3f(.05,.02,.08),abs(N.x))*.6;}} // 조준경 · 렌즈(코팅 반사)
-else if(m==11.0){al=vec3f(.2,.085,.035)*(.7+.5*n3(b*vec3f(300.0,300.0,30.0)));gl=.4;}
+else if(m==11.0){al=vec3f(.14,.05,.022)*(.65+.55*n3(b*vec3f(300.0,300.0,30.0)));gl=.45;} // AKM 적갈색 목재 (결은 Z 방향)
 else{al=vec3f(.02);gl=.3;}
 if(cf>0.0&&g.sun.w>.5){ // 천: 잔주름 + 직조
 N=normalize(N+(vec3f(n3(b*70.0),n3(b*70.0+9.0),n3(b*70.0+17.0))-.5)*.5*cf);
@@ -293,7 +323,7 @@ return vec4f(fogAt(c,i.w),1.0);
 }`;
 
  /* ───── 뼈대 풀이 (모델 공간 4x4, 할당 없음) ───── */
- const B=new Float32Array(18*16),T=new Float32Array(16),PAL=new Float32Array(MAXP*NB*16),TA=new Float32Array(NA),IB=new Uint32Array(MAXP*2+2),GL=[0,1,2,3,4,5,6].map(()=>[]);
+ const B=new Float32Array(18*16),T=new Float32Array(16),PAL=new Float32Array(MAXP*NB*16),TA=new Float32Array(NA),IB=new Uint32Array(MAXP*3+2),GL=[[],[],[],[]],GP=new Float32Array(16);
  for(let i=15;i<288;i+=16)B[i]=1;
  const mm=(O,o,A,a,C,c)=>{ // O[o] = A[a]·C[c]
   for(let k=0;k<16;k+=4){const x=C[c+k],y=C[c+k+1],z=C[c+k+2],w=C[c+k+3];for(let r=0;r<4;r++)O[o+k+r]=A[a+r]*x+A[a+4+r]*y+A[a+8+r]*z+A[a+12+r]*w;}
@@ -331,7 +361,7 @@ return vec4f(fogAt(c,i.w),1.0);
  /* 포즈 벡터 a[32]: 0 골반 위치 · 3 골반 회전(숙임,요,롤) · 6 척추 · 9 머리 · 12 왼손 · 15 오른손(어깨 기준 주먹 목표) · 18 왼발 · 21 오른발(발바닥, 모델 공간)
   · 24 무기 방향 · 27 양손 파지 · 28,29 손목 꺾임 · 30 눈 감김 · 31 입 벌림 · 32 손 목표 절대좌표 가중 · 33 머리뼈 기준 · 34 가슴뼈 기준 · 35-37 팔꿈치 극(x는 좌우 대칭) · 38 그 가중 */
  const tgt=(P,a,t,dt)=>{
-  const ps=P._cp,u=t-P._t0,sd=P._r,sg=sd>.5?1:-1,g=P.gun,pst=g==='pistol',lg=g==='ak'||g==='rifle',kn=g==='knife',rd=g==='radio',br=sin(t*1.4+sd*9),sw=sin(t*.45+sd*6),sit=P._sit;
+  const ps=P._cp,u=t-P._t0,sd=P._r,sg=sd>.5?1:-1,g=P.gun,GMd=gm(g),gc=GMd?GMd.cls:'',pst=gc==='pistol'||g==='pistol',lg=!!LG[gc],hv=gc==='shoulder'||gc==='hip',kn=g==='knife',rd=g==='radio',br=sin(t*1.4+sd*9),sw=sin(t*.45+sd*6),sit=P._sit;
   const fy=(P.p[1]>.3&&P.p[1]<.62?-P.p[1]:-.47)/P._sc,live=ps!=='dead'&&ps!=='sleep';
   a.fill(0);
   if(sit===2){ // 의자(좌판 ≈0.46 m): P.p = 좌판 위 엉덩이 점. 바닥은 궁전 바닥(있으면) 아니면 −0.46. 상체 곧게, 아래팔은 탁자(바닥 +0.76) 위
@@ -347,7 +377,7 @@ return vec4f(fogAt(c,i.w),1.0);
    S3(a,12,.05,-.61,.05);S3(a,15,-.05,-.61,.05);a[18]=.1;a[21]=-.1;
   }
   S3(a,24,0,-.92,.38);
-  if(lg&&!sit){S3(a,15,.08,-.33,.16);S3(a,24,.5,-.42,.76);a[27]=1;} // 소총: 앞에총
+  if(lg&&!sit){S3(a,15,.08,-.33,.16);S3(a,24,.5,hv?-.75:-.42,.76);a[27]=1;} // 소총: 앞에총 (중화기는 총구를 더 낮게)
   if(kn&&!sit){S3(a,15,-.03,-.57,.1);S3(a,24,-.12,-.22,1);a[29]=-.15;} // 단검: 낮게, 날은 앞으로
   if(ps==='sleep'){a[3]=-.3;a[6]=.12+.02*sin(t*.9+sd*9);a[9]=.22;a[10]=sg*.25;a[11]=sg*.28;a[30]=1;}
   else if(ps==='brace'){ // 충돌 대비 자세 (좌석 간격 0.8 m): 엉덩이를 깊이, 상체를 숙여 팔짱 낀 팔뚝을 앞 좌석 등받이에 대고 이마를 그 위에. 발은 바닥, 겁먹은 떨림
@@ -426,7 +456,7 @@ return vec4f(fogAt(c,i.w),1.0);
    }else if(g&&!rd){ // 조준: 몸을 비껴 서고 총을 어깨에 붙여 aim 을 향함
     let dx=0,dy=0,dz=1;const kk=ps==='fire'?Math.exp(-(t*9%1)*5):0;
     if(P.aim){const q=toL(P,P.aim);dx=q[0]+.15;dy=q[1]-a[1]-.5;dz=q[2];const l=H(dx,dy,dz)||1;dx/=l;dy/=l;dz/=l;}
-    const hz=H(dx,dz)||1,e=pst?[.5,.15,.04]:[.36-.03*kk,.05,-.07];
+    const hz=H(dx,dz)||1,e=GMd&&GMd.tp&&GMd.tp.e?GMd.tp.e.map((v,i)=>i?v:v-.03*kk):pst?[.5,.15,.04]:[.36-.03*kk,.05,-.07];if(gc==='hip')a[3]-=.08;
     a[4]=-.35;a[7]=cl(Math.atan2(dx,dz),-1.3,1.3)-.15;a[6]-=dy*.4+.03*kk;a[11]=.1;a[27]=1;
     S3(a,15,dx*e[0]+dz/hz*e[1],dy*e[0]+e[2],dz*e[0]-dx/hz*e[1]);S3(a,24,dx,dy+.04*kk,dz);
    }
@@ -462,15 +492,18 @@ return vec4f(fogAt(c,i.w),1.0);
   if(live&&(t*.27+sd*7)%1>.965)a[30]=1; // 눈 깜박임
  };
  const F={on:0,gun:'pistol',kind:'rok',aim:0,kick:0,reload:0,bob:0,sway:[0,0],scope:false,hide:false,throw:0};
- const fpose=a=>{ // 1인칭: 모델 공간 = 카메라 공간(+Z 전방). 어깨는 화면 아래, 주먹 목표는 허리 사격 ↔ 조준
-  const ad=F.aim||0,rl=F.reload?sin(PI*F.reload):0,ps=F.gun==='pistol',kk=F.kick||0,bb=F.bob||0,sw=F.sway||[0,0];
+ const FPD={hip:[.042,-.015,.25],ads:[.172,.048,.26],dir:[0,0]},FPP={hip:[.072,.01,.34],ads:[.172,.072,.3],dir:[0,0]};
+ const fpose=a=>{ // 1인칭: 모델 공간 = 카메라 공간(+Z 전방). 어깨는 화면 아래, 주먹 목표는 허리 사격 ↔ 조준 (총마다 G.gunModels[id].fp)
+  const M=gm(F.gun),cl0=M?M.cls:F.gun==='pistol'?'pistol':'rifle',f=M&&M.fp||(cl0==='pistol'?FPP:FPD),hp=cl0==='hip',sh=cl0==='shoulder';
+  const lw=F.lower||0,ad=hp?0:(F.aim||0)*(1-lw),rl=F.reload?sin(PI*F.reload):0,kk=F.kick||0,bb=F.bob||0,sw=F.sway||[0,0],d=f.dir||[0,0];
+  let A=f.ads;if(F.scope&&M&&M.pt.mount)A=[A[0],.153-(M.pt.mount[1]-.02),A[2]]; // T 조준경: 조준경 중심 = mount.y − .02
   a.fill(0);a[1]=-.63;a[2]=.12;
-  S3(a,15,L(ps?.072:.042,.172,ad)+cos(bb*.5)*.004+.03*rl,L(ps?.01:-.015,ps?.072:.048,ad)+sin(bb)*.006-.07*rl+.01*kk,L(ps?.34:.25,ps?.3:.26,ad)-.045*kk);
-  S3(a,24,sw[0]*.4+.22*rl,sw[1]*.4+.05*kk+.3*rl,1);a[27]=1-rl;S3(a,12,-.2,-.2,.3);
-  if(F.gun==='ak'){ // AKM 낮은 경계 자세: 개머리는 어깨, 총구는 화면 가운데 쪽 약간 아래 · 조준하면 가늠자 선이 화면 중심
-   S3(a,15,L(.052,.172,ad)+cos(bb*.5)*.004+.03*rl,L(-.05,.07,ad)+sin(bb)*.006-.07*rl+.01*kk,L(.19,.27,ad)-.045*kk);
-   a[24]+=.1*(1-ad);a[25]-=.15*(1-ad);a[28]=.15;
-  }
+  const jx=hp&&F.fire?(Math.random()-.5)*.008:0,jy=hp&&F.fire?(Math.random()-.5)*.008:0;
+  S3(a,15,L(f.hip[0],A[0],ad)+cos(bb*.5)*.004+.03*rl,L(f.hip[1],A[1],ad)+sin(bb)*.006-.07*rl+.01*kk-(sh?.08*rl:0),L(f.hip[2],A[2],ad)-.045*kk);
+  S3(a,24,sw[0]*.4+.22*rl*!sh+d[0]*(1-ad)+jx,sw[1]*.4+.05*kk+.3*rl*!sh+d[1]*(1-ad)-.35*lw-(sh?.25*rl:0)+jy,1);a[27]=1-rl*!sh;S3(a,12,-.2,-.2,.3);
+  if(F.gun==='akm'||F.gun==='ak')a[28]=.15;
+  if(sh&&rl>0){a[27]=1-rl;S3(a,12,.05,-.05,.45);} // RPG 재장전: 관을 숙이고 왼손을 총구 쪽으로
+  const cy=F.cyc||0;if(cy>0&&F.gun==='k14'){const w=sin(PI*ss(0,.9,cy));a[49]=w;S3(a,46,-.055,.06,.03);a[29]=.4*w;} // K14 노리쇠: 오른손이 손잡이로
   if(F.gun==='knife'){ // 단검: 오른손 낮게 앞으로 (날이 보이게) · kick = 찌르기 · throw = 머리 위로 던짐(0.5 에서 놓음)
    const th=F.throw||0,st=kk>0?sin(PI*(1-kk))**.7:0,k1=ss(0,.34,th),k2=ss(.34,.5,th),k3=ss(.5,.85,th),w=th>0?1-ss(.85,1,th):0;
    let h=[.06+cos(bb*.5)*.005+.05*st+sw[0]*.05,.01+sin(bb)*.007+.04*st+sw[1]*.05,.36+.18*st],d=[.2-.1*st,.36-.22*st,1];
@@ -480,8 +513,14 @@ return vec4f(fogAt(c,i.w),1.0);
    S3(a,15,...h);S3(a,24,...d);a[27]=0;a[29]=-.15;a[43]=.9; // a[43] = 날 롤 (넓은 면이 보이게)S3(a,12,-.06,-.3,.25);
   }
  };
+ const wax=a=>{ // 무기 뼈 축: Z = a[24..26], X 는 수평, a[43] 롤
+  let zx=a[24],zy=a[25],zz=a[26],l=H(zx,zy,zz)||1;zx/=l;zy/=l;zz/=l;l=H(zx,zz)||1;
+  const xx=zz/l,xz=-zx/l;
+  S3(B,272,xx,0,xz);S3(B,276,zy*xz,zz*xx-zx*xz,-zy*xx);S3(B,280,zx,zy,zz);
+  const r=a[43];if(r)for(let i=0;i<3;i++){const x=B[272+i],y=B[276+i];B[272+i]=cos(r)*x+sin(r)*y;B[276+i]=cos(r)*y-sin(r)*x;} // 무기 롤
+ };
  const solve=(P,a,sl)=>{
-  const pst=P.gun==='pistol',yw=a[4]+a[7],cy=cos(yw),sy=sin(yw);
+  const GMd=gm(P.gun),pt=GMd&&GMd.pt,pst=GMd?GMd.cls==='pistol':P.gun==='pistol',yw=a[4]+a[7],cy=cos(yw),sy=sin(yw);let ox=0,oy=0,oz=0;
   rot(B,0,a[0],a[1],a[2],a[3],a[4],a[5]);
   fk(1,0,a[6]*.5,a[7]*.5,a[8]*.5);fk(2,1,a[6]*.5,a[7]*.5,a[8]*.5);fk(3,2,a[9]*.4,a[10]*.4,a[11]*.4);fk(4,3,a[9]*.6,a[10]*.6,a[11]*.6);
   for(let k=0;k<2;k++){ // 다리 IK + 발(정강이가 많이 누우면 발끝이 따라감)
@@ -499,19 +538,18 @@ return vec4f(fogAt(c,i.w),1.0);
    }
    const pw=a[38]*(1-a[40+k]),px0=a[35]*Math.sign(s),pz0=a[37];
    const PX=L(L(s*2.5*cy-.6*sy,s*2.5,ab),px0*cy+pz0*sy,pw),PY=L(L(-.75,-.6,ab),a[36],pw),PZ=L(L(-.6*cy-s*2.5*sy,0,ab),pz0*cy-px0*sy,pw);
-   if(!k){const w=a[27],q=pst?.02:.24,e=pst?-.02:-.035;fx=L(fx,B[284]+B[280]*q+B[276]*e+.03*pst,w);fy=L(fy,B[285]+B[281]*q+B[277]*e,w);fz=L(fz,B[286]+B[282]*q+B[278]*e,w);}
+   if(!k){const w=a[27],h=pt&&pt.h2||(pst?[.03,-.02,.02]:[0,-.035,.24]);for(let c=0;c<3;c++){const v=B[284+c]+B[272+c]*h[0]+B[276+c]*h[1]+B[280+c]*h[2];c?c>1?fz=L(fz,v,w):fy=L(fy,v,w):fx=L(fx,v,w);}} // 받침손 = 총의 pt.h2
+   if(k&&a[49]>0){wax(a);ox=fx;oy=fy;oz=fz;const w=a[49];fx+=(B[272]*a[46]+B[276]*a[47]+B[280]*a[48])*w;fy+=(B[273]*a[46]+B[277]*a[47]+B[281]*a[48])*w;fz+=(B[274]*a[46]+B[278]*a[47]+B[282]*a[48])*w;} // K14 노리쇠 조작: 오른손만 손잡이를 떠남
    let tx=fx,ty=fy,tz=fz;
    for(let it=0;it<2;it++){ // 주먹 중심이 목표에 오도록 한 번 보정
     ik(i,sx,sy2,sz,tx,ty,tz,.29,.26,PX,PY,PZ,1);fk(i+2,i+1,a[28+k],k?a[45]:0,0);
     tx+=fx-B[n+12]+B[n+4]*.075;ty+=fy-B[n+13]+B[n+5]*.075;tz+=fz-B[n+14]+B[n+6]*.075;
    }
    if(k){ // 무기 뼈: 원점 = 오른 주먹, Z = 포즈가 정한 방향
-    let zx=a[24],zy=a[25],zz=a[26],l=H(zx,zy,zz)||1;zx/=l;zy/=l;zz/=l;l=H(zx,zz)||1;
-    const xx=zz/l,xz=-zx/l;
-    S3(B,272,xx,0,xz);S3(B,276,zy*xz,zz*xx-zx*xz,-zy*xx);S3(B,280,zx,zy,zz);
-    const r=a[43];if(r)for(let i=0;i<3;i++){const x=B[272+i],y=B[276+i];B[272+i]=cos(r)*x+sin(r)*y;B[276+i]=cos(r)*y-sin(r)*x;} // 무기 롤
-    S3(B,284,B[n+12]-B[n+4]*.075,B[n+13]-B[n+5]*.075,B[n+14]-B[n+6]*.075);
-    const q=pst?.16:P.gun==='knife'?.2:.6;S3(P._mz,0,B[284]+B[276]*.05+zx*q,B[285]+B[277]*.05+zy*q,B[286]+B[278]*.05+zz*q);S3(P._mz,3,zx,zy,zz);
+    wax(a);const zx=B[280],zy=B[281],zz=B[282];
+    S3(B,284,B[n+12]-B[n+4]*.075,B[n+13]-B[n+5]*.075,B[n+14]-B[n+6]*.075);if(a[49]>0)S3(B,284,ox,oy,oz);
+    if(pt&&pt.mz){const m=pt.mz;for(let c=0;c<3;c++)P._mz[c]=B[284+c]+B[272+c]*m[0]+B[276+c]*m[1]+B[280+c]*m[2];} // 총구 = pt.mz
+    else{const q=pst?.16:P.gun==='knife'?.2:.6;S3(P._mz,0,B[284]+B[276]*.05+zx*q,B[285]+B[277]*.05+zy*q,B[286]+B[278]*.05+zz*q);}S3(P._mz,3,zx,zy,zz);
    }
   }
   if(P.gun==='radio')for(let k=0;k<3;k++){ // 무전기: 왼 주먹에, 방향은 머리를 따르되 윗부분(스피커)을 뒤로 20° 기울임 → 아래(마이크)는 입 쪽
@@ -525,7 +563,7 @@ return vec4f(fogAt(c,i.w),1.0);
   const o=(sl*NB+4)*16;for(let k=0;k<3;k++)j[51+k]=PAL[o+k]*0+PAL[o+4+k]*YC+PAL[o+8+k]*.012+PAL[o+12+k]; // 머리 중심 (피격 판정)
   const kd=KIND[P.kind]||0,fe=fem(P,kd);P._ok=1;
   // 머리쓰개: 6 고컷 헬멧 · 7 철모 · 8 정모(장교·병사, 인민 남자는 천 모자) · 9 머리카락. 부품 비트: 1 방탄판·무릎 · 2 치마 · 4 쪽머리 · 8 권총집
-  const hg=kd<2?6:kd===2?(K[3]>.35?7:8):kd===4||kd===5||(kd===6&&!fe&&K[1]>.6)?8:9,pm=(kd<3?1:0)|(kd===4||kd===5?8:0)|(kd===5?2:0)|(fe&&kd>2?4:0);
+  const hg=kd<2?6:kd===2?(K[3]>.35?7:8):kd===4||kd===5||(kd===6&&!fe&&K[1]>.6)?8:9,pm=(kd<3?1:0)|(kd===4||kd===5?8:0)|(kd===5?2:0)|(fe&&kd>2?4:0)|(P.loaded===0||P.loaded===false?0:16)|(P.scope?0:64);
   PAL.set([kd,P._r,K[0],hg,a[30],P._g[0],P._g[1],a[31],+!!P._W,(K[1]-.4)*.012,.96+K[2]*.09,P.gun||P._cp==='grip'?1:P._cp==='salute'?0:.2,fe,pm,+(kd===6&&fe&&K[1]>.55),0],(sl*NB+18)*16);
  };
  const mk=(kind,o)=>{
@@ -539,7 +577,7 @@ return vec4f(fogAt(c,i.w),1.0);
   if(ps==='hit'){P._ht=t;ps=P.pose=P._cp&&P._cp!=='dead'?P._cp:'stand';}
   if(ps==='throw'){if(!(t-P._tt<.6)){P._tt=t;P._tg=P.gun||1;}ps=P.pose=P._cp&&P._cp!=='dead'?P._cp:'stand';} // 던지기: 한 번 겹쳐 재생하고 포즈는 되돌림
   if(P.gun!==P._tg&&P._tg!==1)P._tg=0;
-  const tu=t-P._tt;P._hid=P._tg&&tu>.33&&(tu<.62||P._tg==='radio')||ps==='grip'&&(P.gun==='ak'||P.gun==='rifle'); // 놓은 뒤 소품 숨김 (무전기는 총을 바꿀 때까지)
+  const tu=t-P._tt;P._hid=P._tg&&tu>.33&&(tu<.62||P._tg==='radio')||ps==='grip'&&!!gid(P.gun)&&P.gun!=='pistol'&&gm(P.gun).cls!=='pistol'; // 놓은 뒤 소품 숨김 (무전기는 총을 바꿀 때까지)
   if(ps!==P._cp){if(P._cp){P._s.set(P._a);P._bt=0;P._bd=Math.max(BD[ps]||.3,BD[P._cp]||.3);if(ps==='dead')P._dk=P._cp==='kneel'||P._cp==='cower';}P._sit=SIT[ps==='dead'?P._cp||P.pose:ps];P._cp=ps;P._t0=t;}
   if(ps==='stumble'&&t-P._t0>2.5)P.pose='stand';
   const q=P._lp0,d=H(P.p[0]-q[0],P.p[2]-q[2]);q[0]=P.p[0];q[2]=P.p[2];
@@ -558,7 +596,7 @@ return vec4f(fogAt(c,i.w),1.0);
   return t>0&&q>0?Math.max(t-Math.sqrt(q),0):-1;
  };
  G.people={
-  list,fp:F,
+  list,fp:F,props:[],models:GM,gid,stats:()=>GS,
   add(kind,o){const P=mk(kind,o);list.push(P);return P;},
   remove(P){const i=list.indexOf(P);i>=0&&list.splice(i,1);},
   clear(){list.length=0;},
@@ -575,7 +613,7 @@ return vec4f(fogAt(c,i.w),1.0);
   }
  };
 
- let sm,bgl,bg,pb,ib,vb,xb,pipe,pipeN,spipe,lod=-1,n=0,fpn=-1;const PP={},PN={},MR=[],off=[0,0,0,0,0,0,0];
+ let sm,bgl,bg,pb,ib,vb,xb,pipe,pipeN,spipe,lod=-1,n=0,fpn=-1,gkey='';const PP={},PN={},MR=[],off=[],GS={};
  const mkp=(vs,ds,fragment,count=1,cull='back')=>G.dev.createRenderPipeline({
   layout:G.layout(bgl),vertex:{module:sm,entryPoint:vs,buffers:[
    {arrayStride:40,attributes:[{shaderLocation:0,offset:0,format:'float32x3'},{shaderLocation:1,offset:12,format:'float32x3'},{shaderLocation:2,offset:24,format:'float32x4'}]},
@@ -584,9 +622,40 @@ return vec4f(fogAt(c,i.w),1.0);
  const draw=(p,pl,s,pn)=>{ // s = 1: 그림자 (1인칭 팔·총 제외: 1인칭은 각 묶음의 마지막 칸)
   if(!n||!pl)return;
   p.setPipeline(pl);p.setBindGroup(1,bg);p.setVertexBuffer(0,vb);p.setVertexBuffer(1,ib);p.setIndexBuffer(xb,'uint16');
-  for(let k=0;k<7;k++){const g=GL[k],f=fpn>=0&&g[g.length-1]===fpn,c=g.length-(f?1:0);if(c>0)p.drawIndexed(MR[k][1],c,MR[k][0],0,off[k]);
+  for(let k=0;k<GL.length;k++){const g=GL[k],f=fpn>=0&&g[g.length-1]===fpn,c=g.length-(f?1:0);if(c>0)p.drawIndexed(MR[k][1],c,MR[k][0],0,off[k]);
    // 1인칭 팔·무기는 뒷면 제거 없이 따로 그림: 주먹(손가락을 접어 만든 면)이 가까이서 뒤집혀 구멍 나 보이던 것 방지
    if(f&&!s&&pn){p.setPipeline(pn);p.drawIndexed(MR[k][1],1,MR[k][0],0,off[k]+c);p.setPipeline(pl);}}
+ };
+ const build=lo=>{ // 메시 묶음: 몸 · 조준경 · 단검 · 무전기 + 총마다 상세·LOD (G.gunModels 가 바뀌면 다시 만듦)
+  const ks=Object.keys(GM).filter(k=>GM[k]&&GM[k].build),key=ks.join();
+  if(lo===lod&&key===gkey)return;lod=lo;gkey=key;V=[];I=[];
+  const F0=[()=>body(lo),scope,knife,radio];GN.length=0;
+  for(const k of ks){GI[k]=F0.length;GN.push(k);F0.push(()=>GM[k].build(K,lo,0),()=>GM[k].build(K,lo,1));}
+  if(!ks.length)F0.push(()=>gun(0),()=>gun(0),()=>gun(1),()=>gun(1),()=>gun(2),()=>gun(2)),['akm','k2c1','k5'].forEach((k,i)=>GI[k]=4+2*i); // mod_guns 없음: 옛 3종
+  while(GL.length<F0.length)GL.push([]);GL.length=F0.length;
+  F0.forEach((f,k)=>{const s=I.length,v=V.length;try{f();}catch(e){G.err('people: gun build '+(e.stack||e));V.length=v;I.length=s;}MR[k]=[s,I.length-s];
+   const nm=k<4?['body','scope','knife','radio'][k]:(ks[(k-4)>>1]||['akm','k2c1','k5'][(k-4)>>1])+((k-4)&1?':lod':'');GS[nm]=[(V.length-v)/10,(I.length-s)/3];});
+  GS.total=[V.length/10,I.length/3];
+  if(V.length/10>65535)G.err('people: vertex budget '+V.length/10);
+  for(let t=0;t<I.length;t+=3){ // 면 법선을 정점에 누적 → 매끈한 법선
+   const a=I[t]*10,b=I[t+1]*10,c=I[t+2]*10,e=[0,1,2].map(k=>V[b+k]-V[a+k]),f=[0,1,2].map(k=>V[c+k]-V[a+k]),nn=V3.cross(e,f);
+   for(const q of[a,b,c])for(let k=0;k<3;k++)V[q+3+k]+=nn[k];
+  }
+  const d=G.dev,U=GPUBufferUsage;vb&&vb.destroy();xb&&xb.destroy();
+  const v=new Float32Array(V),x=new Uint16Array(I.length+1&~1);x.set(I);
+  vb=d.createBuffer({size:v.byteLength,usage:U.VERTEX|U.COPY_DST});d.queue.writeBuffer(vb,0,v);
+  xb=d.createBuffer({size:x.byteLength,usage:U.INDEX|U.COPY_DST});d.queue.writeBuffer(xb,0,x);
+ };
+ const K={loft};
+ const pushG=(g,sl,det)=>{ // 총 묶음에 칸 추가 (상세 / LOD)
+  if(g==='knife')return GL[2].push(sl);if(g==='radio')return GL[3].push(sl);
+  const k=gid(g);if(k&&GI[k]!=null)GL[GI[k]+(det?0:1)].push(sl);
+ };
+ const gpar=(sl,g,Q,pr)=>{ // 팔레트 20번째 칸: [회전각, 노리쇠, 양각대, 조준경 dy, dz, 도트, 반짝임, 반짝임 점 y, z]
+  const M=gm(g),pt=M&&M.pt||{},mo=pt.mount,sc=Q.scope&&mo;GP.fill(0);
+  GP[0]=Q.spin||0;GP[1]=Q.cyc||0;GP[2]=Q.bip||0;GP[3]=sc?mo[1]-.125:0;GP[4]=sc?mo[2]-.07:0;GP[5]=Q===F?(F.dot??F.aim??0):0;
+  if(pr){const gl=pt.gl||[0,.1,0];GP[6]=Q.glint!=null?Q.glint:Math.max(0,sin(G.time*1.9+Math.atan2(Q.M[8],Q.M[10])*5))**20;GP[7]=gl[1];GP[8]=gl[2];}
+  PAL.set(GP,(sl*NB+19)*16);
  };
  G.register('people',{
   init(){
@@ -601,29 +670,33 @@ return vec4f(fogAt(c,i.w),1.0);
    const d=G.dev,U=GPUBufferUsage,lo=+(Q.level<1);
    pipe=PP[Q.msaa]||(PP[Q.msaa]=mkp('vs',{depthCompare:'greater'},{module:sm,entryPoint:'fs',targets:[{format:G.HDR}]},Q.msaa));
    pipeN=PN[Q.msaa]||(PN[Q.msaa]=mkp('vs',{depthCompare:'greater'},{module:sm,entryPoint:'fs',targets:[{format:G.HDR}]},Q.msaa,'none'));
-   if(lo===lod)return;lod=lo;V=[];I=[];
-   [()=>body(lo),()=>gun(0),()=>gun(1),()=>gun(2),scope,knife,radio].forEach((f,k)=>{const s=I.length;f();MR[k]=[s,I.length-s];});
-   for(let t=0;t<I.length;t+=3){ // 면 법선을 정점에 누적 → 매끈한 법선
-    const a=I[t]*10,b=I[t+1]*10,c=I[t+2]*10,e=[0,1,2].map(k=>V[b+k]-V[a+k]),f=[0,1,2].map(k=>V[c+k]-V[a+k]),nn=V3.cross(e,f);
-    for(const q of[a,b,c])for(let k=0;k<3;k++)V[q+3+k]+=nn[k];
-   }
-   vb&&vb.destroy();xb&&xb.destroy();
-   const v=new Float32Array(V),x=new Uint16Array(I.length+1&~1);x.set(I);
-   vb=d.createBuffer({size:v.byteLength,usage:U.VERTEX|U.COPY_DST});d.queue.writeBuffer(vb,0,v);
-   xb=d.createBuffer({size:x.byteLength,usage:U.INDEX|U.COPY_DST});d.queue.writeBuffer(xb,0,x);
+   build(lo);
   },
+  stats:()=>GS,
   prepare(){
    try{
-    const t=G.time,dt=G.dt,c=G.cam;n=0;fpn=-1;for(const g of GL)g.length=0;
-    for(let i=0;i<=list.length;i++){
-     const P=list[i]||(i===list.length&&F.on&&!F.hide?FP:0);if(!P||P.vis===false||n>=MAXP)continue;
-     if(P===FP){ // 카메라 기준 좌표계
-      const z=V3.norm(V3.sub(c.target,c.pos)),x=V3.norm(V3.cross(c.up,z)),y=V3.cross(z,x);
-      P._W=new Float32Array([...x,0,...y,0,...z,0,...c.pos,1]);P.gun=F.gun;P.kind=F.kind||'rok';fpose(P._a);
-     }else step(P,t,dt);
-     solve(P,P._a,n);GL[0].push(n);const gk=GUN[P.gun];
-     if(gk&&!(P===FP?gk===5&&F.throw>=.5:P._hid))GL[gk].push(n); // 던진 뒤 · 붙잡는 중(총은 멘 것으로)에는 소품을 그리지 않음
-     if(P===FP){fpn=n;if(F.scope&&gk<3)GL[4].push(n);}n++;
+    if(G.Q)build(+(G.Q.level<1)); // mod_guns 가 나중에 실려도 묶음을 다시 만듦 (키가 같으면 아무 일 없음)
+    const t=G.time,dt=G.dt,c=G.cam,lv=G.Q?G.Q.level:1,fo=F.on&&!F.hide;n=0;fpn=-1;for(const g of GL)g.length=0;
+    for(let i=0;i<list.length;i++){ // 사람
+     const P=list[i];if(!P||P.vis===false||n>=MAXP-1)continue;
+     step(P,t,dt);solve(P,P._a,n);GL[0].push(n);
+     const j=P._j,dc=H(j[0]-c.pos[0],j[1]-c.pos[1],j[2]-c.pos[2]);gpar(n,P.gun,P,0);
+     if(!P._hid)pushG(P.gun,n,lv>=1&&dc<6);n++;
+    }
+    const PR=G.people.props;let pc=0;
+    if(PR)for(const Q of PR){ // 바닥 총 · 날아가는 로켓 (총 묶음만, 손 없음). 마지막 칸은 1인칭 몫
+     if(!Q||Q.vis===false||!Q.M||!gid(Q.id))continue;if(n>=MAXP-1)break;
+     const o=(n*NB+17)*16;PAL.set(Q.M,o);const ld=Q.loaded===0||Q.loaded===false?0:16;
+     PAL.fill(0,(n*NB+18)*16,(n*NB+18)*16+16);PAL[(n*NB+18)*16]=-1;PAL[(n*NB+18)*16+10]=1;PAL[(n*NB+18)*16+13]=ld|64;
+     gpar(n,Q.id,Q,1);const dc=H(Q.M[12]-c.pos[0],Q.M[13]-c.pos[1],Q.M[14]-c.pos[2]);
+     pushG(Q.id,n,Q.lod!=null?!Q.lod:dc<4);n++;pc++;
+    }
+    if(fo&&n<MAXP){ // 1인칭 (카메라 기준 좌표계) — 각 묶음의 마지막 칸
+     const P=FP,z=V3.norm(V3.sub(c.target,c.pos)),x=V3.norm(V3.cross(c.up,z)),y=V3.cross(z,x);
+     P._W=new Float32Array([...x,0,...y,0,...z,0,...c.pos,1]);P.gun=F.gun;P.kind=F.kind||'rok';P.loaded=F.loaded;P.scope=F.scope;fpose(P._a);
+     solve(P,P._a,n);GL[0].push(n);gpar(n,F.gun,F,0);
+     if(!(P.gun==='knife'&&F.throw>=.5))pushG(P.gun,n,1);
+     const M=gm(F.gun);fpn=n;if(F.scope&&M&&M.pt&&M.pt.mount)GL[1].push(n);n++;
     }
     if(!n)return;
     let o=0;GL.forEach((g,k)=>{off[k]=o;IB.set(g,o);o+=g.length;});

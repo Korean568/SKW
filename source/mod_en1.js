@@ -67,8 +67,8 @@ if(G.i18n){
     '사살한 북한군':'KPA killed',
 
     /* ── 총격전 HUD (mod_fps.js) ── */
-    'K2C1 소총':'K2C1 Rifle','K7 권총':'K7 Pistol','AK 소총':'AK Rifle',
-    'K2C1 소총 + 스코프':'K2C1 Rifle + Scope','AK 소총 + 스코프':'AK Rifle + Scope','K7 권총 + 스코프':'K7 Pistol + Scope',
+    'K2C1 소총':'K2C1 Rifle','K7 권총':'K7 SMG','AK 소총':'AK Rifle',
+    'K2C1 소총 + 스코프':'K2C1 Rifle + Scope','AK 소총 + 스코프':'AK Rifle + Scope','K7 권총 + 스코프':'K7 SMG + Scope',
     '방탄판':'Armor',
     '북한군':'KPA','북한군을 제압하라':'Neutralize the KPA',
     '방탄판 교체 중…':'Swapping plate…',
@@ -84,6 +84,9 @@ if(G.i18n){
     '화면을 클릭하면 조준이 시작됩니다':'Click the screen to take aim',
     'WASD 이동 · Shift 달리기 · C 앉기 · 좌클릭 사격 · 우클릭 조준 · R 재장전 · E 줍기 · F 방탄판 교체 · T 스코프 · 1 K2C1 · 2 K7 · 3 AK · 휠 무기 교체':
       'WASD move · Shift run · C crouch · Left click fire · Right click aim · R reload · E pick up · F swap plate · T scope · 1 K2C1 · 2 K7 · 3 AK · Wheel switch weapon',
+    // 도움말 줄 (#lk) — 무기 11종 (mod_arms): 1–4 칸 · B 사격 모드 · T 스코프. 무기 이름 · 모드 · 줍기 안내는 mod_enarms.js
+    'WASD 이동 · Shift 달리기 · C 앉기 · 좌클릭 사격 · 우클릭 조준 · R 재장전 · E 줍기 · F 방탄판 교체 · T 스코프 · B 사격 모드 · 1–4 무기 · 휠 무기 교체':
+      'WASD move · Shift run · C crouch · Left click fire · Right click aim · R reload · E pick up · F swap plate · T scope · B fire mode · 1–4 weapons · Wheel switch weapon',
     '북한군 제압 완료':'KPA Neutralized',
     '추락 현장을 지켜냈다':'The crash site is secured',
   });
