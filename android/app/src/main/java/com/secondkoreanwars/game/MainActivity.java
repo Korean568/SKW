@@ -42,7 +42,13 @@ import android.window.OnBackInvokedDispatcher;
 
 import androidx.webkit.WebViewAssetLoader;
 
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Locale;
 
@@ -51,19 +57,26 @@ import java.util.Locale;
  *
  * 스토리 게임(HTML 한 파일, WebGPU)을 WebView 하나에 띄운다.
  *  - 게임 파일은 앱 안(assets/index.html)에 있고 https://appassets.androidplatform.net/assets/ 로 서빙한다
- *    (보안 출처여야 WebGPU · localStorage 가 동작한다). 네트워크는 쓰지 않는다 (INTERNET 권한 없음).
- *  - 게임과의 약속: window.skwDesktop (platform 'android') 은 assets 에 끼워 넣은 작은 스크립트
+ *    (보안 출처여야 WebGPU · localStorage 가 동작한다). 게임 페이지는 앱 밖 주소를 불러오지 않는다.
+ *  - 게임 자동 업데이트 (Updater, PC판과 같은 desktop/update/latest.json + game.gz): 켤 때 최대 4초 기다려 새 게임을 받으면
+ *    바로 그걸로 시작하고, 아니면 지금 게임으로 시작해 뒤에서 받는다 (다음 시작 · '지금 적용' 때 사용). 켜져 있는 동안 30분마다 다시 확인.
+ *    받은 게임(filesDir/game/)은 assets/index.html 자리에서 서빙하고, 다리 스크립트(assets/android-shim.js)를 그때 끼워 넣는다.
+ *    네트워크는 Updater 의 스레드에서만 쓴다 (GitHub 의 공개 게임 파일만 받음, 보내는 정보 없음).
+ *  - 게임과의 약속: window.skwDesktop (platform 'android', 자동 업데이트 skwDesktop.update 포함) 은 assets 에 끼워 넣은 작은 스크립트
  *    (android/scripts/android-shim.js)가 아래 Bridge(window.SkwNative)를 감싸 만든다.
  *  - 뒤로 버튼: window.skwBack() 이 true 를 돌려주면 게임이 처리한 것, 아니면 "한 번 더 누르면 종료".
  */
 public class MainActivity extends Activity {
     private static final String HOST = WebViewAssetLoader.DEFAULT_DOMAIN; // appassets.androidplatform.net
-    private static final String START_URL = "https://" + HOST + "/assets/index.html";
+    private static final String INDEX_PATH = "/assets/index.html";
+    private static final String START_URL = "https://" + HOST + INDEX_PATH;
     private static final String BRIDGE = "SkwNative";
     private static final String DEFAULT_WEBVIEW = "com.google.android.webview";
     private static final long EXIT_WINDOW_MS = 2000;   // 이 시간 안에 뒤로를 한 번 더 누르면 종료
     private static final long BACK_REPLY_MS = 800;     // 게임이 이 시간 안에 답하지 않으면 처리 안 한 것으로 봄
     private static final long CRASH_WINDOW_MS = 30000; // 이 시간 안에 렌더 프로세스가 3번 죽으면 자동 재시작을 멈춤
+    private static final long STARTUP_WAIT_MS = 4000;  // 켤 때 업데이트 확인 · 받기를 기다리는 최대 시간
+    private static final long RECHECK_MS = 30 * 60 * 1000L; // 켜져 있는 동안 다시 확인하는 간격
 
     private final Handler main = new Handler(Looper.getMainLooper());
 
@@ -71,15 +84,22 @@ public class MainActivity extends Activity {
     private WebView web;
     private View notice;                 // 안내 화면 (WebGPU 없음 · 반복 충돌 · 불러오기 실패)
     private WebViewAssetLoader assets;
+    private volatile Updater updater;    // Bridge(자바스크립트 스레드) · shouldInterceptRequest(WebView 스레드)도 읽는다
+    private volatile String shimText;    // assets/android-shim.js (받은 게임에 끼워 넣을 다리 스크립트)
     private Toast toast;
     private String versionName = "";
+    private long versionCode;
     private boolean resumed;
+    private boolean started;             // 게임 페이지를 처음 불러왔는가 (켤 때 업데이트 확인을 기다리는 동안 false)
+    private long lastCheck;              // 마지막으로 업데이트 확인을 시작한 때 (elapsedRealtime)
     private long lastBackWarn = -EXIT_WINDOW_MS * 2;
     private long lastCrash = -CRASH_WINDOW_MS * 2;
     private int crashCount;
     private final Runnable pauseTimers = () -> {
         if (this.web != null && !this.resumed) this.web.pauseTimers();
     };
+    private final Runnable startNow = this::startGame;
+    private final Runnable recheck = this::onRecheck;
 
     /* ───────────────────────── 생명 주기 ───────────────────────── */
 
@@ -87,7 +107,9 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         try {
-            versionName = String.valueOf(getPackageManager().getPackageInfo(getPackageName(), 0).versionName);
+            PackageInfo pi = getPackageManager().getPackageInfo(getPackageName(), 0);
+            versionName = String.valueOf(pi.versionName);
+            versionCode = pi.getLongVersionCode();
         } catch (Exception e) {
             versionName = "";
         }
@@ -108,8 +130,18 @@ public class MainActivity extends Activity {
         assets = new WebViewAssetLoader.Builder()
                 .addPathHandler("/assets/", new WebViewAssetLoader.AssetsPathHandler(this))
                 .build();
-        createWebView();
+
+        // 자동 업데이트: 받아 둔 새 게임이 있으면 그걸 띄우고(디스크만), 네트워크 확인은 Updater 의 스레드에서
+        String[] bundled = bundledVersion();
+        Updater up = new Updater(getFilesDir(), Updater.BASES, bundled[0], bundled[0], bundled[1],
+                (json, done) -> main.post(() -> onUpdateStatus(json, done)));
+        updater = up;
+        up.useCached();
+
+        createWebView(); // 게임은 startGame() 에서 불러온다
         hideSystemBars();
+        if (startCheck("start") > 0) main.postDelayed(startNow, STARTUP_WAIT_MS); // 늦어도 4초 뒤에는 지금 게임으로 시작
+        else startGame();
 
         if (Build.VERSION.SDK_INT >= 33) Api33.registerBack(this); // Android 13+: 새 뒤로 가기 방식
     }
@@ -125,11 +157,13 @@ public class MainActivity extends Activity {
             web.onResume();
             js("window.__skwAndroid&&window.__skwAndroid.resume()");
         }
+        scheduleRecheck();
     }
 
     @Override
     protected void onPause() {
         resumed = false;
+        main.removeCallbacks(recheck);
         if (web != null) {
             // 일시정지 메뉴를 띄우고 소리를 멈춘 다음(페이지 안에서) WebView 를 멈춘다
             js("window.__skwAndroid&&window.__skwAndroid.pause()");
@@ -142,6 +176,8 @@ public class MainActivity extends Activity {
     @Override
     protected void onDestroy() {
         main.removeCallbacksAndMessages(null);
+        Updater up = updater;
+        if (up != null) up.close();
         if (web != null) web.resumeTimers(); // pauseTimers 는 프로세스 전체에 걸리므로 되돌려 둔다
         destroyWebView();
         super.onDestroy();
@@ -191,7 +227,7 @@ public class MainActivity extends Activity {
         s.setSupportMultipleWindows(false);
         s.setJavaScriptCanOpenWindowsAutomatically(false);
         s.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
-        s.setSafeBrowsingEnabled(false);               // 네트워크를 쓰지 않는다
+        s.setSafeBrowsingEnabled(false);               // 게임 페이지는 앱 안의 파일만 연다 (앱 밖 주소는 Client 가 막음)
 
         v.addJavascriptInterface(new Bridge(), BRIDGE);
         v.setWebViewClient(new Client());
@@ -199,7 +235,7 @@ public class MainActivity extends Activity {
 
         root.addView(v, 0, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         web = v;
-        v.loadUrl(START_URL);
+        if (started) v.loadUrl(START_URL); // 켤 때는 업데이트 확인이 끝난 뒤(최대 4초) startGame() 이 불러온다
         v.requestFocus();
     }
 
@@ -226,6 +262,10 @@ public class MainActivity extends Activity {
         public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
             Uri u = request.getUrl();
             if (isAppUrl(u)) {
+                if (INDEX_PATH.equals(u.getPath())) { // 받아 둔 새 게임이 있으면 앱에 든 게임 대신
+                    WebResourceResponse g = downloadedGame();
+                    if (g != null) return g;
+                }
                 WebResourceResponse r = assets.shouldInterceptRequest(u);
                 if (r == null) return empty(404, "Not Found");
                 if ("text/html".equals(r.getMimeType())) r.setEncoding("UTF-8");
@@ -304,6 +344,129 @@ public class MainActivity extends Activity {
         public void gpuStatus(String status) {
             main.post(() -> onGpuStatus(status));
         }
+
+        /** 자동 업데이트 상태 S (JSON 글자) — skwDesktop.update.status() */
+        @JavascriptInterface
+        public String updStatus() {
+            Updater up = updater;
+            return up == null ? "null" : up.statusJson();
+        }
+
+        /** 지금 확인 (이미 확인 중이면 그 확인). 돌려주는 값 = 확인 번호 (0 = 못 함). 결과는 window.__skwUpd(S) 로 간다 */
+        @JavascriptInterface
+        public int updCheck() {
+            Updater up = updater;
+            return up == null ? 0 : up.check("manual");
+        }
+
+        /** 받아 둔 새 게임으로 바꾸고 처음 화면부터 다시 불러온다. false = 준비된 게임 없음 */
+        @JavascriptInterface
+        public boolean updApply() {
+            Updater up = updater;
+            if (up == null || !up.apply()) return false;
+            main.post(MainActivity.this::reloadGame);
+            return true;
+        }
+
+        /** 업데이트 기록 (filesDir/update.log) — 안 될 때 원인을 보려고 */
+        @JavascriptInterface
+        public String updLog() {
+            Updater up = updater;
+            return up == null ? "" : up.logText();
+        }
+    }
+
+    /* ───────────────────────── 게임 자동 업데이트 ───────────────────────── */
+
+    /** assets/version.json (prepare-assets.js 가 씀): {내부 번호, 보이는 번호}. 없으면 versionCode(1.6.0 → 10600)에서 */
+    private String[] bundledVersion() {
+        String v = null, l = "";
+        try (InputStream in = getAssets().open("version.json")) {
+            JSONObject j = new JSONObject(new String(Updater.readAll(in, 4096, 0), StandardCharsets.UTF_8));
+            v = Updater.cleanVersion(j.opt("version"));
+            l = Updater.cleanLabel(j.opt("label"));
+        } catch (IOException | JSONException e) {
+            v = null;
+        }
+        if (v == null) v = (versionCode / 10000) + "." + (versionCode / 100 % 100) + "." + (versionCode % 100);
+        return new String[]{v, l};
+    }
+
+    /** assets/android-shim.js (주석을 지운 다리 스크립트, 버전 자리 그대로). 없으면 null */
+    private String shim() {
+        String s = shimText;
+        if (s != null) return s;
+        try (InputStream in = getAssets().open("android-shim.js")) {
+            s = new String(Updater.readAll(in, 256 * 1024, 0), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            return null;
+        }
+        shimText = s;
+        return s;
+    }
+
+    /** 받아 둔 새 게임 + 다리 스크립트 (없거나 못 읽으면 null → 앱에 든 게임). WebView 의 별도 스레드에서 불린다 */
+    private WebResourceResponse downloadedGame() {
+        Updater up = updater;
+        Updater.Game g = up == null ? null : up.current();
+        if (g == null) return null;
+        String sh = shim();
+        String html = sh == null ? null : up.gameHtml(g, sh);
+        if (html == null) return null;
+        return new WebResourceResponse("text/html", "UTF-8", new ByteArrayInputStream(html.getBytes(StandardCharsets.UTF_8)));
+    }
+
+    /** 게임 페이지를 처음 불러온다 (켤 때 업데이트 확인이 끝났거나 STARTUP_WAIT_MS 가 지났을 때, 한 번만) */
+    private void startGame() {
+        main.removeCallbacks(startNow);
+        if (started) return;
+        started = true;
+        Updater up = updater;
+        if (up != null && up.busy()) up.log("켬: " + STARTUP_WAIT_MS + "ms 안에 확인이 끝나지 않아 지금 게임으로 시작 (확인은 계속)");
+        if (web != null) web.loadUrl(START_URL);
+    }
+
+    /** Updater 의 상태가 바뀜 (UI 스레드). 켜는 중이면 확인이 끝나는 대로 시작, 아니면 게임에 알린다 */
+    private void onUpdateStatus(String json, boolean done) {
+        if (isFinishing() || isDestroyed()) return;
+        Updater up = updater;
+        if (!started) {
+            if (!done || up == null) return;
+            if (up.apply()) up.log("켬: 새 게임을 받아서 바로 그걸로 시작"); // 'ready' 일 때만 바뀐다 (S.applied = true)
+            startGame();
+            return;
+        }
+        js("window.__skwUpd&&window.__skwUpd(" + json + ")");
+    }
+
+    private int startCheck(String why) {
+        lastCheck = SystemClock.elapsedRealtime();
+        Updater up = updater;
+        return up == null ? 0 : up.check(why);
+    }
+
+    /** 앱이 앞에 있는 동안 RECHECK_MS 마다 (뒤에 있다가 돌아왔을 때 그 시간이 지났으면 바로) */
+    private void scheduleRecheck() {
+        main.removeCallbacks(recheck);
+        main.postDelayed(recheck, Math.max(0, lastCheck + RECHECK_MS - SystemClock.elapsedRealtime()));
+    }
+
+    private void onRecheck() {
+        if (!resumed || isFinishing() || isDestroyed()) return;
+        startCheck("timer");
+        scheduleRecheck();
+    }
+
+    /** '지금 적용': 바뀐 게임을 처음 화면부터 */
+    private void reloadGame() {
+        if (isFinishing() || isDestroyed()) return;
+        if (web == null) { // 안내 화면 중이면 새 WebView 로
+            hideNotice();
+            createWebView();
+            return;
+        }
+        hideNotice();
+        web.loadUrl(START_URL);
     }
 
     /** http/https 주소만 시스템 브라우저로 연다. */

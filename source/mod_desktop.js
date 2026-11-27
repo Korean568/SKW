@@ -269,6 +269,7 @@ ${UP || oldApp ? `<span>버전</span><div data-k=up><output data-i18n-skip></out
           const f = root.querySelector('[data-k=fs]'); f.style.display = f.previousElementSibling.style.display = 'none';
         }
         if (touch()) root.querySelector('[data-k=sens]').previousElementSibling.textContent = '시점 감도';
+        const vo = root.querySelector('[data-k=up] output'); vo && (vo.textContent = G.LABEL || D.label || D.gameVersion || D.version || ''); // 설정의 버전 줄 (0.xx)
         G.i18n && G.i18n.onChange(() => { menu === 'set' && sync(); }); // 처음 화면 버튼 등 다른 곳에서 바꿔도 설정 표시 맞춤
         root.addEventListener('click', e => { const a = e.target.closest('[data-a]'); if (a) return ACT[a.dataset.a](); const b = e.target.closest('[data-k] button'); b && onSet(b.parentNode.dataset.k, b.dataset.v); });
         root.addEventListener('input', e => { const k = e.target.parentNode.dataset.k; k && onSet(k, e.target.value, 1); });
@@ -281,15 +282,14 @@ ${UP || oldApp ? `<span>버전</span><div data-k=up><output data-i18n-skip></out
           G.el('button', { textContent: '설정', onclick: () => settings('title') }, bar);
           canQuit && G.el('button', { textContent: '게임 종료', onclick: quit }, bar);
           // 보이는 번호 = 0.xx (G.LABEL: 빌드가 게임 안에 넣음 — 옛 앱(1.2.0)이 받은 새 게임도 맞게) · 내부 semver(D.gameVersion)는 마우스를 올리면
-          const lab = G.LABEL || (D && D.label), vo = root.querySelector('[data-k=up] output');
-          vo && (vo.textContent = lab || D.gameVersion || D.version || '');
+          const lab = G.LABEL || (D && D.label);
           G.el('div', { className: 'dkv', textContent: D || lab ? 'v' + (lab || D.gameVersion || D.version) : 'dev · browser', title: D ? (D.gameVersion || D.version) + '' : '' }, o);
           const a = o.querySelector('a.tb');
           if (a && D && D.openExternal) a.addEventListener('click', e => { e.preventDefault(); quiet(D.openExternal(a.href)); });
           marks();
         }
         // 게임 업데이트 상태: 새 앱은 껍데기가 알려 줌 · 옛 앱은 게임이 직접 확인 (3초 뒤, 그리고 30분마다)
-        if (UP) { try { UP.onStatus(uSet); } catch (e) { } quiet(UP.status().then(s => { uSet(s); uApplied(s); })); }
+        if (UP) try { UP.onStatus(uSet); quiet(UP.status().then(s => { uSet(s); uApplied(s); })); } catch (e) { G.err('[desktop] update ' + e); }
         else if (oldApp) { setTimeout(uCheck, 3000); setInterval(uCheck, 1800000); }
         // 저장된 설정 적용 (?q= 로 고정한 경우 그래픽은 그대로)
         sub();

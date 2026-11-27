@@ -69,7 +69,7 @@ const cleanLabel = (v) => (typeof v === 'string' && /^[0-9A-Za-z.+-]{1,24}$/.tes
 let pkgLabel = '';
 try { pkgLabel = cleanLabel(require('./package.json').skwLabel); } catch (e) { /* 없음 */ }
 let game = { version: SHELL, label: pkgLabel, file: path.join(APP_DIR, 'index.html'), buf: null }; // 지금 띄우는 게임 (buf: 받은 게임은 메모리에서 — 디스크 파일이 바뀌어도 적용 전까지 그대로)
-let ready = null, started = false, busy = null, T0 = Date.now(); // ready = 받아 두고 아직 안 띄운 새 게임 · started = 창을 띄웠나
+let ready = null, started = false, busy = null, wake = null, T0 = Date.now(); // ready = 받아 두고 아직 안 띄운 새 게임 · started = 창을 띄웠나 · wake = 시작 대기 끝내기
 const gameDir = () => path.join(app.getPath('userData'), 'game');
 // 상태 (preload 의 skwDesktop.update 와 같은 모양): state 'idle'|'checking'|'downloading'|'ready'|'latest'|'error'
 const S = { state: 'idle', latest: null, error: null, at: 0, applied: false };
@@ -151,7 +151,8 @@ const download = async ({ base, m }) => {
   } catch (e) { ulog('저장 실패 (이번 실행에서만 씀): ' + e.message); }
   ulog(`${base}${file} → 게임 ${m.version}${label ? ' (' + label + ')' : ''} 받음 · ${(raw.length / 1024).toFixed(0)} KB · ${Date.now() - t0}ms`);
   const g = { version: m.version, label, file: f, buf: html };
-  if (!started) { game = g; S.applied = true; } else ready = g; // 창을 띄우기 전이면 바로 새 게임으로 시작
+  if (!started) { game = g; S.applied = true; wake && wake(); } else ready = g; // 창을 띄우기 전이면 바로 새 게임으로 시작 (다른 주소의 답을 더 기다리지 않음)
+  setS({ state: ready ? 'ready' : 'latest', error: null }); // 다른 주소가 아직 답하지 않았어도 지금 아는 것을 바로 알림 (끝 상태는 run 이 정함)
 };
 const run = async (src) => {
   const t0 = Date.now(), got = [], errs = [], tried = new Set();
@@ -342,7 +343,7 @@ if (!app.requestSingleInstanceLock()) {
     useCached();
     if (!UPDATE_OFF) {
       ulog(`시작 · 앱 ${SHELL} · 게임 ${game.version}${game.buf ? ' (받아 둔 것)' : ''} · 주소 ${UPDATE_BASES.join(' ')}`);
-      await Promise.race([check('start'), sleep(START_WAIT)]);
+      await Promise.race([check('start'), sleep(START_WAIT), new Promise((r) => { wake = r; })]);
       ulog(`창 띄움 +${Date.now() - T0}ms · 게임 ${game.version}${S.applied ? ' (새로 받은 것)' : ''} · 상태 ${S.state}`);
       setInterval(() => check('timer'), EVERY);
     }

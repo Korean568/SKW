@@ -1,6 +1,6 @@
 'use strict';
 /* 영어 사전 (enui) — G.i18n.add({한국어:'English'})
-   공용 화면: PC판 일시정지·설정 메뉴(mod_desktop) · 성능 알약(mod_gpu) · 실행 불가 안내 화면(core.js G.fatal) */
+   공용 화면: PC판 일시정지·설정 메뉴 · 게임 업데이트 표시(mod_desktop) · 성능 알약(mod_gpu) · 실행 불가 안내 화면(core.js G.fatal) */
 {
   if (G.i18n) {
     G.i18n.add({
@@ -22,6 +22,12 @@
       '화면이 돌아가지 않으면 세로 화면 고정(자동 회전) 설정을 확인해 주세요': 'If the screen does not turn, check the rotation lock (auto-rotate) setting',
       '자막 크기': 'Subtitle Size', '작게': 'Small', '보통': 'Medium', '크게': 'Large',
       '언어': 'Language', '돌아가기': 'Back', '돌아가기 ·': 'Back ·',
+      /* ── 게임 업데이트 (mod_desktop: 설정의 버전 줄 · 처음 화면 알림 — PC · Android 앱) ── */
+      '버전': 'Version', '업데이트 확인': 'Check for Updates', '지금 적용': 'Apply Now', '그래도 적용': 'Apply Anyway', '닫기': 'Close',
+      '확인 중…': 'Checking…', '최신 버전입니다': 'You have the latest version',
+      '확인 실패 — 인터넷 연결을 확인하세요': 'Check failed — please check your internet connection',
+      '지금 적용하면 처음 화면으로 돌아갑니다': 'Applying now returns to the title screen',
+      '그래도 안 바뀌면 itch.io 에서 새로 받아 주세요': 'If it still does not change, download it again from itch.io',
       /* ── 성능 알약 ── */
       '그래픽 설정 · F2 순환': 'Graphics settings · F2 to cycle', '그래픽 등급 · F2 순환': 'Graphics tier · F2 to cycle',
       '자동 감지': 'Auto-detect', // 알약의 '자동' 버튼 설명 (등급 이름 Very Low … Ultra 는 두 언어 모두 영어)
@@ -50,6 +56,14 @@
     G.i18n.re([
       // 설정: 렌더 배율 출력 "75 % (자동)"
       [/^(\d+) % \(자동\)$/, '$1 % (auto)'],
+      // 게임 업데이트: "새 버전 0.16 …" (번호는 0.xx 또는 내부 번호)
+      [/^새 버전 (\S+) 받는 중…$/, 'Downloading version $1…'],
+      [/^새 버전 (\S+) 준비됨$/, 'Version $1 is ready'],
+      [/^새 버전 (\S+) 으로 업데이트했습니다$/, 'Updated to version $1'],
+      [/^새 버전 (\S+) 은 앱을 새로 받아야 합니다$/, 'Version $1 needs a new app — get it from itch.io'],
+      [/^새 버전 (\S+) 이 나왔습니다 — 앱을 껐다 켜 주세요$/, 'Version $1 is out — please restart the app'],
+      [/^새 버전 (\S+) 이 나왔습니다 — 새 APK 를 받아 주세요$/, 'Version $1 is out — please download the new APK'],
+      [/^새 버전 (\S+) 이 나왔습니다 — itch\.io 에서 새 앱을 받아 주세요$/, 'Version $1 is out — please download the new app from itch.io'],
       // 성능 알약 상세: "이름 판별 Medium High (13.5) · 벤치마크 Very Low (0.512ms)" (' · ' 조각마다 — 등급 이름에 빈칸이 있음)
       [/^이름 판별 (.+)$/, 'Name check $1'],
       [/^벤치마크 (.+)$/, 'Benchmark $1'],
