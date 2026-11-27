@@ -179,7 +179,7 @@ return mix(textureSampleLevel(noiseTex,linSamp,u+z*o,0.0).r,textureSampleLevel(n
 }
 @fragment fn fs(i:VO,@builtin(front_facing) ff:bool)->@location(0)vec4f{
 let m=i.m.x;let kd=i.m.y;let sd=i.m.z;let b=i.b;let h=b-vec3f(0.0,${YC},.012);let ax=abs(h.x);let fe=i.e.x;let tor=i.e.w<4.5;
-var N=normalize(i.n);if(!ff){N=-N;}let E=normalize(g.cam.xyz-i.w);let Ls=g.sun.xyz;let px=length(fwidth(b));let fpv=i.e.w>31.0;
+var N=normalize(i.n);if(!ff){N=-N;}let E=normalize(g.cam.xyz-i.w);if(!(dot(N,N)>.5)){N=E;}let Ls=g.sun.xyz;let px=length(fwidth(b));let fpv=i.e.w>31.0; // 법선 0 (렌즈 원판 가운데) → NaN 검은 점 방지
 let hh=hgt(b,m);let dwx=dpdx(i.w);let dwy=dpdy(i.w);let dhx=dpdx(hh);let dhy=dpdy(hh);
 var al=vec3f(.03);var gl=.5;var tc=vec3f(0.0);var sk=0.0;var ao=1.0;var hi=0.0;var cf=0.0;
 let hc=vec3f(.022,.018,.016);
