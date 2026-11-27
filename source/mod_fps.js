@@ -10,7 +10,7 @@
   const D={ht:0,mh:100,pk:0,get sh(){return AR.D.shots;}}; // 검증용 통계
   const S={hp:100,ammo:0,mag:0,kills:0,total:50,alive:0,plate:100,spare:3,body:0,dead:0,scope:0}; // hp = 방탄판 HP
   // core 는 G.fps 를 프레임률 숫자로도 쓴다 → 접근자로 두 역할
-  const F={on:false,bot:G.params.has('bot'),S,start,stop,revive,rate:+G.fps||60,D,valueOf(){return this.rate;},toFixed(n){return this.rate.toFixed(n);}};
+  const F={on:false,bot:G.params.has('bot'),S,start,stop,revive,die:()=>F.on&&!pl.dead&&die(),rate:+G.fps||60,D,valueOf(){return this.rate;},toFixed(n){return this.rate.toFixed(n);}};
   Object.defineProperty(G,'fps',{get:()=>F,set:v=>{if(typeof v==='number'&&v===v)F.rate=v;},configurable:true});
   const pl={p:[0,0,0],yaw:0,pit:0,vy:0,cr:0,bob:0,bobA:0,ins:1,ads:0,hurt:9,ex:0,sw:[0,0],dead:0,end:0,mv:0,run:0,air:0,rp:0,iv:0,bn:0,bt:0};
   F.pl=pl;F.E=()=>E; // 테스트 훅: 플레이어 상태 · 적 목록
@@ -140,6 +140,7 @@
     if(!pl.ins||inF()){const s=o0.pos||C.w([0,0,2]);pl.p=[s[0],floorAt(s[0],s[2],s[1]+1)[0],s[2]];pl.yaw=o0.yaw??-PI/2;}
     Object.assign(pl,{dead:0,iv:T+3,pit:-.04,vy:0,bn:0});Object.assign(S,{hp:100,plate:100,spare:3,body:0,dead:0});
     ui.fd.style.display='none';hud.msg=['부활 · 3초간 무적',T+3];G.sfx.play('click');
+    if(S.kills>=S.total)finish();
   }
 
   /* ── 적 지휘: 살아 있는 적 6~9명 유지, 보이지 않는 곳에서 등장 ── */
@@ -153,7 +154,9 @@
     dir.n++;
   }
   function director(dt){
-    dir.t-=dt;S.alive=E.filter(e=>!e.P.dead).length;
+    S.alive=E.filter(e=>!e.P.dead).length;
+    if(pl.dead)return; // 죽어 있는 동안에는 새 적이 나오지 않는다
+    dir.t-=dt;
     const want=min(9,6+(S.kills/12|0));
     if(dir.n<S.total&&S.alive<want&&dir.t<=0){spawn();dir.t=dir.n<6?.35:1+R();}
   }
@@ -232,7 +235,7 @@
     free(e);S.kills++;
     const dead=E.filter(x=>x.P.dead),cap=G.Q.level?22:9; // 시신 수 제한 (LOW 는 적게)
     if(dead.length>cap){const o=dead[0];PP.remove(o.P);E.splice(E.indexOf(o),1);}
-    if(S.kills>=S.total)finish();
+    if(S.kills>=S.total&&!pl.dead)finish(); // 죽어 있는 동안 아군이 끝내도 승리는 부활 뒤에 (전사 화면을 덮지 않게)
   }
   function damage(e,dmg,part){
     if(e.P.dead)return;

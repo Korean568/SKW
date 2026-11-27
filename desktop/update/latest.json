@@ -1,9 +1,9 @@
 {
-  "version": "1.4.0",
-  "label": "0.14",
+  "version": "1.5.0",
+  "label": "0.15",
   "file": "game.gz",
-  "sha256": "e79f0ae5c4bc21c0f60dfefd27faaf2104ad6c3716a4fbeb5bbd118c2fe0ce28",
-  "size": 290392,
+  "sha256": "eae28945bb41f384fc322b58a3a5869514d50052cdc8f9603d9a376b88685657",
+  "size": 290424,
   "minShell": "1.2.0",
-  "date": "2026-11-27T07:32:17.473Z"
+  "date": "2026-11-27T09:22:11.029Z"
 }
