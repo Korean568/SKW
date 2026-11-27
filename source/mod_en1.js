@@ -76,6 +76,10 @@ if(G.i18n){
     '예비 방탄판 없음':'No spare plates','무방비 — 예비 방탄판 없음':'Exposed — No spare plates',
     '김민철 하사가 쓰러졌다':'Staff Sgt. Kim Min-cheol is down',
     '부활 · 3초간 무적':'Revived · Invulnerable for 3s',
+    '방탄판 1개로 부활 · 3초간 무적':'Revived with 1 plate · Invulnerable for 3s','방탄판 1개로 부활':'Revived with 1 plate','3초간 무적':'Invulnerable for 3s',
+    '예비 방탄판 1개를 써서 부활':'Revive using 1 spare plate','예비 방탄판이 없다':'No spare plates left',
+    '체크포인트(전투 시작)부터 다시':'Restart from the checkpoint (start of the fight)',
+    '체크포인트 — 전투 시작부터 다시':'Checkpoint — restarting the fight',
     'AK 소총 획득 — [3] 으로 교체':'Got an AK rifle — [3] to switch',
     '방탄판 +1':'Armor plate +1','탄창 획득!':'Got a magazine!',
     '권총에는 스코프를 달 수 없다':'Can’t mount a scope on a pistol',
@@ -92,6 +96,7 @@ if(G.i18n){
   });
   G.i18n.re([
     [/^무방비 · 피격 (\d)\/2$/,'Exposed · hits $1/2'],
+    [/^남는 예비 방탄판 (\d+)개$/,(m,n)=>'Spare plates left: '+n],
   ]);
   /* 영어일 때만: 긴 영어 글자가 넘치지 않게 (한국어 화면은 그대로) */
   G.css(`html[lang=en] #fd b{font-size:clamp(30px,5.4vw,70px);letter-spacing:.16em;margin-right:-.16em}

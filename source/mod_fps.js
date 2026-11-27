@@ -97,7 +97,7 @@
     const s=o.pos||C.w([0,0,2]);
     Object.assign(pl,{p:[s[0],s[1],s[2]],yaw:o.yaw??-PI/2,pit:-.04,vy:0,cr:0,ads:0,hurt:9,ex:0,dead:0,end:0,rp:0,iv:0,bn:0,bt:0,ended:0,bot:null});
     pl.p[1]=floorAt(pl.p[0],pl.p[2],pl.p[1]+1)[0];
-    dir={t:0,n:0};occ={};E=[];fires=[];ui.fd.style.display='none';
+    dir={t:0,n:0};occ={};E=[];fires=[];ui.fd.style.display='none';ui.fdK='';hud.msg=o.cp?['체크포인트 — 전투 시작부터 다시',3.5]:null;
     // 아군: 앞 2명 · 뒤 2명 (플레이어가 밀면 비켜 줌)
     posts=[[0,4.9,1,0],[0,3.55,0,0],[0,-.85,1,PI],[0,.5,0,PI]];
     A=(o.allies||[]).slice(0,4).map((P,i)=>{
@@ -135,13 +135,20 @@
     pl.dead=T;S.dead=1;S.plate=0;pl.rp=0;G.sfx.play('hit',{gain:1,rate:.5});
     try{document.pointerLockElement&&document.exitPointerLock();}catch(e){}
   }
-  function revive(){ // 제자리(기내) 또는 시작 지점(아군 사이)에서 새 방탄판 · 3초 무적
+  function revive(){ // 예비 방탄판 1개를 써서 제자리(기내) 또는 시작 지점(아군 사이)에서 부활 · 3초 무적. 예비가 없으면 체크포인트(전투 시작)부터 다시
     if(!F.on||!pl.dead)return;
+    if(S.spare<=0&&S.kills<S.total)return retry();
     if(!pl.ins||inF()){const s=o0.pos||C.w([0,0,2]);pl.p=[s[0],floorAt(s[0],s[2],s[1]+1)[0],s[2]];pl.yaw=o0.yaw??-PI/2;}
-    Object.assign(pl,{dead:0,iv:T+3,pit:-.04,vy:0,bn:0});Object.assign(S,{hp:100,plate:100,spare:3,body:0,dead:0});
-    ui.fd.style.display='none';hud.msg=['부활 · 3초간 무적',T+3];G.sfx.play('click');
+    Object.assign(pl,{dead:0,iv:T+3,pit:-.04,vy:0,bn:0});Object.assign(S,{hp:100,plate:100,spare:max(0,S.spare-1),body:0,dead:0});
+    ui.fd.style.display='none';hud.msg=['방탄판 1개로 부활 · 3초간 무적',T+3];G.sfx.play('click');
     if(S.kills>=S.total)finish();
   }
+  function retry(){ui.fd.style.display='none';G.sfx.play('click');pl.rt=1;} // 체크포인트 = 전투 시작 (다음 프레임 update 에서: 이야기 onRetry 가 장면을 다시 세움 · 없으면 같은 설정으로 다시 시작)
+  const card=()=>{ // 전사 카드: 부활(예비 방탄판 1개) 또는 체크포인트부터 다시
+    const rt=S.spare<=0&&S.kills<S.total,k=rt+'|'+S.spare;if(ui.fdK===k)return;ui.fdK=k;
+    ui.fdB.textContent=rt?'다시 하기':'부활';
+    ui.fdN.textContent=rt?'예비 방탄판이 없다 · 체크포인트(전투 시작)부터 다시':S.spare>0?'예비 방탄판 1개를 써서 부활 · 남는 예비 방탄판 '+(S.spare-1)+'개':'';
+  };
 
   /* ── 적 지휘: 살아 있는 적 6~9명 유지, 보이지 않는 곳에서 등장 ── */
   function spawn(){
@@ -441,7 +448,7 @@
     ui.ct.innerHTML=`북한군 <b>${S.kills}</b> / ${S.total}<small>북한군을 제압하라</small>`;
     const pa=pl.dead?'':pl.rp>0?'방탄판 교체 중…':lo?(z?'무방비 — ':'')+(S.spare?'방탄판 교체 [F]':'예비 방탄판 없음'):'';
     ui.pa.textContent=pa;ui.pa.style.display=pa?'block':'none';ui.pa.className=pl.rp>0?'r':S.spare?'':'n';
-    ui.fd.style.display=pl.dead&&T-pl.dead>1?'grid':'none';
+    pl.dead&&card();ui.fd.style.display=pl.dead&&T-pl.dead>1?'grid':'none';
     const ms=hud.msg&&T<hud.msg[1]?hud.msg[0]:'',np=hud.pkN&&hud.pkN.pl&&S.spare<3;
     const n=hud.pkN,cp=n?(np?'[E] 방탄판 줍기':n.of==='sw'?'[E] AKM 소총(으)로 바꾸기':n.gun&&!own('akm')&&AR.canTake('akm')==='free'?'[E] AKM 소총·탄창 줍기':'[E] 탄창 줍기'):''; // 다음 E 가 할 일
     const pr=pl.dead?'':ms||cp||(hud.pk>0&&hud.pkT)||AR.prompt;
@@ -451,6 +458,7 @@
 
   function update(dt){
     if(!F.on)return;
+    if(pl.rt){pl.rt=0;try{o0.onRetry?o0.onRetry():start({...o0,cp:1});}catch(e){G.err('fps retry: '+(e.stack||e));}return;}
     try{
       T+=dt;fires=fires.filter(f=>f[3]>G.time);
       if(!pl.end||T<pl.end){
@@ -482,7 +490,7 @@
 #pa{position:absolute;left:50%;top:30%;transform:translateX(-50%);padding:.3em 1em;border:2px solid #fb3;border-radius:6px;background:#000a;color:#fb3;font:700 24px system-ui;letter-spacing:.12em;display:none;animation:pu .45s infinite alternate}#pa.n{border-color:#fff;color:#fff}#pa.r{animation:none;border-color:#fff8;color:#fff}@keyframes pu{to{opacity:.55}}
 #pm{position:absolute;left:-30px;top:-34px;width:60px;text-align:center;font:700 12px system-ui;display:none;text-shadow:0 0 2px #000,0 1px 3px #000}#pm:after{content:'▼';display:block;font-size:14px}
 #bv{position:absolute;inset:0;opacity:0;background:radial-gradient(#ff600000 35%,#ff6a0040 70%,#ff3c00b0);box-shadow:inset 0 0 20vmin 5vmin #ff5a00b0}
-#fd{position:absolute;inset:0;display:none;place-content:center;justify-items:center;background:radial-gradient(#0006,#000d);pointer-events:auto}#fd b{font-size:clamp(44px,8vw,100px);letter-spacing:.4em;margin-right:-.4em}#fd small{font-size:16px;color:#bbb}#fd button.t{font-size:15px;padding:.4em 1.6em;margin-top:1.6em;background:#0000;color:#ddd;border:1px solid #fff6;box-shadow:none}#fd button{margin:1.2em 0 .6em;padding:.35em 2.4em;font:800 clamp(24px,3.4vw,44px) system-ui;letter-spacing:.5em;color:#111;background:#fff;border:0;border-radius:8px;cursor:pointer;box-shadow:0 0 40px #fff6}
+#fd{position:absolute;inset:0;display:none;place-content:center;justify-items:center;background:radial-gradient(#0006,#000d);pointer-events:auto}#fd b{font-size:clamp(44px,8vw,100px);letter-spacing:.4em;margin-right:-.4em}#fd small{font-size:16px;color:#bbb}#fd small.n{margin-top:1.1em;color:#fc6}#fd button.t{font-size:15px;padding:.4em 1.6em;margin-top:1.6em;background:#0000;color:#ddd;border:1px solid #fff6;box-shadow:none}#fd button{margin:1.2em 0 .6em;padding:.35em 2.4em;font:800 clamp(24px,3.4vw,44px) system-ui;letter-spacing:.5em;color:#111;background:#fff;border:0;border-radius:8px;cursor:pointer;box-shadow:0 0 40px #fff6}
 #ct{position:absolute;left:50%;top:3.5vh;transform:translateX(-50%);text-align:center;font-size:19px;letter-spacing:.06em}#ct b{font-size:26px;color:#fc6}#ct small{display:block;font-size:14px;color:#bcd;letter-spacing:.2em}
 #pr{position:absolute;left:50%;top:62%;transform:translateX(-50%);font-size:18px;color:#fe9;text-shadow:0 0 2px #000,0 0 2px #000,0 1px 3px #000}
 #dd{position:absolute;inset:0;background:radial-gradient(ellipse 34% 22% at 50% 0,#fffa,#fff0);opacity:0}
@@ -492,8 +500,9 @@
       ui.fh=G.el('div',{id:'fh'});
       ui.xh=G.el('div',{id:'xh',innerHTML:'<i></i><i></i><i></i><i></i>'},ui.fh);
       for(const k of['bv','pm','hm','am','hp','ct','pr','pa','dd','vg','lk','fe','fd'])ui[k]=G.el('div',{id:k},ui.fh);
-      ui.pm.textContent='방탄판';ui.fd.innerHTML='<b>전사</b><small>김민철 하사가 쓰러졌다</small><button>부활</button><small>Enter</small><button class=t>처음 화면</button>';
-      ui.fd.querySelector('button').onclick=()=>{revive();G.canvas.requestPointerLock&&G.canvas.requestPointerLock();};
+      ui.pm.textContent='방탄판';ui.fd.innerHTML='<b>전사</b><small>김민철 하사가 쓰러졌다</small><small class=n></small><button>부활</button><small>Enter</small><button class=t>처음 화면</button>';
+      ui.fdB=ui.fd.querySelector('button');ui.fdN=ui.fd.querySelector('.n');
+      ui.fdB.onclick=()=>{revive();G.canvas.requestPointerLock&&G.canvas.requestPointerLock();};
       ui.fd.querySelector('.t').onclick=()=>{ui.fd.style.display='none';G.story&&G.story.title&&G.story.title();}; // 처음 화면으로
       if(G.fx){ // 불 위치 수집: trail('fire') 0.3초 · burst('explosion') 1.5초
         const fx=G.fx,tr=fx.trail,bu=fx.burst,rec=(p,t)=>{if(!F.on||!p)return;for(const f of fires)if(hypot(f[0]-p[0],f[1]-p[1],f[2]-p[2])<.4)return f[3]=G.time+t;fires.push([p[0],p[1],p[2],G.time+t]);};

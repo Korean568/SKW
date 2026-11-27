@@ -167,7 +167,8 @@
     const allies=['col','park','lee','shin'].map(k=>W[k]);
     if(fpsOK()){
       for(const P of EN) PP.remove(P);EN.length=0;
-      try {G.fps.start({pos:C.w([0,0,1.6]),eye:C.w([0,1.62,1.6]),yaw:C.K.site.yaw,allies,total:50,onEnd:end});}
+      const cp=S.cp;S.cp=0;// 체크포인트(예비 방탄판 없이 전사) → 전투 시작부터 다시
+      try {G.fps.start({pos:C.w([0,0,1.6]),eye:C.w([0,1.62,1.6]),yaw:C.K.site.yaw,allies,total:50,onEnd:end,cp,onRetry:()=>{go('fight');S.cp=1;}});}
       catch (e){G.err('[story] fps.start ' + e);S.fb=1;S.cm='stand';}
    } else {S.fb=1;S.cm='stand';} // 전투 모듈이 없을 때: 분대가 자동으로 소탕 → 승리
  }
