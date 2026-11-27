@@ -38,7 +38,7 @@
   const D={shots:0,hits:0,blasts:0,selfHits:0,blocked:0,bb:0,unarmed:0,dry:0,spinUp:0,maxRays:0,autoRl:0,kw:{},rounds:{},drops:0};
   const rk={on:0,p:[0,0,0],v:[0,0,0],t:0,d:0,prop:null};
   const ms={l:0,r:0,wh:0};
-  let A=null,T=0,ui={},pres=null,hudT=0,mkT=0,mkL=[];
+  let A=null,T=0,ui={},pres=null,hudT=0,mkT=0,mkL=[],pz=0;
 
   const props=()=>Array.isArray(PP().props)?PP().props:(api._props||(api._props=[]));
   const cur=()=>inv.slot[inv.cur];
@@ -494,6 +494,7 @@
       addEventListener('mouseup',e=>{if(e.button===0)ms.l=0;if(e.button===2)ms.r=0;});
       addEventListener('wheel',e=>{if(A&&!api.bot&&document.pointerLockElement===G.canvas)ms.wh=e.deltaY;},{passive:true});
     },
+    prepare(){if(G.paused){A&&!pz&&sndOff();pz=1;}else pz=0;}, // 일시정지(메뉴): update 가 멈추므로 M134 · 로켓 지속음을 끔 (풀리면 다음 프레임에 다시 켜짐)
     update(dt){
       if(!A)return;
       try{

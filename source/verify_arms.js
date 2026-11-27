@@ -98,6 +98,9 @@ const SLOG = `const LOG=[];let FR=0;{const p0=G.sfx.play,l0=G.sfx.loop;G.sfx.pla
       // 방탄판 교체 중(F): 쏘지 않을 뿐 글자 · 딸깍 없음
       pl.rp=0;silent('plateK2',()=>{pl.rp=Math.max(pl.rp,.5);},()=>{pl.rp=0;});
       A.give('m134');run(1.2,()=>hold());silent('deadM134',()=>{pl.dead=1;},()=>{pl.dead=0;});silent('plateM134',()=>{pl.rp=Math.max(pl.rp,.5);},()=>{pl.rp=0;});
+      // 일시정지(메뉴): 지속음 끔 → 풀면 다음 프레임에 다시
+      run(1,()=>{hold();I.fire=1;});G.paused=true;L0=LOG.length;G.mods.arms.prepare();const pz=LOG.slice(L0).map(x=>x[1]);G.paused=false;G.mods.arms.prepare();L0=LOG.length;run(.3,()=>{hold();I.fire=1;});
+      {const re=[...new Set(LOG.slice(L0).map(x=>x[1]).filter(n=>n.startsWith('L:m134')))];out.pause={pz,re,ok:pz.includes('L:m134f:0')&&pz.includes('L:m134s:0')&&re.includes('L:m134f:1')&&re.includes('L:m134s:1')};}
       // 멈춤(처음 화면): 회전 · 사격 · 로켓 지속음 모두 끔
       run(1.5,()=>{hold();I.fire=1;});const spun=A.st.spin;L0=LOG.length;G.story.title();const off=LOG.slice(L0).map(x=>x[1]);run(.5);
       const last={};for(const[,n]of LOG)if(n.startsWith('L:'))last[n.slice(2,-2)]=n.slice(-1);
@@ -168,6 +171,15 @@ const SLOG = `const LOG=[];let FR=0;{const p0=G.sfx.play,l0=G.sfx.loop;G.sfx.pla
       let t=0,n=0,fly=0;for(let i=0;i<200;i++){if(!G.arms.rocket&&G.arms.inv.mag.rpg7===0)G.arms.inv.mag.rpg7=1;G.arms.inp.fire=i%2;const t0=performance.now();${STEP}t+=performance.now()-t0;n++;G.arms.rocket&&fly++;}
       return {alive,dead,drops:G.arms.drops.list.length,props:(G.people.props||[]).length,rocketFrames:fly,msPerFrame:+(t/n).toFixed(3),errs:G.errors}})()`);
     say(!r.errs.length && !logs.length, 'logic cost MEDIUM: ' + JSON.stringify(r));
+    await p.close();
+  }
+  // 7) people.prepare 비용 (총 모델 포함, MEDIUM · 교전 중 사람 ~40 + 바닥 총 7): 200 프레임 평균 · 중앙값 · 90%
+  if (want('prep')) {
+    const [p, logs] = await open('&god&q=MEDIUM');
+    const r = await p.evaluate(`(()=>{G.story.start();G.story.go('fight');for(let i=0;i<700;i++){G.fps.bot=true;${STEP}}const pr=G.mods.people.prepare,ts=[];
+      for(let i=0;i<200;i++){G.fps.bot=true;const dt=.05;G.time+=dt;G.dt=dt;G.frame++;G.lights.length=0;for(const m of G.order)m.update&&m.update(dt);const t0=performance.now();pr();ts.push(performance.now()-t0);}
+      ts.sort((a,b)=>a-b);return {people:G.people.list.filter(P=>P.vis!==false).length,props:(G.people.props||[]).length,mean:+(ts.reduce((a,b)=>a+b)/200).toFixed(3),median:+ts[100].toFixed(3),p90:+ts[180].toFixed(3),max:+ts[199].toFixed(2),errs:G.errors}})()`);
+    say(!r.errs.length && !logs.length, 'people.prepare ms/frame (with guns): ' + JSON.stringify(r));
     await p.close();
   }
   await b.close();
