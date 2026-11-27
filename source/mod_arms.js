@@ -357,7 +357,7 @@
       if(!okPt(p,o,acc,gap))continue;
       const id=pickW(tab,cnt,caps,heavy);if(!id)break;
       cnt[id]=(cnt[id]|0)+1;HEAVY(id)&&heavy.n++;
-      acc.push(add(id,p,R()*2*PI,W[id].pk[0],W[id].pk[1],{F:o.frame?o.frame(p):null}));
+      acc.push(add(id,p,o.yaw?o.yaw(p):R()*2*PI,W[id].pk[0],W[id].pk[1],{F:o.frame?o.frame(p):null})); // o.yaw: 좁은 통로에서는 통로 방향으로
     }
     D.drops=drops.list.length;return acc;
   }

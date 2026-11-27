@@ -279,18 +279,18 @@
       allow:()=>pl.dead||pl.end?OFFA:pl.rp>0?RPA:ONA,busyE:()=>!!hud.pkN,people:()=>PP.list.map(wp),
       frame:p=>{const z=floorAt(p[0],p[2],p[1]+.6)[1];return z===1?C.M:z===2?M4.mul(C.M,TR):null;}}; // 기내 바닥 기울기를 따른다
   }
-  function drops1(){ // 바닥 총 (§4.3): 기내 2~3 · 바깥 나머지 (모두 7) — 엄폐물 · 엔진 · 아군 자리 · 시작점 · 등장 지점 근처 제외
+  function drops1(){ // 바닥 총 (§4.3): 기내 2~3 · 바깥 나머지 (모두 7) — 엄폐물 · 엔진 · 아군 자리 · 시작점 · 등장 지점 · 사람(1.2 m) 근처 제외
     const c0=C.w([0,0,0]),hz=C.K.hole[2],inn=[],out=[];
-    for(let z=-13.5;z<=13;z+=.9){
-      if(z>-7.5&&z<-5)continue;const x=(R()-.5)*.8;if(x>0&&abs(z-hz)<1.4)continue;
+    for(let z=-13.5;z<=13;z+=.9){ // 기내: 통로 가운데 (좌석과 .3 m 이상 · 통로 방향으로 눕힘)
+      if(z>-7.5&&z<-5)continue;const x=.05+(R()-.5)*.14;if(abs(z-hz)<1.4)continue; // 폭발 구멍 줄 제외
       const w=z<-6.45?C.w(M4.point(TR,[x,0,z])):C.w([x,0,z]);w[1]=floorAt(w[0],w[2],w[1]+.6)[0];inn.push(w);
     }
     for(let i=0;i<60;i++){const a=R()*2*PI,r=5+R()*17,x=c0[0]+sin(a)*r,z=c0[2]+cos(a)*r;if(!floorAt(x,z,C.ground(x,z)+.6)[1])out.push([x,C.ground(x,z),z]);}
-    const eg=C.w([-5.9,-1.6,3]),s=o0.pos||C.w([0,0,2]),away=[[eg[0],0,eg[2],2.4],[s[0],0,s[2],2.5],...posts.map(q=>{const w=C.w([q[0],0,q[1]]);return[w[0],0,w[2],1.2];}),...C.K.spawn.map(p=>[p[0],0,p[2],5])];
+    const eg=C.w([-5.9,-1.6,3]),s=o0.pos||C.w([0,0,2]),away=[[eg[0],0,eg[2],2.4],[s[0],0,s[2],2.5],...posts.map(q=>{const w=C.w([q[0],0,q[1]]);return[w[0],0,w[2],1.2];}),...C.K.spawn.map(p=>[p[0],0,p[2],5]),...PP.list.map(P=>{const w=wp(P);return[w[0],0,w[2],1.2];})];
     const ok=p=>!C.K.cover.some(b=>abs(p[0]-b[0])<b[3]+.6&&abs(p[2]-b[2])<b[5]+.6&&p[1]<b[1]+b[4]+.6)&&abs(C.ground(p[0]+.5,p[2])-C.ground(p[0]-.5,p[2]))<.35&&abs(C.ground(p[0],p[2]+.5)-C.ground(p[0],p[2]-.5))<.35;
     const okIn=p=>!C.K.cover.some(b=>abs(p[0]-b[0])<b[3]+.6&&abs(p[2]-b[2])<b[5]+.6&&p[1]<b[1]+b[4]+.6);
     const o={cnt:{},hs:{n:0,cap:1},away,frame:AR.drops&&adapter().frame},k=2+(R()<.5?1:0);
-    const a=AR.drops.scatter(inn,k,DROP1,{...o,ok:okIn});
+    const a=AR.drops.scatter(inn,k,DROP1,{...o,ok:okIn,yaw:()=>(R()<.5?0:PI)+(R()-.5)*.35});
     AR.drops.scatter(out,7-a.length,DROP1,{...o,ok});
   }
   const has556=()=>AR.inv.slot.some(k=>k&&AR.W[k].cal==='556'),own=k=>AR.inv.slot.includes(k);
@@ -333,6 +333,7 @@
     const left=k=>k&&(iv.mag[k]|0)+(iv.pool[AR.W[k].cal]|0)>0;
     if(!left(id)){const s=iv.slot.findIndex(left);s>=0&&(I.slot=s+1);}
     else if(id==='rpg7'&&b.tg&&b.td<9&&!AR.rocket){const s=iv.slot.findIndex((k,i)=>i<3&&left(k));s>=0&&(I.slot=s+1);} // 가까운 적에게는 로켓을 쏘지 않는다
+    else if(id!=='rpg7'&&iv.slot[3]==='rpg7'&&left('rpg7')&&b.tg&&b.td>14&&AR.st.sw<=0&&AR.st.rl<=0)I.slot=4; // 먼 적에게는 다시 로켓
     const m=AR.mag;
     if(b.tg&&!b.tg.P.dead){
       b.idle=0;const c=chest(b.tg.P),d=V3.sub(c,eye),ty=atan2(d[0],d[2]),tp=atan2(d[1],hypot(d[0],d[2]));

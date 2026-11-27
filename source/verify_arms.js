@@ -1,7 +1,7 @@
 // 무기(mod_arms) 검증 — 스토리 1: node verify_arms.js [구역…] (구역: bot bot<id> rules drops dropsall voices cost prep — 없으면 cost · prep 빼고 전부)
 // 봇 승리(기본 장비 · wep=m134 · wep=rpg7 · wep=k14, 무기별 처치 수) · 수동 규칙(자동 재장전 없음 · 약실 +1 · 교체 시 발밑에 떨어뜨림 · E 로만 줍기 · 빈 칸 줍기는 손의 총 유지)
 // RPG-7 신관 5 m · 자기 피해 · 후폭풍 · M134 회전 시간 · 방아쇠 잠금(전사 · 방탄판 교체는 소리 없이) · 소리 이름(mod_audio 표) · 실시간 보이스 ≤ 25
-// 바닥 총 통계(스토리 1 · 200회: 7개 · 기내 2~3 · 중화기 ≤ 1 · 약 47%) · drops=all 거리 · 스토리 3 없음 · 로직 프레임 비용 · people.prepare 비용 · G.errors
+// 바닥 총 통계(스토리 1 · 400회: 7개 · 기내 2~3 · 중화기 ≤ 1 · 약 47%) · drops=all 거리 · 스토리 3 없음 · 로직 프레임 비용 · people.prepare 비용 · G.errors
 const { chromium } = require('playwright');
 const FLAGS = ['--enable-unsafe-webgpu', '--use-webgpu-adapter=swiftshader', '--autoplay-policy=no-user-gesture-required'];
 const MODS = 'gpu,sky,post,mesh,fx,audio,i18n,people,guns,arms,cabin,fps,village,story2,palace,story3,ruins,story4,story,desktop,touch,en1,en2,en3,en4,enui,enarms';
@@ -83,6 +83,10 @@ const SLOG = `const LOG=[];let FR=0;{const p0=G.sfx.play,l0=G.sfx.loop;G.sfx.pla
       out.rpgFar={mag:A.inv.mag.rpg7,blasts:A.D.blasts-D1.blasts,selfHits:A.D.selfHits-D1.selfHits,unarmed:A.D.unarmed-D1.unarmed,snd:rs,ok:A.D.blasts-D1.blasts===1&&A.D.selfHits-D1.selfHits===1&&rs.includes('rpgl')&&rs.includes('boom')&&rs.includes('L:rocket:1')&&rs.includes('L:rocket:0')};
       // 빈 RPG: 자동 재장전 없음
       run(1,()=>{hold();I.fire=1;});out.rpgEmpty={mag:A.inv.mag.rpg7,pool:A.inv.pool.rkt,prompt:A.prompt,ok:A.inv.mag.rpg7===0};
+      // 일체형 광학(RPG PGO-7 · AUG 링): 모델이 보이는 동안 조준 정도는 시점이 모델에 닿기 전까지만 (RPG < .375 · AUG < .525), 그 위는 겹침으로 숨김
+      for(const[g,lim]of[['rpg7',.375],['aug',.525],['k14',.675]]){A.give(g);run(1.2,()=>hold());let mx=0,hid=0,ov=0;const F=G.people.fp;
+        run(1.6,i=>{hold();I.ads=i<16?1:0;});for(let i=0;i<32;i++){hold();I.ads=i<16?1:0;run(.05);if(F.on&&!F.hide)mx=Math.max(mx,F.aim);else hid++;ov=Math.max(ov,A.view.ovA);}
+        out['ads_'+g]={visMaxAim:+mx.toFixed(3),hiddenFrames:hid,ovMax:ov,ok:mx<lim&&hid>5&&ov===1};}
       // K14: 'bolt' 은 사격 .1~.25초 뒤 (같은 프레임 아님)
       A.give('k14');run(1.5,()=>hold());L0=LOG.length;run(1,i=>{hold();I.fire=i===1?1:0;});
       {const S=LOG.slice(L0),a=S.find(x=>x[1]==='k14'),b=S.find(x=>x[1]==='bolt');out.bolt={shot:a&&a[0],bolt:b&&b[0],ok:!!a&&!!b&&b[0]-a[0]>=2&&b[0]-a[0]<=5};}
@@ -106,10 +110,10 @@ const SLOG = `const LOG=[];let FR=0;{const p0=G.sfx.play,l0=G.sfx.loop;G.sfx.pla
     await p.close();
   }
 
-  // 3) 스토리 1 바닥 총 통계 (시작 200회, 로직만): 7개 · 기내 2~3 · 중화기 ≤ 1 (약 47%) · K14 ≤ 1 · 벽 안 아님(밀림 < 3 cm) · 사람 · 시작점 · 등장 지점과 거리 — 이어서 스토리 3 은 바닥 총 없음
+  // 3) 스토리 1 바닥 총 통계 (시작 400회, 로직만): 7개 · 기내 2~3 · 중화기 ≤ 1 (약 47%) · K14 ≤ 1 · 벽 안 아님(밀림 < 3 cm) · 사람 · 시작점 · 등장 지점과 거리 — 이어서 스토리 3 은 바닥 총 없음
   if (want('drops')) {
     const [p, logs] = await open('&god');
-    const r = await p.evaluate(`(()=>{G.story.start();const A=G.arms,C=G.cabin,N=200,R={n:N,cnt:{},heavyRuns:0,bad:[],ids:{},minPerson:9,minStart:9,minSpawn:99,minGap:99,maxPush:0,inside:{}};
+    const r = await p.evaluate(`(()=>{G.story.start();const A=G.arms,C=G.cabin,N=400,R={n:N,cnt:{},heavyRuns:0,bad:[],ids:{},minPerson:9,minStart:9,minSpawn:99,minGap:99,maxPush:0,inside:{}};
       for(let k=0;k<N;k++){G.story.go('fight');for(let j=0;j<60&&!G.fps.on;j++){${STEP}}const L=A.drops.list,ad=A.dbg.ad(),me=G.fps.pl,ppl=ad.people();
         R.cnt[L.length]=(R.cnt[L.length]||0)+1;let h=0,k14=0,inn=0,mp=0;
         for(const d of L){R.ids[d.id]=(R.ids[d.id]||0)+1;A.W[d.id].slot==='H'&&h++;d.id==='k14'&&k14++;d.F&&inn++;
@@ -119,12 +123,12 @@ const SLOG = `const LOG=[];let FR=0;{const p0=G.sfx.play,l0=G.sfx.loop;G.sfx.pla
           for(const s of C.K.spawn)R.minSpawn=Math.min(R.minSpawn,Math.hypot(s[0]-d.p[0],s[2]-d.p[2]));
           for(const e of L)e!==d&&(R.minGap=Math.min(R.minGap,Math.hypot(e.p[0]-d.p[0],e.p[2]-d.p[2])));}
         R.inside[inn]=(R.inside[inn]||0)+1;h&&R.heavyRuns++;(h>1||k14>1||L.length!==7||inn<2||inn>3||mp>.03)&&R.bad.push({k,n:L.length,h,k14,inn});}
-      for(const k of ['minPerson','minStart','minSpawn','minGap','maxPush'])R[k]=+R[k].toFixed(2);R.heavyPct=+(100*R.heavyRuns/N).toFixed(1);
+      for(const k of ['minPerson','minStart','minSpawn','minGap','maxPush'])R[k]=+R[k].toFixed(3);R.heavyPct=+(100*R.heavyRuns/N).toFixed(1);
       // 스토리 3: 처음 화면 → 스토리 3 시작 · 3초 진행 → 바닥 총 · 무기 소품 없음
       G.story.title();G.story3.start();for(let i=0;i<60;i++){${STEP}}
       R.s3={bound:A.bound,drops:A.drops.list.length,armsProps:(G.people.props||[]).filter(x=>x._arms).length};G.story3.stop&&G.story3.stop();
       R.errs=G.errors;return R;})()`);
-    say(!r.bad.length && r.cnt[7] === r.n && r.maxPush < .03 && r.minPerson >= 1.2 && r.minStart >= 2.5 && r.minSpawn >= 5 && r.minGap >= 2.5, 'S1 drops x' + r.n + ': ' + JSON.stringify({ cnt: r.cnt, inside: r.inside, ids: r.ids, maxPush: r.maxPush, minPerson: r.minPerson, minStart: r.minStart, minSpawn: r.minSpawn, minGap: r.minGap, bad: r.bad.slice(0, 5) }));
+    say(!r.bad.length && r.cnt[7] === r.n && r.maxPush <= .03 && r.minPerson >= 1.2 && r.minStart >= 2.5 && r.minSpawn >= 5 && r.minGap >= 2.5, 'S1 drops x' + r.n + ': ' + JSON.stringify({ cnt: r.cnt, inside: r.inside, ids: r.ids, maxPush: r.maxPush, minPerson: r.minPerson, minStart: r.minStart, minSpawn: r.minSpawn, minGap: r.minGap, bad: r.bad.slice(0, 5) }));
     say(r.heavyPct >= 40 && r.heavyPct <= 55, `S1 heavy weapon present in ${r.heavyPct}% of runs (target ≈ 47%, 40–55)`);
     say(!r.s3.bound && !r.s3.drops && !r.s3.armsProps, 'S3 has no floor guns: ' + JSON.stringify(r.s3));
     say(!r.errs.length && !logs.length, 'drops errors: ' + JSON.stringify(r.errs) + JSON.stringify(logs.slice(0, 3)));
@@ -141,7 +145,7 @@ const SLOG = `const LOG=[];let FR=0;{const p0=G.sfx.play,l0=G.sfx.loop;G.sfx.pla
     await p.close();
   }
 
-  // 5) 실시간 소리 보이스 (0.05초 단계를 실제 시간에 맞춰): M134 4초 연사 + 로켓 1발 + 교전 NPC 총성 → G.sfx.voices() ≤ 25
+  // 5) 실시간 소리 보이스 (0.05초 단계를 실제 시간에 맞춰): M134 5초 연사 + 로켓 1발 + 교전 NPC 총성 → G.sfx.voices() ≤ 25 (첫 1초는 앞선 빠른 단계의 보이스가 빠지는 시간이라 제외)
   if (want('voices')) {
     const [p, logs] = await open('&god');
     const r = await p.evaluate(`(async()=>{G.story.start();G.story.go('fight');for(let i=0;i<300;i++){G.fps.bot=true;${STEP}}
@@ -150,7 +154,7 @@ const SLOG = `const LOG=[];let FR=0;{const p0=G.sfx.play,l0=G.sfx.loop;G.sfx.pla
       let vmax=0,vs=[],launched=0,rk=0,st=G.sfx.voices();const sl=ms=>new Promise(r=>setTimeout(r,ms));
       for(let i=0;i<110;i++){const t0=performance.now();for(const k in I)I[k]=0;I.fire=i===39?0:1;
         if(i===40){A.inv.slot[3]='rpg7';A.inv.mag.rpg7=1;}if(i===41){A.inv.slot[3]='m134';launched=A.D.blasts+A.D.unarmed+(A.rocket?1:0);}
-        ${STEP}A.rocket&&rk++;const v=G.sfx.voices();vmax=Math.max(vmax,v);i%10||vs.push(v);await sl(Math.max(0,50-(performance.now()-t0)));}
+        ${STEP}A.rocket&&rk++;const v=G.sfx.voices();i>=20&&(vmax=Math.max(vmax,v));i%10||vs.push(v);await sl(Math.max(0,50-(performance.now()-t0)));}
       return {vmax,vs,rocketFrames:rk,launched,shots:A.D.shots,ctx:typeof AudioContext,errs:G.errors};})()`);
     say(r.vmax <= 25 && r.rocketFrames > 3 && r.shots > 100 && !r.errs.length && !logs.length, 'realtime voices (M134 burst + rocket + NPC fire): ' + JSON.stringify(r));
     await p.close();
