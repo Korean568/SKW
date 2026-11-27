@@ -69,7 +69,7 @@ final class Updater {
     private static final Pattern SHA = Pattern.compile("^[0-9a-f]{64}$");
     private static final Pattern FILE = Pattern.compile("^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$");
 
-    /** 상태가 바뀔 때마다 불린다 (아무 스레드에서나). json = S, done = 확인 중이 아님 */
+    /** 상태가 바뀔 때마다 불린다 (아무 스레드에서나, Updater 의 잠금 안에서 — 금방 끝낼 것). json = S, done = 확인 중이 아님 */
     interface Listener {
         void onStatus(String json, boolean done);
     }
@@ -270,10 +270,10 @@ final class Updater {
                 state = "error";
                 error = "sha256";
             }
+            notifyStatus(true);
         }
         if (ok) announce(g.version);
         log(ok ? "새 게임 " + g.version + " 으로 바꿈" : "바꾸지 못함: 받아 둔 파일이 없거나 바뀜");
-        notifyStatus(true);
         return ok;
     }
 
@@ -304,8 +304,8 @@ final class Updater {
             id = ++seq;
             state = "checking";
             error = null;
+            notifyStatus(false);
         }
-        notifyStatus(false);
         try {
             worker.execute(() -> run(why));
         } catch (RuntimeException e) { // RejectedExecutionException: 이미 닫힘
@@ -313,8 +313,8 @@ final class Updater {
                 busy = false;
                 state = "error";
                 error = "closed";
+                notifyStatus(true);
             }
-            notifyStatus(true);
             return 0;
         }
         return id;
@@ -339,12 +339,14 @@ final class Updater {
         } finally {
             String s;
             synchronized (lock) {
-                busy = false;
-                at = System.currentTimeMillis();
                 s = state + (error != null ? " (" + error + ")" : "") + (latestVersion != null ? " · " + latestVersion : "");
             }
             log("결과: " + s + " · " + (System.currentTimeMillis() - t0) + "ms");
-            notifyStatus(true);
+            synchronized (lock) { // busy 를 풀면서 마지막 상태를 같은 순간에 알린다 (그 사이에 들어온 check() 와 순서가 섞이지 않게)
+                busy = false;
+                at = System.currentTimeMillis();
+                notifyStatus(true);
+            }
         }
     }
 
@@ -394,8 +396,8 @@ final class Updater {
                 state = "downloading";
                 latestVersion = best.version;
                 latestLabel = best.label;
+                notifyStatus(false);
             }
-            notifyStatus(false);
             List<Manifest> from = new ArrayList<>();
             from.add(best);
             for (Manifest m : got) if (m != best && m.version.equals(best.version) && m.sha256.equals(best.sha256)) from.add(m);
@@ -622,16 +624,15 @@ final class Updater {
         return new JSONObject().put("version", v).put("label", l == null ? "" : l);
     }
 
+    /** 상태를 바꾼 그 잠금 안에서 부른다 → 바뀐 순서대로 전해진다 (listener 는 Handler.post 처럼 금방 끝나야 하고 Updater 를 다시 부르면 안 됨) */
     private void notifyStatus(boolean done) {
-        Listener l = listener;
-        if (l == null) return;
         synchronized (lock) {
-            if (closed) return;
-        }
-        try {
-            l.onStatus(statusJson(), done);
-        } catch (RuntimeException e) {
-            log("상태 전달 오류: " + e);
+            if (closed || listener == null) return;
+            try {
+                listener.onStatus(statusJson(), done);
+            } catch (RuntimeException e) {
+                log("상태 전달 오류: " + e);
+            }
         }
     }
 
