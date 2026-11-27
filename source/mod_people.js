@@ -183,10 +183,12 @@ var N=normalize(i.n);if(!ff){N=-N;}let E=normalize(g.cam.xyz-i.w);let Ls=g.sun.x
 let hh=hgt(b,m);let dwx=dpdx(i.w);let dwy=dpdy(i.w);let dhx=dpdx(hh);let dhy=dpdy(hh);
 var al=vec3f(.03);var gl=.5;var tc=vec3f(0.0);var sk=0.0;var ao=1.0;var hi=0.0;var cf=0.0;
 let hc=vec3f(.022,.018,.016);
-if(m>18.5){ // 총 재질 19–40 (뼈 공간 b 로 무늬; px 로 무늬를 흐림)
+if(m>18.5){ // 총 재질 19–41 (뼈 공간 b 로 무늬; px 로 무늬를 흐림)
+ if(fpv&&i.u.x>.3&&(m==38.0||m==22.0)&&length(b.xy-vec2f(0.0,.155))<.0175&&((b.z<.003&&b.z>-.013)||(m==38.0&&b.z>.097))){discard;} // K2C 정조준: 도트 관의 마개·고무 덮개를 비워 관 속으로 앞 렌즈의 점이 보이게
  let fa=clamp(1.0-px*400.0,0.0,1.0);let st=.85+.3*n3(b*900.0);gl=.3;
  if(m<19.5||m==38.0){al=vec3f(.042,.042,.046)*st;gl=.36;}                           // 19 무광 수지 · 38 도트 몸통 (낮에도 모양이 읽히게 살짝 밝게)
- else if(m<20.5||m==35.0||m==36.0||m==37.0){al=vec3f(.048,.05,.054)*(.9+.2*n3(b*vec3f(80.0,80.0,900.0)));gl=.5;if(m==36.0){al*=1.4;gl=.6;}} // 20 파커라이징 · 35 양각대 · 36 노리쇠 · 37 링
+ else if(m<20.5||m==35.0||m==36.0||m==37.0||m==41.0){al=vec3f(.048,.05,.054)*(.9+.2*n3(b*vec3f(80.0,80.0,900.0)));gl=.5;if(m==36.0){al*=1.4;gl=.6;}
+  if(m==41.0&&fpv&&length(b.xy-vec2f(0.0,.157))<.0045){discard;}} // 20 파커라이징 · 35 양각대 · 36 노리쇠 · 37 링 · 41 M16 조리개 (1인칭: 구멍)
  else if(m<21.5){al=vec3f(.04,.043,.05);gl=.62;al*=1.0-.45*fa*step(.5,fract(b.z*105.0))*step(.004,abs(fract(b.y*70.0)-.5));} // 21 레일 (가로 홈)
  else if(m<22.5){al=vec3f(.025,.025,.027);gl=.18;cf=.2;}                                   // 22 고무
  else if(m<23.5){al=vec3f(.085,.083,.058)*(.92+.16*n3(b*600.0));gl=.32;}                    // 23 AUG 올리브
