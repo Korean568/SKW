@@ -48,6 +48,7 @@
   const scoped=id=>W[id].sc===1&&inv.scope[id]; // T 로 단 스코프
   const zoomOf=id=>{const w=W[id];return scoped(id)?3.5:w.zm;};
   const ovOf=id=>scoped(id)?'scope':W[id].ov;
+  const gain=it=>{const c=W[it.id].cal;return inv.slot.includes(it.id)?max(0,min(it.loaded+it.res,CAP[c]-(inv.pool[c]|0))):-1;}; // 'own' 줍기로 실제 늘 탄약 (-1: 없는 총)
   const say=(t,d=1.5)=>{st.msg=t;st.msgT=T+d;};
   const note=t=>{if(T>st.noteT-.5){st.note=t;st.noteT=T+1.5;}}; // 1.5초 · 연타 제한
   const snd=(n,o)=>n&&G.sfx?G.sfx.play(n,o||{}):null;
@@ -56,7 +57,7 @@
   /* ── 인벤토리 ── */
   function reset(){
     inv.slot=[null,null,null,null];inv.cur=0;inv.mag={};inv.pool={};inv.mode={};inv.scope={};inv.last={P:0,S:1,H:3};
-    Object.assign(st,{cd:0,rl:0,sw:0,bn:0,trig:0,cyc:0,spin:0,acc:0,ft:0,spr:0,kick:0,ads:0,so:0,shake:0,lf:'',lfT:-9,br:2,brk:0,note:'',noteT:0,msg:'',msgT:0});
+    Object.assign(st,{cd:0,rl:0,rh:0,sw:0,bn:0,trig:0,cyc:0,spin:0,acc:0,ft:0,spr:0,kick:0,ads:0,so:0,shake:0,lf:'',lfT:-9,br:2,brk:0,note:'',noteT:0,msg:'',msgT:0});
     rocketOff();sndOff();rlCut();
   }
   function canTake(id){ // 'own' 탄약만 · 'free' 빈 칸 · 'swap' 교체
@@ -71,7 +72,7 @@
     if(fr==null){ // 칸이 차 있음: 손에 든 같은 분류 총, 아니면 마지막에 쓴 총과 교체 → 발밑에 떨어뜨림 (장전 수 유지)
       s=ss.includes(inv.cur)?inv.cur:ss.includes(inv.last[w.slot])?inv.last[w.slot]:ss[0];
       dropGun(inv.slot[s]);r='swap';
-      if(s===inv.cur){rlCut();st.sw=st.swT=.4;st.rl=0;st.cd=.4;st.spin=0;st.bn=0;}
+      if(s===inv.cur){rlCut();st.sw=st.swT=.4;st.rl=0;st.cd=.4;st.spin=0;st.bn=0;st.cyc=0;st.ft=0;} // 손의 총 상태(노리쇠 · 회전)는 새 총으로 넘어가지 않음
     }
     inv.slot[s]=id;inv.mag[id]=loaded;inv.mode[id]=0;inv.scope[id]=0;addPool(w.cal,res);
     if(r==='free')say(`${w.n} 획득 — [${s+1}] 으로 교체`,2.5);
@@ -108,11 +109,11 @@
   function reload(){
     const id=cur();if(!id)return;const w=W[id],m=inv.mag[id]|0,p=inv.pool[w.cal]|0;
     if(st.rl>0||st.sw>0||p<=0||m>=w.mag+(w.ch&&m>0?1:0))return;
-    st.rc=w.ch&&m>0?1:0;st.rl=st.rlT=w.rl;st.bn=0;st.cyc=0;st.rv=snd(id==='m134'?'rlb':id==='rpg7'?'rlr':'reload'); // 탄창에 남아 있으면 약실 +1 · 탄띠 6초 · 로켓 4초
+    st.rc=w.ch&&m>0?1:0;st.rl=st.rlT=w.rl;st.bn=0;st.cyc=0;st.rv=id==='m134'?snd('rlb'):id==='rpg7'?snd('rlr'):snd('reload',{span:w.rl*1.2}); // 탄창에 남아 있으면 약실 +1 · 탄띠 6초 · 로켓 4초 · 탄창 소리는 재장전 시간에 맞춰 늘림 (마지막 '장전'이 .84 지점)
   }
   function reloadDone(){
     const id=cur(),w=W[id],m=inv.mag[id]|0,n=min(w.mag+(st.rc?1:0)-m,inv.pool[w.cal]|0);
-    inv.mag[id]=m+max(0,n);inv.pool[w.cal]-=max(0,n);st.rl=0;st.rv=null;
+    inv.mag[id]=m+max(0,n);inv.pool[w.cal]-=max(0,n);st.rl=0;st.rv=null;st.rh=1; // R 을 누르고 있어도 다시 장전하지 않음 (떼야 다음)
   }
 
   /* ── 사격 ── */
@@ -246,7 +247,7 @@
       if(!w){pick(al,me);outView(dt,al,me);return;}
       // 재장전 (수동만)
       if(st.rl>0){st.rl-=dt;if(st.rl<=0)reloadDone();}
-      if(inp.rl&&al.rl&&!pres)reload();
+      if(!inp.rl)st.rh=0;if(inp.rl&&!st.rh&&al.rl&&!pres)reload(); // 교체 중에 누른 R 은 끝난 뒤 장전
       // 조준 (M134: 오른쪽 버튼 = 회전 유지)
       const adsOK=inp.ads&&al.ads&&!me.run&&st.rl<=0&&!w.noads&&!pres&&!fpOff();
       st.ads+=((adsOK?1:0)-st.ads)*min(1,dt*(zoomOf(id)>1?8:11)*(w.as||1));
@@ -382,20 +383,26 @@
         const dx=it.p[0]-me.p[0],dz=it.p[2]-me.p[2],d=hypot(dx,dz);
         if(d>=nd||abs(it.p[1]-me.p[1])>1.3)continue;
         if(d>.8&&(dx*f[0]+dz*f[2])/(d*fl)<.82)continue; // 시야 35° 안 (발밑 0.8 m 는 언제나)
+        if(!gain(it)||!seen(it,me))continue; // 탄약이 가득 찬 같은 총 · 벽 너머 총은 안내 · 줍기 없음
         nd=d;near=it;
       }
     }
     drops.near=near;
     if(near&&e0){
-      const r=take(near.id,near.loaded,near.res);remove(near);drops.near=null;
-      if(r==='own')say(`${W[near.id].n} 탄약 +${near.loaded+near.res}`,1.5);
+      const k=gain(near),r=take(near.id,near.loaded,near.res);remove(near);drops.near=null;
+      if(r==='own')say(`${W[near.id].n} 탄약 +${k}`,1.5);
     }
+  }
+  function seen(it,me){ // 눈높이 · 무릎 높이 선이 둘 다 막히면 숨은 총 (벽 · 좌석 등받이 · 잔해 너머) — 낮은 턱 아래 총은 무릎 선으로 보임
+    const t=v3(it.p,[0,.1,0]);
+    for(const o of[A.eye(),v3(me.p,[0,.3,0])]){const dv=V3.sub(t,o),l=hypot(...dv);if(A.solid(o,nrm(dv),l)>=l-.3)return 1;}
+    return 0;
   }
   function promptText(){
     const id=cur(),w=id&&W[id],m=id?inv.mag[id]|0:0,p=w?inv.pool[w.cal]|0:0;
     if(T<st.noteT)return st.note;
     const n=drops.near;
-    if(n){const c=canTake(n.id),N=W[n.id].n;return c==='own'?`[E] ${N} 탄약 줍기 (+${n.loaded+n.res})`:c==='free'?`[E] ${N} 줍기`:`[E] ${N}(으)로 바꾸기`;}
+    if(n){const c=canTake(n.id),N=W[n.id].n;return c==='own'?`[E] ${N} 탄약 줍기 (+${gain(n)})`:c==='free'?`[E] ${N} 줍기`:`[E] ${N}(으)로 바꾸기`;}
     if(T<st.msgT)return st.msg;
     if(!w||pres)return'';
     if(st.rl>0)return'재장전 중…';
@@ -411,7 +418,7 @@
     const w=W[id],m=inv.mag[id]|0,p=inv.pool[w.cal]|0,md=w.md[inv.mode[id]|0];
     let s=`<b>${m}</b> / ${p}<small><span>${w.n}</span>`;
     if(w.md.length>1||md==='bolt')s+=`<span>${MODE[md]}</span>`;
-    if(scoped(id))s+='<span>스코프</span>';
+    if(scoped(id))s+=`<span>${G.i18n&&!G.i18n.D.has('스코프 장착')?'스코프':'스코프 장착'}</span>`; // HUD 전용 키 (터치 버튼 '스코프'→'SCOPE' 와 구분) — 영어 사전에 없으면 예전 키
     s+='</small>';
     if(id==='m134')s+=`<em><span>탄띠</span>${st.spin>.05?`<span>회전 중</span> ${'▮'.repeat(1+st.spin*4|0)}`:''}</em>`;
     else if(id==='rpg7')s+=`<em><span>로켓</span> ${m} / ${p}</em>`;
@@ -419,7 +426,7 @@
     return s;
   }
   function markers(){ // ▼ 표지: 6 m 안 · 시야 안 · 가려지지 않은 것 3개까지
-    const on=A&&!pres&&(A.allow()||ON).free&&!fpOff();let j=0;
+    const on=A&&!pres&&(A.allow()||ON).free&&!fpOff()&&!drops.near&&!(A.busyE&&A.busyE());let j=0; // E 안내가 떠 있으면 표지 없음 (안내 상자와 겹침)
     if(on){
       const me=A.me(),eye=A.eye(),chk=T>mkT;if(chk)mkT=T+.2;
       const L=drops.list.map(it=>[hypot(it.p[0]-me.p[0],it.p[2]-me.p[2]),it]).filter(a=>a[0]<6).sort((a,b)=>a[0]-b[0]);
@@ -427,8 +434,8 @@
         if(j>=ui.mk.length)break;
         const t=v3(it.p,[0,.1,0]),q=G.project(v3(t,[0,.2,0]));if(!q||q[2]<=0||q[0]<0||q[1]<0||q[0]>innerWidth||q[1]>innerHeight)continue;
         if(chk){const dv=V3.sub(t,eye),l=hypot(...dv);it.seen=A.solid(eye,nrm(dv),l)>=l-.25;}
-        if(!it.seen||it===drops.near)continue; // 줍기 안내가 뜬 총은 표지 생략 (글자와 겹침)
-        const e=ui.mk[j++];e.style.display='block';e.style.transform=`translate(${q[0]|0}px,${q[1]|0}px)`;e.style.opacity=d<1.8?1:.55;
+        if(!it.seen)continue;
+        const e=ui.mk[j++];e.style.display='block';e.style.transform=`translate(${q[0]|0}px,${q[1]|0}px)`;e.style.opacity=d<1.8?1:.85;
         if(e._t!==W[it.id].sh){e._t=W[it.id].sh;e.firstChild.textContent=e._t;}
       }
     }
@@ -473,16 +480,16 @@
   G.register('arms',{
     init(){
       G.css(`#wa{position:absolute;inset:0;pointer-events:none;display:none;color:#fff;font-family:system-ui,'Malgun Gothic',sans-serif;text-shadow:0 1px 3px #000c}
-#wa .ov{position:absolute;inset:0;opacity:0}#wa .ov svg{position:absolute;left:50%;top:50%;width:84vmin;height:84vmin;margin:-42vmin}
+#wa .ov{position:absolute;inset:0;opacity:0;z-index:-1}#wa .ov svg{position:absolute;left:50%;top:50%;width:84vmin;height:84vmin;margin:-42vmin}
 #wsc{background:radial-gradient(circle,#38605010 0,#0000 22vmin,#0008 37vmin,#000 41vmin)}
 #wrg{background:radial-gradient(circle,#0000 30vmin,#0006 46vmin,#000a 70vmin)}
 #wpg{background:radial-gradient(circle,#2a2a1808 0,#0000 24vmin,#000a 36vmin,#000 40vmin)}
-.wmk{position:absolute;left:-40px;top:-34px;width:80px;text-align:center;font:700 12px system-ui;display:none;color:#fe9}.wmk:after{content:'▼';display:block;font-size:13px}
-#wh{position:absolute;right:4vw;bottom:5vh;text-align:right;font-size:16px;color:#cde;display:none}
+.wmk{position:absolute;left:-40px;top:-34px;width:80px;text-align:center;font:700 12px system-ui;display:none;color:#fe9;text-shadow:0 0 2px #000,0 1px 3px #000}.wmk:after{content:'▼';display:block;font-size:13px}
+#wh{position:absolute;right:4vw;bottom:max(5vh,calc(2vh + 34px));text-align:right;font-size:16px;color:#cde;display:none}
 #wh b,#am b{font-weight:700;color:#fff}#wh b{font-size:30px}#wh small,#am small{display:block;font-size:13px;letter-spacing:.12em;color:#9bc}
 #wh small span+span:before,#am small span+span:before{content:' · '}#wh em,#am em{display:block;font:600 12px system-ui;color:#fc8;font-style:normal}#wh em span+span:before,#am em span+span:before{content:' · '}
-#wh u,#am u{display:flex;gap:7px;justify-content:flex-end;margin-top:4px;text-decoration:none;font:600 11px system-ui;color:#fff7}#wh u .on,#am u .on{color:#fe9}#wh u i,#am u i{font-style:normal}
-#whp{position:absolute;left:50%;top:62%;transform:translateX(-50%);font-size:18px;color:#fe9;display:none}`);
+#wh u,#am u{display:flex;gap:7px;justify-content:flex-end;margin-top:4px;text-decoration:none;font:600 12px system-ui;color:#fffc;text-shadow:0 0 2px #000,0 1px 3px #000}#wh u .on,#am u .on{color:#fe9;background:#000a;border-radius:3px;padding:0 3px}#wh u i,#am u i{font-style:normal}
+#whp{position:absolute;left:50%;top:62%;transform:translateX(-50%);font-size:18px;color:#fe9;display:none;text-shadow:0 0 2px #000,0 1px 3px #000}`);
       ui.wa=G.el('div',{id:'wa'});
       const svg=b=>`<svg viewBox="-50 -50 100 100" stroke=#000 fill=none>${b}</svg>`;
       ui.sc=G.el('div',{id:'wsc',className:'ov',innerHTML:svg('<path d="M-50 0H50M0-50V50" stroke-width=.22 /><path d="M-25 0H25M0-25V25" stroke-width=1.3 stroke-dasharray="0 5" stroke-linecap=round /><path d="M-50 0H-30M30 0H50M0 30V50" stroke-width=1.4 /><circle r=49.5 stroke-width=1.5 stroke=#0008 />')},ui.wa); // 스코프: 밀도트 조준선

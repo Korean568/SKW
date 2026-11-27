@@ -70,8 +70,9 @@ const SLOG = `const LOG=[];let FR=0;{const p0=G.sfx.play,l0=G.sfx.loop;G.sfx.pla
       const s0=A.D.shots;let first=-1;run(3,i=>{hold();I.fire=1;if(first<0&&A.D.shots>s0)first=i*.05;win.push(snd);snd=0;if(win.length>20)win.shift();pk=Math.max(pk,win.reduce((a,b)=>a+b,0));});
       const rps=(A.D.shots-s0)/(3-first);G.sfx.play=pl0;const Lf=LOG.length;run(1.5,()=>hold());const lf=LOG.slice(Lf).find(x=>x[1].startsWith('L:m134f:0'));
       out.m134={spinUp:A.D.spinUp,first,rps:+rps.toFixed(1),maxRays:A.D.maxRays,spinAfter:+A.st.spin.toFixed(2),oneShotsPerSec:pk,fOff:!!lf,ok:A.D.spinUp>.45&&A.D.spinUp<.6&&rps>40&&pk<=25&&A.st.spin<.01&&!!lf};
-      // 탄띠 교체 소리 'rlb'
-      A.inv.mag.m134=0;L0=LOG.length;run(.3,i=>{hold();I.rl=i<2?1:0;});out.rlb={snd:mine(L0),ok:mine(L0).includes('rlb')};
+      // 탄띠 교체 소리 'rlb' — 로직 단계는 실제 시간보다 빨라 보이스가 상한까지 쌓임 → 실제 시간으로 잠깐 비운 뒤 (상한에 걸리면 play 가 거절 → 끊을 소리 없음 · rlCut 이 우연히 실패)
+      for(let k=0;k<40&&G.sfx.voices()>8;k++){await new Promise(r=>setTimeout(r,100));G.sfx.tick(0);}
+      const v0=G.sfx.voices();A.inv.mag.m134=0;L0=LOG.length;run(.3,i=>{hold();I.rl=i<2?1:0;});out.rlb={snd:mine(L0),voices:v0,rv:!!A.st.rv,ok:mine(L0).includes('rlb')&&!!A.st.rv};
       // 재장전 중 무기 교체 → 재장전 취소 · 그 소리도 끊김 (G.sfx.stop)
       run(.5,()=>hold());L0=LOG.length;run(.2,i=>{hold();I.slot=i===0?1:0;});out.rlCut={rl:A.st.rl,cur:A.cur,mag:A.inv.mag.m134,cut:LOG.slice(L0).some(x=>x[1]==='X:stop'),ok:A.st.rl===0&&A.cur===A.inv.slot[0]&&A.inv.mag.m134===0&&LOG.slice(L0).some(x=>x[1]==='X:stop')};
       // RPG: 2 m 앞 벽 → 신관 미작동 · 뒤에 벽 → 후폭풍

@@ -276,7 +276,7 @@
       hurtSelf:(dm,body)=>{ // 로켓 폭발 · 후폭풍: 방탄판 피해 (2.5 m 안: 방탄판 0 + 몸 1발)
         if(safe())return;D.ht++;hud.dd=hud.fl=1;G.sfx.play('hit',{gain:.8});
         if(body){S.plate=0;bodyHit(0);}else if(S.plate>0)S.plate=max(0,S.plate-dm);else bodyHit(0);D.mh=min(D.mh,S.plate);},
-      allow:()=>pl.dead||pl.end?OFFA:pl.rp>0?RPA:ONA,busyE:()=>!!hud.pkN,people:()=>PP.list.map(wp),
+      allow:()=>pl.dead||pl.end?OFFA:pl.rp>0?RPA:ONA,busyE:()=>!!hud.pkN||hud.eT===T,people:()=>PP.list.map(wp),
       frame:p=>{const z=floorAt(p[0],p[2],p[1]+.6)[1];return z===1?C.M:z===2?M4.mul(C.M,TR):null;}}; // 기내 바닥 기울기를 따른다
   }
   function drops1(){ // 바닥 총 (§4.3): 기내 2~3 · 바깥 나머지 (모두 7) — 엄폐물 · 엔진 · 아군 자리 · 시작점 · 등장 지점 · 사람(1.2 m) 근처 제외
@@ -305,8 +305,8 @@
     let near=null,nd=2.4;
     for(const e of E)if(e.P.dead&&T-e.td>.6&&offer(e)){const d=hypot(e.P.p[0]-pl.p[0],e.P.p[2]-pl.p[2]);if(d<nd&&abs(e.P.p[1]-pl.p[1])<1.3){nd=d;near=e;}}
     if(near)near.of=offer(near);
-    if(near&&use&&!pl.dead){
-      const of=near.of;
+    if(near&&use&&!pl.dead){ // 이 E 는 시신이 씀 → 같은 프레임 바닥 총 줍기 없음 (busyE · 한 번 누름 = 한 가지)
+      const of=near.of;hud.eT=T;
       if(of==='pl'||of==='am'){
         const pt=near.pl&&S.spare<3;let tk=0;if(pt){S.spare++;near.pl=0;}
         if(near.ammo>0&&(!pt||offer(near)==='am')){ // 탄약: 7.62×39 · 5.56 총이 있으면 +30 · K7 이 있으면 +15 · 주무기 칸이 비었으면 AKM 째로

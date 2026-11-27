@@ -159,7 +159,8 @@
       const v = out = gn(g, mix); src = []; end = 0; rt = (o.rate ?? 1) * (p ? .92 + Math.random() * .16 : 1); // 음높이 변주
       if (p) out = bq(LPF, 16000 / (1 + d / 500), .5, to(new StereoPannerNode(c, { pan: G.clamp((dz * Lf[0] - dx * Lf[2]) / (d + 30), -1, 1) * .85 }), v));
       name == 'ping' && v.connect(echo);
-      for (const q of f) part(q, now + .01 + Math.min(d / 340, 2.5), out); // 음속 지연
+      const sp = o.span || 1; // {span}: 파트 시작 시각(지연)만 늘림 — 재장전 소리를 총마다 다른 재장전 시간에 맞춤 (길이는 그대로)
+      for (const q of f) part(sp !== 1 && q[7] ? Object.assign(q.slice(), { 7: q[7] * sp }) : q, now + .01 + Math.min(d / 340, 2.5), out); // 음속 지연
       const w = { o: v, g, e: end + .05, s: src }; V.push(w); return w; // 돌려준 보이스는 stop() 으로 끊을 수 있음 (긴 재장전 소리 등)
     },
     stop(w, k = .03) { if (w && V.includes(w) && w.g < 9) { tgt(w.o.gain, 0, k); kill(w, c.currentTime + Math.max(.08, 6 * k)); } }, // 원샷 보이스 끊기 (짧게 감쇠 → 딸깍 없음)

@@ -367,6 +367,7 @@
 #ov button,#end button{margin:1.1em 0 .2em;padding:.5em 2.4em;font:700 max(18px,1.9vw) system-ui;letter-spacing:.3em;color:#0b0f14;background:#fff;border:0;border-radius:6px;cursor:pointer;box-shadow:0 6px 30px #fff4;pointer-events:auto}
 #dl{left:50%;bottom:6vh;transform:translateX(-50%);width:min(820px,88vw);padding:.7em 1.4em .8em;background:#0a0e14d8;border-radius:8px;font:500 max(14px,2.4vh)/1.45 system-ui;color:#f2f4f7;text-align:center;opacity:0;transition:opacity .35s}
 #dl b{display:block;font-size:.66em;letter-spacing:.12em;margin-bottom:.2em}
+html:not(.touch) #dl{max-width:max(240px,calc(92vw - 356px - 2.8em))}/* 좁은 창(1000px 안팎): 대사창이 양옆 아래 HUD(왼쪽 체력 150px · 오른쪽 탄약/무기 칸 ≤170px, 둘 다 4vw 안쪽) 사이에 들어가게 */
 #cap{left:50%;top:12vh;transform:translateX(-50%);width:min(860px,84vw);text-align:center;font:italic 400 max(15px,2.5vh)/1.7 serif;color:#fff;text-shadow:0 0 14px #000;transition:opacity 1.2s;opacity:0}
 #ttl{left:5vw;top:7vh;font:300 max(12px,2vh) system-ui;letter-spacing:.35em;color:#fff;border-left:3px solid #e03b3b;padding:.2em .8em;opacity:0;transition:opacity 1s;text-shadow:0 1px 4px #000}
 #vl{inset:0;background:radial-gradient(#fff0 20%,#e8eef4);opacity:0}#bk{inset:0;background:#000;opacity:0}
