@@ -5,8 +5,9 @@
  *   update/game.gz      스토리 게임 HTML (오프닝 없음) 을 gzip 한 것 — 브라우저에서 바로 열리지 않는 형식
  *   update/latest.json  { version, label, file, sha256, size, minShell, date }
  *
- * 앱(main.js)은 켜질 때 latest.json 을 보고 version 이 지금 것보다 새것이면 game.gz 를 받아
- * sha256 을 확인한 뒤 사용자 폴더에 저장하고 그 게임을 띄운다. 인터넷이 없으면 가진 것으로 시작한다.
+ * 앱(main.js)은 켜질 때 · 켜져 있는 동안 30분마다 · 게임의 "업데이트 확인" 때 latest.json 을 (raw · github.io 둘 다) 보고
+ * version 이 지금 것보다 새것이면 game.gz 를 받아 sha256 을 확인한 뒤 사용자 폴더에 저장하고 그 게임을 띄운다 (켜질 때 4초 안에 못 받으면 "지금 적용").
+ * 인터넷이 없으면 가진 것으로 그대로 돈다. 옛 앱(1.2.0~1.5.0)은 켜질 때만 확인한다 — 새 게임이 직접 latest.json 을 보고 "앱을 껐다 켜 주세요" 를 알린다.
  *   version  = package.json 의 version (내부 번호, semver). 앱이 비교하는 것은 이것뿐 → 릴리스마다 반드시 올린다
  *   label    = package.json 의 skwLabel (사람에게 보이는 0.xx). 1.3.0 부터의 앱이 게임 화면 표시용으로 넘긴다 (옛 앱은 모르는 칸이라 무시)
  *   minShell = 이 게임을 띄울 수 있는 가장 낮은 앱(껍데기) 버전. main.js / preload.js 를 바꿔 옛 앱과 안 맞게 되면 올린다.

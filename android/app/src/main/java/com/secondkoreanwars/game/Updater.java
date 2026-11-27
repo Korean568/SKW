@@ -104,6 +104,8 @@ final class Updater {
 
     /** 우리가 정한 짧은 실패 이유 (HTTP 404 · sha256 · minShell …) */
     static final class Fail extends IOException {
+        private static final long serialVersionUID = 1L;
+
         Fail(String code) {
             super(code);
         }
