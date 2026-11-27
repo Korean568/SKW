@@ -158,8 +158,9 @@
     if(dir.n<S.total&&S.alive<want&&dir.t<=0){spawn();dir.t=dir.n<6?.35:1+R();}
   }
   const chest=P=>{const e=PP.eye(P);return[e[0],e[1]-.3,e[2]];};
+  const free=e=>{e.rs&&occ[e.key]--;e.rs=0;}; // 잡아 둔 자리 반납 (가다 죽거나 · 막혀 다음 지점으로 가도 — 안 돌려주면 줄이 꼬리 뒤 밖까지 밀려 끝까지 숨어 버림)
   function slotPos(e,w){ // 같은 자리의 여러 명은 플레이어 반대쪽으로 줄을 선다
-    const n=occ[w.key]=(occ[w.key]||0)+1;e.key=w.key;
+    free(e);const n=occ[w.key]=(occ[w.key]||0)+1;e.key=w.key;e.rs=1;
     if(n<2)return w.p.slice();
     const l=C.l(w.p),k=n-1;
     if(w.ins){if(abs(l[0])<.3)l[2]+=(l[2]>C.l(pl.p)[2]?1:-1)*k*1.05;else l[2]+=(k%2?.7:-.7)*((k+1)>>1);}
@@ -178,7 +179,7 @@
       if(L<.15||e.t>14){ // 도착 (또는 막힘 → 다음 지점)
         e.goal=null;e.t=0;
         if(w.st&&L<.5){e.st='hold';e.ht=4+R()*5+(e.wi===e.path.length-1?1e9:0);e.cpose=w.st===1?'crouch':'aim';e.bn=0;}
-        else e.wi=min(e.wi+1,e.path.length-1);
+        else{free(e);e.wi=min(e.wi+1,e.path.length-1);}
       }else{
         const ox=P.p[0],oz=P.p[2],s=min(L,sp*dt);
         if(fz[1])move(P.p,d[0]/L*s,d[2]/L*s,.2);else{P.p[0]+=d[0]/L*s;P.p[2]+=d[2]/L*s;}
@@ -210,7 +211,7 @@
       }
     }else{P.aim=null;}
     P.pose=tg&&e.bt>0&&e.nb>0?'fire':e.cpose;
-    if(e.ht<=0||(e.bn>=3&&e.wi<e.path.length-1)){occ[e.key]--;e.st='go';e.t=0;e.wi=min(e.wi+1,e.path.length-1);e.bn=0;}
+    if(e.ht<=0||(e.bn>=3&&e.wi<e.path.length-1)){free(e);e.st='go';e.t=0;e.wi=min(e.wi+1,e.path.length-1);e.bn=0;}
   }
   function shotE(e,tg){ // 적 사격: 명중은 확률(노출 시간이 길수록 정확), 예광탄은 항상 보인다
     const m=PP.muzzle(e.P),o=[m[0],m[1],m[2]],d=hypot(...V3.sub(tg.p,o));
@@ -228,7 +229,7 @@
   }
   function kill(e,head){
     const P=e.P;P.pose='dead';P.dead=true;P.aim=null;e.ammo=20+(R()*30|0);e.td=T;e.pl=R()<.15;e.gun=1; // 15% 방탄판 · AKM 은 총째로 가져가기 전까지 시신에 남는다
-    occ[e.key]&&e.st==='hold'&&occ[e.key]--;S.kills++;
+    free(e);S.kills++;
     const dead=E.filter(x=>x.P.dead),cap=G.Q.level?22:9; // 시신 수 제한 (LOW 는 적게)
     if(dead.length>cap){const o=dead[0];PP.remove(o.P);E.splice(E.indexOf(o),1);}
     if(S.kills>=S.total)finish();
