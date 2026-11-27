@@ -8,16 +8,16 @@ const STEP = `const dt=.05;G.time+=dt;G.dt=dt;G.frame++;G.lights.length=0;for(co
   let bad = 0; const say = (ok, m) => { if (!ok) bad++; console.log((ok ? 'PASS ' : 'FAIL ') + m); };
   const b = await chromium.launch({ args: FLAGS });
   const open = async (q, vp = { width: 960, height: 540 }) => { const p = await b.newPage({ viewport: vp }), logs = []; p.on('console', m => (m.type() === 'error' || m.type() === 'warning') && !/CONTEXT_LOST/.test(m.text()) && logs.push(m.text().slice(0, 200))); p.on('pageerror', e => logs.push('pageerror ' + e.message));
-    await p.goto(U + q + (/lang=/.test(q) ? '' : '&lang=ko')); await p.waitForFunction(() => window.G && (G.ready || G.dead), null, { timeout: 180000 }); return [p, logs]; };
+    await p.goto(U + (q || '?') + (/lang=/.test(q) ? '' : (q ? '&' : '') + 'lang=ko')); await p.waitForFunction(() => window.G && (G.ready || G.dead), null, { timeout: 180000 }); return [p, logs]; };
   { const [p, logs] = await open('?step&q=HIGH');
     const r = await p.evaluate(async () => { for (const q of ['HIGH', 'LOW', 'MEDIUM', 'HIGH']) { G.setQuality(q, 1); await G.test.run(2); } G.dyn = .7; G.resize(); await G.test.run(2); G.dyn = 1; G.resize(); await G.test.run(2); return G.errors; });
     say(!r.length && !logs.length, 'preset switch + resize: ' + JSON.stringify(r) + ' ' + JSON.stringify(logs)); await p.close(); }
   { const [p, logs] = await open('?step&q=LOW'); // 전체 진행 (로직만, 0.05초 단계)
     const r = await p.evaluate(`(()=>{const beats=[];let last='',i=0;G.story.start();for(;i<30000;i++){if(G.fps.on)G.fps.bot=true;${STEP}const b=G.story.S.beat;if(b!==last){beats.push(b+'@'+(i*.05|0));last=b}if(b==='end'&&!G.fps.on)break}return {beats,win:G.story.S.win,S:G.fps.S,errs:G.errors}})()`);
     say(r.win === true && r.S.kills === r.S.total && !r.errs.length && !logs.length, 'full story + bot fight: ' + JSON.stringify(r)); await p.close(); }
-  { const [p, logs] = await open('?step&q=LOW'); // 가만히 있으면 전사
-    const r = await p.evaluate(`(()=>{let i=0;G.story.start();G.story.go('fight');for(;i<12000;i++){G.fps.bot=false;${STEP}if(G.story.S.beat==='end'&&!G.fps.on)break}return {t:i*.05|0,win:G.story.S.win,hp:G.fps.S.hp,card:/전사/.test(document.body.innerText),errs:G.errors}})()`);
-    say(r.win === false && r.card && !r.errs.length && !logs.length, 'defeat path: ' + JSON.stringify(r)); await p.close(); }
+  { const [p, logs] = await open('?step&q=LOW'); // 가만히 있으면 전사 → '전사' 카드 (패배 엔딩 없음: 부활 · 처음 화면) → 부활하면 새 방탄판으로 계속
+    const r = await p.evaluate(`(()=>{let i=0,card=false;G.story.start();G.story.go('fight');for(;i<12000&&!card;i++){G.fps.bot=false;${STEP}card=/전사/.test(document.body.innerText)}const t=i*.05|0,on=G.fps.on;G.fps.revive();${STEP}return {t,card,on,revived:!G.fps.S.dead&&G.fps.S.plate===100,cardAfter:/전사/.test(document.body.innerText),errs:G.errors}})()`);
+    say(r.card && r.on && r.revived && !r.cardAfter && !r.errs.length && !logs.length, 'defeat path (death card + revive): ' + JSON.stringify(r)); await p.close(); }
   { let p, logs, lost = 0; // 실시간 루프 + 시작 버튼 (헤드리스 SwiftShader 는 가끔 첫 프레임에 장치를 잃음 → 재시도)
     for (let k = 0; k < 6; k++) { [p, logs] = await open('', { width: 1280, height: 720 }); let ok = 0;
       for (let i = 0; i < 25 && !ok; i++) { await p.waitForTimeout(1000); ok = await p.evaluate(() => window.G && G.ready && !G.dead && G.frame > 20).catch(() => 0); }

@@ -432,8 +432,8 @@
       const L=drops.list.map(it=>[hypot(it.p[0]-me.p[0],it.p[2]-me.p[2]),it]).filter(a=>a[0]<6).sort((a,b)=>a[0]-b[0]);
       for(const[d,it]of L){
         if(j>=ui.mk.length)break;
-        const t=v3(it.p,[0,.1,0]),q=G.project(v3(t,[0,.2,0]));if(!q||q[2]<=0||q[0]<0||q[1]<0||q[0]>innerWidth||q[1]>innerHeight)continue;
-        if(chk){const dv=V3.sub(t,eye),l=hypot(...dv);it.seen=A.solid(eye,nrm(dv),l)>=l-.25;}
+        const t=v3(it.p,[0,.1,0]);if(chk){const dv=V3.sub(t,eye),l=hypot(...dv);it.seen=A.solid(eye,nrm(dv),l)>=l-.25;} // 화면 밖이어도 0.2초마다 갱신 → 시야에 들어온 순간 바로 판정
+        const q=G.project(v3(t,[0,.2,0]));if(!q||q[2]<=0||q[0]<0||q[1]<0||q[0]>innerWidth||q[1]>innerHeight)continue;
         if(!it.seen)continue;
         const e=ui.mk[j++];e.style.display='block';e.style.transform=`translate(${q[0]|0}px,${q[1]|0}px)`;e.style.opacity=d<1.8?1:.85;
         if(e._t!==W[it.id].sh){e._t=W[it.id].sh;e.firstChild.textContent=e._t;}

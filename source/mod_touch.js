@@ -313,7 +313,7 @@ html.touch #dk .bk{position:absolute;top:calc(12px + var(--st));right:calc(6vw +
 #tcw .b{position:relative;display:grid;place-content:center;justify-items:center;width:64px;height:42px;border-radius:11px;line-height:1.1;font-size:12px}#tcw .b b{font-size:16px}#tcw .b span{font-size:11px;font-weight:600;letter-spacing:0;white-space:nowrap}
 #tcw .b.on{background:#fe9e;color:#0b0f14;border-color:#fe9}#tcw .b.no{opacity:.45}
 html.touch #wh{right:calc(12px + var(--sr));top:calc(40px + var(--st));bottom:auto;font-size:15px}html.touch #wh small,html.touch #wh u,html.touch #am u{font-size:11px}
-html.touch #am,html.touch #wh{max-width:114px}html.touch #wh u,html.touch #am u{flex-wrap:wrap;gap:1px 6px}
+html.touch #am,html.touch #wh{max-width:114px}html.touch #wh u,html.touch #am u{flex-wrap:nowrap;white-space:nowrap;gap:0 4px}html.touch:has(#tcw.v) #wh u,html.touch:has(#tcw.v) #am u{visibility:hidden}
 html.touch #whp{top:66%;padding:.5em 1.1em;border-radius:9px;font-size:clamp(15px,4vh,20px)}html.touch #whp[data-k]{pointer-events:auto;touch-action:none;background:#000b;border:1px solid #fe9a}
 #tc[data-s=s4] .b[data-a=use]{right:calc(120px + var(--sr))!important;bottom:calc(162px + var(--sb))!important}/* 스토리 4 는 대사창이 떠 있는 채 움직임 → 줍기를 장전 위로 */
 #tc[data-s=s4] .b[data-a=aim]{right:calc(26px + var(--sr))!important;bottom:calc(66px + var(--sb))!important;width:68px!important;height:68px!important}
