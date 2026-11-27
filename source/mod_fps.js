@@ -95,7 +95,7 @@
     stop();o0=o;T=0;
     Object.assign(D,{ht:0,mh:100,pk:0});Object.assign(S,{hp:100,plate:100,spare:3,body:0,dead:0,scope:0,kills:0,total:o.total||50,alive:0});
     const s=o.pos||C.w([0,0,2]);
-    Object.assign(pl,{p:[s[0],s[1],s[2]],yaw:o.yaw??-PI/2,pit:-.04,vy:0,cr:0,ads:0,hurt:9,ex:0,dead:0,end:0,rp:0,iv:0,bn:0,bt:0,ended:0,bot:null});
+    Object.assign(pl,{p:[s[0],s[1],s[2]],yaw:o.yaw??-PI/2,pit:-.04,vy:0,cr:0,ads:0,hurt:9,ex:0,dead:0,end:0,rp:0,iv:0,bn:0,bt:0,ended:0,bot:null,rt:0});
     pl.p[1]=floorAt(pl.p[0],pl.p[2],pl.p[1]+1)[0];
     dir={t:0,n:0};occ={};E=[];fires=[];ui.fd.style.display='none';ui.fdK='';hud.msg=o.cp?['체크포인트 — 전투 시작부터 다시',3.5]:null;
     // 아군: 앞 2명 · 뒤 2명 (플레이어가 밀면 비켜 줌)

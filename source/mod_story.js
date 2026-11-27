@@ -79,7 +79,7 @@
  }
   function prep(b){// 장면 시작 상태를 누적 적용 (go() 용)
     const n=BEATS.indexOf(b);stage();
-    if(n>=2){act('lav');W.park.vis=false;W.park.wp=null;W.col.pose='sleep';C.S.tv=1;}
+    if(n>=2){act('lav');wait.length=0;W.park.vis=false;W.park.wp=null;W.col.pose='sleep';C.S.tv=1;}
     if(n>=3){boomState();S.fm=1;S.ft=0;S.y=3150;for(const k of ['col','lee','shin']) W[k].pose='sit';}
     if(n>=4){C.S.gear=0;S.y=900;seatPark();}
     if(n>=6){crashState();S.blk=0;squadUp(1);}
