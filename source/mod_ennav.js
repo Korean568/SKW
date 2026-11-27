@@ -52,6 +52,7 @@
       '함 침몰 — 작전 실패': 'Ship Sunk — Mission Failed',
     });
     G.i18n.re([
+      [/^그래픽 설정 · (수동|자동 감지): (.+)$/, (m, a, t) => 'Graphics settings · ' + (a === '수동' ? 'Manual' : 'Auto') + ': ' + t],
       // 처음 화면 부제: "해상 반격 — <시나리오 제목>" · 그래픽 안내: "수동: LOW" / "자동 감지: HIGH"
       [/^해상 반격 — (.+)$/, (m, t) => 'Naval Counterattack — ' + G.i18n.tr(t)],
       [/^수동: (\S+)$/, 'Manual: $1'], [/^자동 감지: (\S+)$/, 'Auto-detect: $1'],
