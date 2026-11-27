@@ -15,7 +15,7 @@ if (G.i18n) {
     // 사격 모드 (B) · 칸 · HUD 조각 (각각 따로 된 글자 노드)
     '연사': 'Auto', '점사': 'Burst', '단발': 'Single', '볼트': 'Bolt',
     '주무기': 'Primary', '보조': 'Secondary', '중화기': 'Heavy',
-    '탄띠': 'Belt', '회전 중': 'Spinning', '로켓': 'Rockets', '양각대': 'Bipod',
+    '탄띠': 'Belt', '회전 중': 'Spinning', '로켓': 'Rockets', '양각대': 'Bipod', '스코프 장착': 'Scope',
     // 안내 · 알림
     '지금은 쏠 수 없다': 'You can’t fire now', '사람이 있는 쪽으로는 쏠 수 없다': 'Not toward people',
     '조준경 일체형': 'Built-in optic', '탄띠 교체 [R]': 'Change belt [R]', '로켓 없음': 'No rockets',
