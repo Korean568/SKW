@@ -613,7 +613,7 @@ return vec4f(fogAt(c,i.w),1.0);
   }
  };
 
- let sm,bgl,bg,pb,ib,vb,xb,pipe,pipeN,spipe,lod=-1,n=0,fpn=-1,gkey='';const PP={},PN={},MR=[],off=[],GS={};
+ let sm,bgl,bg,pb,ib,vb,xb,pipe,pipeN,spipe,lod=-1,n=0,fpn=-1,gkey='';const PP={},PN={},MR=[],off=[],GS={},GX=[];
  const mkp=(vs,ds,fragment,count=1,cull='back')=>G.dev.createRenderPipeline({
   layout:G.layout(bgl),vertex:{module:sm,entryPoint:vs,buffers:[
    {arrayStride:40,attributes:[{shaderLocation:0,offset:0,format:'float32x3'},{shaderLocation:1,offset:12,format:'float32x3'},{shaderLocation:2,offset:24,format:'float32x4'}]},
@@ -634,6 +634,7 @@ return vec4f(fogAt(c,i.w),1.0);
   if(!ks.length)F0.push(()=>gun(0),()=>gun(0),()=>gun(1),()=>gun(1),()=>gun(2),()=>gun(2)),['akm','k2c1','k5'].forEach((k,i)=>GI[k]=4+2*i); // mod_guns 없음: 옛 3종
   while(GL.length<F0.length)GL.push([]);GL.length=F0.length;
   F0.forEach((f,k)=>{const s=I.length,v=V.length;try{f();}catch(e){G.err('people: gun build '+(e.stack||e));V.length=v;I.length=s;}MR[k]=[s,I.length-s];
+   let x0=0,x1=0;for(let i=v;i<V.length;i+=10){x0=Math.min(x0,V[i]);x1=Math.max(x1,V[i]);}GX[k]=[x0,x1]; // 총의 좌우 폭 (옆으로 눕힌 바닥 총의 높이)
    const nm=k<4?['body','scope','knife','radio'][k]:(ks[(k-4)>>1]||['akm','k2c1','k5'][(k-4)>>1])+((k-4)&1?':lod':'');GS[nm]=[(V.length-v)/10,(I.length-s)/3];});
   GS.total=[V.length/10,I.length/3];
   if(V.length/10>65535)G.err('people: vertex budget '+V.length/10);
@@ -686,7 +687,9 @@ return vec4f(fogAt(c,i.w),1.0);
     const PR=G.people.props;let pc=0;
     if(PR)for(const Q of PR){ // 바닥 총 · 날아가는 로켓 (총 묶음만, 손 없음). 마지막 칸은 1인칭 몫
      if(!Q||Q.vis===false||!Q.M||!gid(Q.id))continue;if(n>=MAXP-1)break;
-     const o=(n*NB+17)*16;PAL.set(Q.M,o);const ld=Q.loaded===0||Q.loaded===false?0:16;
+     const o=(n*NB+17)*16;PAL.set(Q.M,o);const ld=Q.loaded===0||Q.loaded===false?0:16,M=Q.M;
+     if(Q._arms&&abs(M[1])>.9){ // 옆으로 눕힌 바닥 총 (mod_arms: 바닥 +.035, 롤 ±90°): 바닥에 닿는 쪽 폭만큼 띄움 → 볼트 손잡이·PGO-7·M134 가 바닥에 묻히지 않음
+      const x=GX[GI[gid(Q.id)]],sg=M[1]>0?1:-1,d=x?(sg>0?-x[0]:x[1])-.035:0;for(let k=0;k<3;k++)PAL[o+12+k]+=sg*M[k]*d;}
      PAL.fill(0,(n*NB+18)*16,(n*NB+18)*16+16);PAL[(n*NB+18)*16]=-1;PAL[(n*NB+18)*16+10]=1;PAL[(n*NB+18)*16+13]=ld|64;
      gpar(n,Q.id,Q,1);const dc=H(Q.M[12]-c.pos[0],Q.M[13]-c.pos[1],Q.M[14]-c.pos[2]);
      pushG(Q.id,n,Q.lod!=null?!Q.lod:dc<4);n++;pc++;
