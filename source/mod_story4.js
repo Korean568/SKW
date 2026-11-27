@@ -407,7 +407,7 @@
 #dl .s4r{display:inline-block;margin-left:.6em;padding:0 .45em;font:700 .8em system-ui;font-style:normal;letter-spacing:.1em;color:#0b0f14;background:#ff8b7acc;border-radius:3px;vertical-align:.1em}
 #dl .s4q{color:#ffe2db;letter-spacing:.02em;text-shadow:0 0 6px #ff8b7a55}`);
       ui.t=G.el('div',{id:'s4t',innerHTML:'<small>스토리 4</small><b>폐허가 된 서강 : 고혁명의 배신</b><small>대한민국편</small>'});
-      ui.h=G.el('div',{id:'s4h',textContent:'WASD 이동 · 마우스 둘러보기 · 오른쪽 클릭 조준 · Space 건너뛰기'});
+      ui.h=G.el('div',{id:'s4h'});for(const t of ['WASD 이동 · 마우스 둘러보기 · 오른쪽 클릭 조준 · Space 건너뛰기','Shift 달리기 · E 줍기 · R 재장전 · T 스코프 · B 사격 모드 · 1–4 무기 · 휠 무기 교체']) G.el('div',{textContent:t},ui.h);// 둘째 줄: 무기 (쏘기는 없음 — 이 이야기에서는 쏠 수 없다)
       if(G.params.has('nohud')) ui.h.style.visibility='hidden';
       G.canvas.addEventListener('click',()=>{S.on&&S.beat!=='end'&&G.canvas.requestPointerLock&&G.canvas.requestPointerLock();});
       // 오른쪽 버튼 조준은 G.arms 가 처리한다 (예전 me.aimT 리스너 제거 — 조준 허용은 adapter.allow)

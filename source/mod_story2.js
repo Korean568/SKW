@@ -446,7 +446,7 @@
 #s2t small{font:400 max(11px,1.9vh) system-ui;letter-spacing:.55em;color:#a9a196}#s2t b{display:block;font:800 6.4vh system-ui;letter-spacing:.14em;margin:.4em 0;color:#fff}
 #s2v{inset:0;background:radial-gradient(ellipse at 50% 45%,#0000 40%,#000d);opacity:0;transition:opacity 2.5s}
 html[lang=en] #s2c button{letter-spacing:.18em;text-indent:.18em}html[lang=en] #s2t small{letter-spacing:.3em}html[lang=en] #s2t b{font-size:min(6.4vh,4vw);letter-spacing:.06em}`);
-      ui.v=G.el('div',{id:'s2v'});ui.o=G.el('div',{id:'s2o'});ui.h=G.el('div',{id:'s2h',textContent:'WASD 이동 · 마우스 둘러보기 · Shift 달리기 · E 상호작용'});
+      ui.v=G.el('div',{id:'s2v'});ui.o=G.el('div',{id:'s2o'});ui.h=G.el('div',{id:'s2h'});for(const t of ['WASD 이동 · 마우스 둘러보기 · Shift 달리기 · E 상호작용','우클릭 조준 · E 줍기 · R 재장전 · T 스코프 · B 사격 모드 · 1–4 무기 · 휠 무기 교체']) G.el('div',{textContent:t},ui.h);// 둘째 줄: 무기 (쏘기는 없음 — 이 이야기에서는 쏠 수 없다)
       ui.p=G.el('div',{id:'s2p'});ui.m=G.el('div',{id:'s2m',innerHTML:'<i></i><span></span>'});
       ui.c=G.el('div',{id:'s2c',innerHTML:'<button>처형<small>1</small></button><button>거절<small>2</small></button>'});
       ui.t=G.el('div',{id:'s2t',innerHTML:'<small>스토리 2</small><b>북한 마을 : 5일전으로</b><small>조선민주주의인민공화국편</small>'});

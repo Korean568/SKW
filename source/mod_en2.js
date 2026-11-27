@@ -26,6 +26,7 @@
     // 상호작용 · 조작
     '[E] 문 부수기':'[E] Break down door','[E] 끌고 가기':'[E] Drag away',
     'WASD 이동 · 마우스 둘러보기 · Shift 달리기 · E 상호작용':'WASD move · Mouse look · Shift run · E interact',
+    '우클릭 조준 · E 줍기 · R 재장전 · T 스코프 · B 사격 모드 · 1–4 무기 · 휠 무기 교체':'Right-click aim · E pick up · R reload · T scope · B fire mode · 1–4 weapons · Wheel switch weapon',
     // 선택
     '처형':'Execute','거절':'Refuse',
   });

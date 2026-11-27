@@ -12,6 +12,7 @@
     '서강시':'Seogang City','폐허 — 새벽':'Ruins — Dawn',
     // 조작 안내
     'WASD 이동 · 마우스 둘러보기 · 오른쪽 클릭 조준 · Space 건너뛰기':'WASD move · Mouse look · Right-click aim · Space skip',
+    'Shift 달리기 · E 줍기 · R 재장전 · T 스코프 · B 사격 모드 · 1–4 무기 · 휠 무기 교체':'Shift run · E pick up · R reload · T scope · B fire mode · 1–4 weapons · Wheel switch weapon',
     // 대사 — 특전사
     '어? 뭐야 북한군의 헬기잖아?':"Huh? Wait — that's a North Korean chopper!",
     '경계하라!':'Weapons up! Stay sharp!',
