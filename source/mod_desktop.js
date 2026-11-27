@@ -75,7 +75,7 @@
     }
     const items = () => [...(menu === 'pause' ? ui.p : ui.s).querySelectorAll('[data-a]')].filter(e => e.offsetParent); // 숨긴 버튼(지금 적용 등)은 건너뜀
     const bk = () => Math.max(0, items().findIndex(e => e.dataset.a === 'back'));
-    const hi = () => items().forEach((e, i) => e.classList.toggle('sel', i === sel));
+    const hi = () => { const c = items()[sel]; ui.root.querySelectorAll('[data-a]').forEach(e => e.classList.toggle('sel', e === c)); }; // 숨은 버튼에 남은 표시도 지움
     function pause() {
       if (menu || !story()) return;
       G.paused = true; vol(); openT = performance.now();

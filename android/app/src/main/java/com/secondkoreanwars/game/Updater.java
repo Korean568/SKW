@@ -373,7 +373,7 @@ final class Updater {
             asks.put(cs.submit(() -> manifest(b)), i);
         }
         Manifest[] ans = new Manifest[bases.length];
-        LinkedHashSet<String> errs = new LinkedHashSet<>();
+        String[] bad = new String[bases.length];
         long end = System.currentTimeMillis() + latestMs * 2 + backoffMs + 5000;
         boolean found = false;
         for (long w; !asks.isEmpty() && (w = end - System.currentTimeMillis()) > 0; ) {
@@ -389,18 +389,21 @@ final class Updater {
                     end = Math.min(end, System.currentTimeMillis() + graceMs);
                 }
             } catch (ExecutionException e) {
-                String r = reason(e.getCause());
-                errs.add(r);
-                log(h + " latest.json 실패: " + r);
+                bad[i] = reason(e.getCause());
+                log(h + " latest.json 실패: " + bad[i]);
             }
         }
         for (Map.Entry<Future<Manifest>, Integer> e : asks.entrySet()) { // 시간 안에 답하지 않은 주소
             e.getKey().cancel(true);
-            errs.add("timeout");
+            bad[e.getValue()] = "timeout";
             log(host(bases[e.getValue()]) + " latest.json " + (found ? "아직 답이 없음 → 기다리지 않고 받기 시작 (다음 확인 때 다시)" : "실패: timeout"));
         }
-        List<Manifest> got = new ArrayList<>();
-        for (Manifest m : ans) if (m != null) got.add(m);
+        List<Manifest> got = new ArrayList<>(); // 주소 순서대로 (답이 온 순서가 아니라)
+        LinkedHashSet<String> errs = new LinkedHashSet<>();
+        for (int i = 0; i < bases.length; i++) {
+            if (ans[i] != null) got.add(ans[i]);
+            else if (bad[i] != null) errs.add(bad[i]);
+        }
 
         // 2) 가장 높은 버전 (이 앱이 띄울 수 있는 것 중) — 같으면 앞의 주소
         Manifest best = null, blocked = null;
