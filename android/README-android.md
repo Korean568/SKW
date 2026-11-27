@@ -4,7 +4,8 @@
 
 - 앱 이름: **Second Korean Wars** (휴대폰 언어가 한국어면 **제 2차 한국전쟁**)
 - 패키지 이름(앱의 고유 주소): `com.secondkoreanwars.game` — **Play 스토어에 한 번 올리면 영원히 바꿀 수 없습니다**
-- 가로 화면 전용 · 전체 화면 · 인터넷을 쓰지 않음 (권한 요청 없음)
+- 가로 화면 전용 · 전체 화면 · 인터넷은 **게임 자동 업데이트**에만 씀 (INTERNET 권한 하나 — 설치할 때 따로 묻는 권한은 없음)
+- **0.16 부터 게임 내용이 저절로 새 버전으로 바뀝니다** (아래 5번). 0.15 이하 APK 에는 이 기능이 없으니 **0.16 APK 를 한 번만 새로 설치**해 주세요.
 
 > **꼭 알아 두세요.** 이 앱은 아직 **실제 휴대폰에서 시험해 보지 못했습니다.** 만드는 컴퓨터에는 Android 기기도, Android 개발 도구(SDK)도 없어서 코드 검사와 PC 브라우저 시험까지만 했습니다. 그래서 **APK 파일이 실제로 만들어지는지도 GitHub 의 첫 자동 빌드(3번)를 돌려 봐야 압니다.** 특히 앱 안에서 게임 화면을 그리는 기술(WebGPU)이 휴대폰마다 켜지는지는 직접 설치해 봐야만 알 수 있습니다. 첫 APK 를 휴대폰에 설치해 보고 결과(켜지는지, 조작이 되는지, 느린지)와 휴대폰 기종을 알려 주시면 그에 맞춰 고칩니다.
 
@@ -42,7 +43,7 @@ APK 는 3번의 **Android build** 를 한 번 실행한 뒤에 itch.io 페이지
   - `SecondKoreanWars-<버전>-android.apk` · `SecondKoreanWars-<버전>-android.aab` — 업로드 키로 서명한 정식 파일 (4-3 의 시크릿이 있을 때)
   - `SecondKoreanWars-<버전>-android-debug.apk` — 시크릿이 없을 때 나오는 시험용
 - 버전은 PC판과 같은 번호를 씁니다 (`desktop/package.json`, 규칙은 `desktop/README-itch.md` 의 **버전 번호**): `<버전>` · 앱 정보의 버전(versionName) = `skwLabel` (예: 0.13), Play 의 versionCode = 내부 번호 `version` 에서 계산 (1.3.0 → 10300, 0.14 = 1.4.0 → 10400 · 늘 커짐).
-- 앱 아이콘, 스토어 아이콘, 스토어 그래픽 이미지, 스토어 설명 글(한국어 · 영어), 개인정보처리방침 페이지를 만들어 두었습니다 (아래 5번 표).
+- 앱 아이콘, 스토어 아이콘, 스토어 그래픽 이미지, 스토어 설명 글(한국어 · 영어), 개인정보처리방침 페이지를 만들어 두었습니다 (아래 6번 표).
 
 ## 4. 소유자만 할 수 있는 일 — Play 스토어에 올리기
 
@@ -98,7 +99,7 @@ Play 스토어는 "이 파일을 올린 사람이 진짜 개발자" 인지 **업
 | **광고** | 아니요, 광고 없음 |
 | **콘텐츠 등급** | 설문에 **사실대로** 답합니다. 카테고리 **게임**. 이 게임에는 전쟁 배경의 **총격전, 사람이 죽는 장면, 처형 장면**이 있고 **가려서 표기한 욕설**이 있습니다 → 폭력 관련 질문에 "예". 성적 내용 · 도박 · 약물 · 이용자 간 대화 · 위치 공유 · 구매는 없음. **높은 연령 등급(성인 등급)** 이 나올 것으로 예상합니다. |
 | **타겟층** | **만 18세 이상** 만 선택 |
-| **데이터 보안** | "필수 사용자 데이터 유형을 수집하거나 공유하나요?" → **아니요** (이 앱은 인터넷 권한이 없고 아무 것도 수집 · 전송하지 않습니다) |
+| **데이터 보안** | "필수 사용자 데이터 유형을 수집하거나 공유하나요?" → **아니요** (인터넷은 자동 업데이트로 GitHub 의 공개 게임 파일을 **받기만** 하고, 이용자에 대한 정보는 아무것도 보내지 않습니다 — 아래 5번) |
 | **정부 앱 / 금융 기능 / 건강** | 모두 해당 없음 |
 | **앱 카테고리** | 게임 → **액션** |
 | **연락처 세부정보** | 이메일(필수) — 스토어에 공개됩니다. 웹사이트: `https://whgkwns.itch.io/second-korean-wars` |
@@ -120,15 +121,30 @@ Play Console → **앱 정보 늘리기** → **스토어 등록정보** → **�
 | 그래픽 이미지 (1024x500) | `store/feature-1024x500.png` |
 | 휴대전화 스크린샷 | **가로 화면 스크린샷 2장 이상**이 필요합니다. 말씀해 주시면 제가 게임 화면을 렌더해서 만들어 드립니다. |
 
-## 5. 폴더 안내 (개발 메모)
+## 5. 게임 자동 업데이트 (0.16 부터)
+
+PC판과 **같은 업데이트 파일**(`desktop/update/latest.json` + `game.gz`, `cd desktop && npm run publish-update` 로 만듦)을 씁니다. 그래서 새 버전을 낼 때 Android 를 위해 따로 할 일은 없습니다 — PC판 자동 업데이트를 올리면(커밋 · 푸시) 휴대폰 앱도 같은 게임을 받습니다.
+
+- **언제 확인하나**: 앱을 켤 때 · 켜 둔 동안 30분마다(화면이 꺼져 있거나 다른 앱을 보는 동안은 쉬고, 돌아오면 30분이 지났을 때 바로) · 설정의 **업데이트 확인** 을 누를 때.
+- **어디서 받나**: `raw.githubusercontent.com` 과 `korean568.github.io` 두 곳에 동시에 묻고 **더 높은 버전**을 고릅니다 (한 곳이 막히거나 옛 파일을 줘도 다른 곳으로 받음). 시간 제한 latest.json 10초 · game.gz 90초, 실패하면 잠깐 쉬고 한 번 더.
+- **켤 때**: 최대 4초 기다려 새 게임을 다 받으면 바로 새 게임으로 시작하고 "새 버전 0.xx 으로 업데이트했습니다" 를 보여 줍니다. 4초 안에 안 끝나면 지금 게임으로 시작하고 뒤에서 계속 받아, 다 받으면 처음 화면에 "새 버전 0.xx 준비됨 · 지금 적용" 이 뜹니다 (안 누르면 다음에 켤 때 새 게임).
+- **안전**: 받은 파일은 sha256 이 맞을 때만 저장하고(임시 파일 → 이름 바꾸기라 반쯤 받은 파일이 멀쩡한 게임을 덮지 않음), 켤 때도 다시 확인합니다. 더 낮은 버전으로는 바꾸지 않습니다. 인터넷이 없거나 막혀 있어도 게임은 그대로 켜집니다.
+- **앱(APK)과 안 맞는 새 게임**: `latest.json` 의 `minShell` 이 이 APK 의 내부 버전보다 높으면 받지 않고 설정에 "새 버전 0.xx 은 앱을 새로 받아야 합니다" 를 보여 줍니다. Android 쪽 다리(`MainActivity` · `android-shim.js`)를 옛 APK 와 안 맞게 바꾸면 PC판과 같이 `minShell` 을 올리세요.
+- **새 APK 를 설치하면**: APK 에 든 게임이 받아 둔 것보다 같거나 새것이면 APK 의 게임을 쓰고 받아 둔 파일은 지웁니다.
+- **기록**: 앱 안의 `files/update.log` (약 200줄) 에 언제 · 어디서 · 무슨 결과였는지 남습니다. 게임 안에서는 `skwDesktop.update.log()` 로 읽을 수 있고, 시험용(`-debug`) APK 는 PC 에 연결해 `adb shell run-as com.secondkoreanwars.game cat files/update.log` 로 볼 수 있습니다. "업데이트가 안 돼요" 라는 말을 들으면 이 기록이 원인(예: `offline` · `timeout` · `HTTP 404` · `sha256`)을 알려 줍니다.
+- **Play 정책 메모**: Google Play 는 앱이 Play 밖에서 실행 코드(dex · .so 등)를 받는 것을 막지만, WebView 안에서 도는 JavaScript 는 예외로 둡니다 (Device and Network Abuse 정책). 이 앱이 받는 것은 WebView 가 여는 게임 HTML · JavaScript 뿐입니다. (정책 문구는 기억에 따라 적은 것이라, Play 심사에서 문제가 되면 알려 주세요.)
+- 만드는 쪽(개발 메모): `app/src/main/java/.../Updater.java` (네트워크 · 검증 · 저장 · 기록, `android.*` 없이 Java 만 써서 PC 의 JDK 로도 시험함), `MainActivity` 가 `assets/index.html` 요청에 받은 게임(`files/game/game-<버전>.html`)을 돌려주며 다리 스크립트(`assets/android-shim.js`)를 `prepare-assets.js` 와 똑같이 끼워 넣습니다.
+
+## 6. 폴더 안내 (개발 메모)
 
 | 경로 | 내용 |
 |---|---|
-| `app/src/main/java/.../MainActivity.java` | 앱 본체: 전체 화면 WebView, 뒤로 버튼, 백그라운드에서 멈춤, WebGPU 가 없을 때 안내 |
+| `app/src/main/java/.../MainActivity.java` | 앱 본체: 전체 화면 WebView, 뒤로 버튼, 백그라운드에서 멈춤, WebGPU 가 없을 때 안내, 받은 새 게임 서빙 |
+| `app/src/main/java/.../Updater.java` | 게임 자동 업데이트 (5번): latest.json 확인 · game.gz 받기 · sha256 · 저장 · `files/update.log` |
 | `app/src/main/AndroidManifest.xml` · `res/` | 앱 설정, 이름(영어 · 한국어), 아이콘 |
-| `app/src/main/assets/` | 게임 파일 — 저장소에 없음. `scripts/prepare-assets.js` 가 빌드할 때 만듭니다 |
-| `scripts/prepare-assets.js` | 스토리 게임 빌드(PC판과 같은 `desktop/scripts/build-story.js`) + Android 다리 스크립트 끼워 넣기 |
-| `scripts/android-shim.js` | 게임이 쓰는 `window.skwDesktop` (platform `android`) 을 만드는 작은 스크립트 |
+| `app/src/main/assets/` | 게임 파일(`index.html`) + 자동 업데이트용 `android-shim.js` · `version.json` — 저장소에 없음. `scripts/prepare-assets.js` 가 빌드할 때 만듭니다 |
+| `scripts/prepare-assets.js` | 스토리 게임 빌드(PC판과 같은 `desktop/scripts/build-story.js`) + Android 다리 스크립트 끼워 넣기 (끼워 넣는 방법은 `Updater.inject` 와 똑같아야 함) |
+| `scripts/android-shim.js` | 게임이 쓰는 `window.skwDesktop` (platform `android`, 자동 업데이트 `skwDesktop.update` 포함) 을 만드는 작은 스크립트 |
 | `scripts/make-icons.py` · `make-feature.js` | 아이콘 · 스토어 그래픽 이미지 만들기 (만든 그림은 저장소에 있음) |
 | `store/` | 스토어 아이콘 · 그래픽 이미지 · 설명 글 |
 | `../.github/workflows/android.yml` | 자동 빌드 (Actions → Android build) |
@@ -145,4 +161,4 @@ cd android && ./gradlew assembleDebug                            # app/build/out
 서명한 release (`bundleRelease assembleRelease`)는 환경 변수 `ANDROID_KEYSTORE_FILE`(키 파일의 절대 경로) · `ANDROID_KEYSTORE_PASSWORD` 가 있을 때만 서명됩니다. 선택: `ANDROID_KEY_ALIAS`(기본 `upload`) · `ANDROID_KEY_PASSWORD`(기본 = 저장소 비밀번호).
 버전 덮어쓰기: `./gradlew assembleDebug -PversionName=0.13 -PversionCode=10301` (Play 는 올릴 때마다 versionCode 가 전보다 커야 합니다 → 올리기 전에 `desktop/package.json` 의 `version` · `skwLabel` 을 올리세요).
 
-기술 요약: 최소 Android 12 (API 31), 대상 API 36 (Google Play 가 2026년 8월 31일부터 새 앱에 요구), Android Gradle Plugin 8.13.2 · Gradle 8.14.3 · JDK 17, 의존 라이브러리는 `androidx.webkit` 하나, 권한 없음.
+기술 요약: 최소 Android 12 (API 31), 대상 API 36 (Google Play 가 2026년 8월 31일부터 새 앱에 요구), Android Gradle Plugin 8.13.2 · Gradle 8.14.3 · JDK 17, 의존 라이브러리는 `androidx.webkit` 하나, 권한은 `INTERNET` 하나 (자동 업데이트).

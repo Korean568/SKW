@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- 권한 없음. 게임은 네트워크를 쓰지 않는다 (INTERNET 권한도 넣지 않음). -->
+    <!-- 권한은 INTERNET 하나: 게임 자동 업데이트(Updater)가 GitHub 의 공개 파일 desktop/update/latest.json · game.gz 만 받는다
+         (보내는 정보 없음, 게임 페이지 자체는 앱 밖 주소를 불러오지 않음). 인터넷이 없어도 앱에 든 게임으로 그대로 동작한다. -->
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <!-- WebGPU 는 Vulkan 1.1 위에서 돈다: Play 스토어가 지원하지 않는 기기를 걸러 준다 -->
     <uses-feature
@@ -22,7 +24,7 @@
         android:theme="@style/AppTheme"
         android:usesCleartextTraffic="false">
 
-        <!-- WebView 가 사용 통계를 보내거나 세이프 브라우징 목록을 받지 않게 한다 (어차피 네트워크 권한이 없다) -->
+        <!-- WebView 가 사용 통계를 보내거나 세이프 브라우징 목록을 받지 않게 한다 (게임 페이지는 앱 안의 파일만 연다) -->
         <meta-data
             android:name="android.webkit.WebView.MetricsOptOut"
             android:value="true" />

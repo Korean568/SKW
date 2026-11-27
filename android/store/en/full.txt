@@ -7,7 +7,8 @@ A South Korean special forces sergeant on his way home on leave, a North Korean 
 • One story followed from both sides, South and North
 • Korean and English (switch any time in Settings)
 • Touch controls for phones
-• Plays offline: no account, no ads, no in-app purchases, no data collection
+• Plays offline; when you are online, new versions of the game download automatically, no reinstall needed
+• No account, no ads, no in-app purchases, no data collection (automatic updates only download the public game files and send nothing)
 • New stories will keep being added
 
 ■ Please note
