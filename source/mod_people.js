@@ -123,6 +123,7 @@ if(m==31.0){let a=Y[0].x;let c=cos(a);let s=sin(a);let q=vec2f(p.x,p.y-.02*w);p=
 else if(m==35.0){let t=Y[0].z*1.45;let c=cos(t);let s=sin(t);let q=vec2f(p.y-.035*w,p.z-.38*w);let y2=c*q.x-s*q.y;p=vec3f(p.x+w*sign(p.x)*max(-y2,0.0)*.36*Y[0].z,y2+.035*w,s*q.x+c*q.y+.38*w);}
 else if(m==36.0){let k=Y[0].y;let t=-1.05*ss(0.0,.22,k)*(1.0-ss(.78,1.0,k));let c=cos(t);let s=sin(t);let q=vec2f(p.x,p.y-.07*w);p=vec3f(c*q.x-s*q.y,s*q.x+c*q.y+.07*w,p.z-w*.08*ss(.22,.4,k)*(1.0-ss(.6,.78,k)));}
 else if(m==13.0||m==37.0){p+=w*vec3f(0.0,Y[0].w,Y[1].x);}
+else if(m==42.0||m==43.0){let t=3.14159*Y[2].y;let c=cos(t);let s=sin(t);let q=vec2f(p.x+.025*w,p.z+.07*w);p=vec3f(c*q.x+s*q.y-.025*w,p.y,c*q.y-s*q.x-.07*w);} // K7 개머리 접기 (경첩: 오른쪽 x −.025, z −.07)
 return p;}
 fn wp(i:VI)->vec4f{ // 스키닝한 월드 위치 (w = 보임 여부)
 let o=i.i*20u;let X=pal[o+18u];let m=i.b.w;var p=i.p;if(m>12.5){p=gx(m,p,pal[o+19u],1.0);}let mx=max(i.b.x,i.b.y);let kd=X[0].x;let sg=sign(p.x);let hy=p.y-${YC};
@@ -183,14 +184,14 @@ var N=normalize(i.n);if(!ff){N=-N;}let E=normalize(g.cam.xyz-i.w);if(!(dot(N,N)>
 let hh=hgt(b,m);let dwx=dpdx(i.w);let dwy=dpdy(i.w);let dhx=dpdx(hh);let dhy=dpdy(hh);
 var al=vec3f(.03);var gl=.5;var tc=vec3f(0.0);var sk=0.0;var ao=1.0;var hi=0.0;var cf=0.0;
 let hc=vec3f(.022,.018,.016);
-if(m>18.5){ // 총 재질 19–41 (뼈 공간 b 로 무늬; px 로 무늬를 흐림)
+if(m>18.5){ // 총 재질 19–43 (뼈 공간 b 로 무늬; px 로 무늬를 흐림)
  if(fpv&&i.u.x>.3&&(m==38.0||m==22.0)&&length(b.xy-vec2f(0.0,.155))<.0175&&((b.z<.003&&b.z>-.013)||(m==38.0&&b.z>.097))){discard;} // K2C 정조준: 도트 관의 마개·고무 덮개를 비워 관 속으로 앞 렌즈의 점이 보이게
  let fa=clamp(1.0-px*400.0,0.0,1.0);let st=.85+.3*n3(b*900.0);gl=.3;
- if(m<19.5||m==38.0){al=vec3f(.042,.042,.046)*st;gl=.36;}                           // 19 무광 수지 · 38 도트 몸통 (낮에도 모양이 읽히게 살짝 밝게)
+ if(m<19.5||m==38.0||m==42.0){al=vec3f(.042,.042,.046)*st;gl=.36;}                 // 19 무광 수지 · 38 도트 몸통 · 42 K7 개머리 (낮에도 모양이 읽히게 살짝 밝게)
  else if(m<20.5||m==35.0||m==36.0||m==37.0||m==41.0){al=vec3f(.048,.05,.054)*(.9+.2*n3(b*vec3f(80.0,80.0,900.0)));gl=.5;if(m==36.0){al*=1.4;gl=.6;}
   if(m==41.0&&fpv&&length(b.xy-vec2f(0.0,.157))<.0045){discard;}} // 20 파커라이징 · 35 양각대 · 36 노리쇠 · 37 링 · 41 M16 조리개 (1인칭: 구멍)
  else if(m<21.5){al=vec3f(.04,.043,.05);gl=.62;al*=1.0-.45*fa*step(.5,fract(b.z*105.0))*step(.004,abs(fract(b.y*70.0)-.5));} // 21 레일 (가로 홈)
- else if(m<22.5){al=vec3f(.025,.025,.027);gl=.18;cf=.2;}                                   // 22 고무
+ else if(m<22.5||m==43.0){al=vec3f(.025,.025,.027);gl=.18;cf=.2;}                                   // 22 고무
  else if(m<23.5){al=vec3f(.085,.083,.058)*(.92+.16*n3(b*600.0));gl=.32;}                    // 23 AUG 올리브
  else if(m<24.5){let r=fract(b.y*95.0);al=mix(vec3f(.2,.1,.025),vec3f(.32,.2,.06),fa*ss(.3,.7,r)*step(b.y,-.06));gl=.75;tc=vec3f(.05,.025,.004)*ss(.4,1.0,1.0-abs(dot(N,E)));} // 24 호박색 탄창 (탄 줄)
  else if(m<25.5){al=vec3f(.22,.09,.035)*(.65+.55*n3(b*vec3f(420.0,420.0,18.0)));gl=.55;}   // 25 RPG 목재 니스
@@ -637,7 +638,7 @@ return vec4f(fogAt(c,i.w),1.0);
   if(!ks.length)F0.push(()=>gun(0),()=>gun(0),()=>gun(1),()=>gun(1),()=>gun(2),()=>gun(2)),['akm','k2c1','k5'].forEach((k,i)=>GI[k]=4+2*i); // mod_guns 없음: 옛 3종
   while(GL.length<F0.length)GL.push([]);GL.length=F0.length;
   F0.forEach((f,k)=>{const s=I.length,v=V.length;try{f();}catch(e){G.err('people: gun build '+(e.stack||e));V.length=v;I.length=s;}MR[k]=[s,I.length-s];
-   let x0=0,x1=0;for(let i=v;i<V.length;i+=10){x0=Math.min(x0,V[i]);x1=Math.max(x1,V[i]);}GX[k]=[x0,x1]; // 총의 좌우 폭 (옆으로 눕힌 바닥 총의 높이)
+   let x0=0,x1=0;for(let i=v;i<V.length;i+=10){const x=V[i+9]===42||V[i+9]===43?-.05-V[i]:V[i];x0=Math.min(x0,x);x1=Math.max(x1,x);}GX[k]=[x0,x1]; // 바닥 총(개머리 접힘)의 좌우 폭 → 옆으로 눕힌 높이
    const nm=k<4?['body','scope','knife','radio'][k]:(ks[(k-4)>>1]||['akm','k2c1','k5'][(k-4)>>1])+((k-4)&1?':lod':'');GS[nm]=[(V.length-v)/10,(I.length-s)/3];});
   GS.total=[V.length/10,I.length/3];
   if(V.length/10>65535)G.err('people: vertex budget '+V.length/10);
@@ -655,9 +656,9 @@ return vec4f(fogAt(c,i.w),1.0);
   if(g==='knife')return GL[2].push(sl);if(g==='radio')return GL[3].push(sl);
   const k=gid(g);if(k&&GI[k]!=null)GL[GI[k]+(det?0:1)].push(sl);
  };
- const gpar=(sl,g,Q,pr)=>{ // 팔레트 20번째 칸: [회전각, 노리쇠, 양각대, 조준경 dy, dz, 도트, 반짝임, 반짝임 점 y, z]
+ const gpar=(sl,g,Q,pr)=>{ // 팔레트 20번째 칸: [회전각, 노리쇠, 양각대, 조준경 dy, dz, 도트, 반짝임, 반짝임 점 y, z, 개머리 접기]
   const M=gm(g),pt=M&&M.pt||{},mo=pt.mount,sc=Q.scope&&mo;GP.fill(0);
-  GP[0]=Q.spin||0;GP[1]=Q.cyc||0;GP[2]=Q.bip||0;GP[3]=sc?mo[1]-.125:0;GP[4]=sc?mo[2]-.07:0;GP[5]=Q===F?(F.dot??F.aim??0):0;
+  GP[0]=Q.spin||0;GP[1]=Q.cyc||0;GP[2]=Q.bip||0;GP[3]=sc?mo[1]-.125:0;GP[4]=sc?mo[2]-.07:0;GP[5]=Q===F?(F.dot??F.aim??0):0;GP[9]=Q.fold??(pr?1:0); // 9: 접철 개머리 (바닥 총은 접힘)
   if(pr){const gl=pt.gl||[0,.1,0];GP[6]=Q.glint!=null?Q.glint:Math.max(0,sin(G.time*1.9+Math.atan2(Q.M[8],Q.M[10])*5))**20;GP[7]=gl[1];GP[8]=gl[2];}
   PAL.set(GP,(sl*NB+19)*16);
  };
