@@ -223,7 +223,7 @@
     const miss=hit?.05:.35+d*.03,tp=[tg.p[0]+(R()-.5)*miss*2,tg.p[1]+(R()-.6)*miss,tg.p[2]+(R()-.5)*miss*2];
     const dd=nrm(V3.sub(tp,o));
     G.fx.tracer(o,dd,320,0);G.fx.burst('muzzle',o,{size:.025,dir:dd});
-    G.addLight(o,[1,.7,.35],2.5,4,.05);G.sfx.play('rifle',{pos:o,gain:.7});
+    G.addLight(o,[1,.7,.35],2.5,4,.05);G.sfx.play('r762',{pos:o,gain:.7}); // 북한군 AKM
     if(!hit){const t=solid(o,dd,60);if(t<60)G.fx.burst('hit',v3(o,dd,t),{size:.12});}
   }
   function kill(e,head){
@@ -258,7 +258,7 @@
       a.cd-=dt;
       if(a.cd<=0){ // 3발 점사
         const m=PP.muzzle(P),o=[m[0],m[1],m[2]],h=R()<.1,tp=h?c:v3(c,[(R()-.5)*1.2,(R()-.4)*.8,(R()-.5)*1.2]),d=nrm(V3.sub(tp,o));
-        G.fx.tracer(o,d,340,0);G.fx.burst('muzzle',o,{size:.025,dir:d});G.addLight(o,[1,.75,.4],2,4,.05);G.sfx.play('rifle',{pos:o,gain:.6});
+        G.fx.tracer(o,d,340,0);G.fx.burst('muzzle',o,{size:.025,dir:d});G.addLight(o,[1,.75,.4],2,4,.05);G.sfx.play('r556',{pos:o,gain:.6}); // 아군 K2
         if(h){damage(e,40,'body');G.fx.burst('hit',c,{size:.1});}
         a.bn=(a.bn||0)+1;a.cd=a.bn%3?.12:.9+R()*1.2;P.pose='fire';
       }else if(a.cd>.3)P.pose=q[2]?'crouch':'aim';
@@ -276,7 +276,7 @@
       hurtSelf:(dm,body)=>{ // 로켓 폭발 · 후폭풍: 방탄판 피해 (2.5 m 안: 방탄판 0 + 몸 1발)
         if(safe())return;D.ht++;hud.dd=hud.fl=1;G.sfx.play('hit',{gain:.8});
         if(body){S.plate=0;bodyHit(0);}else if(S.plate>0)S.plate=max(0,S.plate-dm);else bodyHit(0);D.mh=min(D.mh,S.plate);},
-      allow:()=>pl.dead||pl.end?OFFA:pl.rp>0?RPA:ONA,busyE:()=>!!hud.pkN,people:()=>[],
+      allow:()=>pl.dead||pl.end?OFFA:pl.rp>0?RPA:ONA,busyE:()=>!!hud.pkN,people:()=>PP.list.map(wp),
       frame:p=>{const z=floorAt(p[0],p[2],p[1]+.6)[1];return z===1?C.M:z===2?M4.mul(C.M,TR):null;}}; // 기내 바닥 기울기를 따른다
   }
   function drops1(){ // 바닥 총 (§4.3): 기내 2~3 · 바깥 나머지 (모두 7) — 엄폐물 · 엔진 · 아군 자리 · 시작점 · 등장 지점 근처 제외
@@ -308,12 +308,12 @@
     if(near&&use&&!pl.dead){
       const of=near.of;
       if(of==='pl'||of==='am'){
-        const pt=near.pl&&S.spare<3;if(pt){S.spare++;near.pl=0;}
+        const pt=near.pl&&S.spare<3;let tk=0;if(pt){S.spare++;near.pl=0;}
         if(near.ammo>0&&(!pt||offer(near)==='am')){ // 탄약: 7.62×39 · 5.56 총이 있으면 +30 · K7 이 있으면 +15 · 주무기 칸이 비었으면 AKM 째로
           AR.addPool('762r',near.ammo);has556()&&AR.addPool('556',30);own('k7')&&AR.addPool('9',15);near.ammo=0;
-          if(near.gun&&!own('akm')&&AR.canTake('akm')==='free'){AR.take('akm',30,0);near.gun=0;near.P.gun=0;hud.msg=[AR.st.msg,T+2.5];}
+          if(near.gun&&!own('akm')&&AR.canTake('akm')==='free'){AR.take('akm',30,0);tk=1;near.gun=0;near.P.gun=0;hud.msg=[AR.st.msg,T+2.5];}
         }
-        G.sfx.play('click');hud.pk=1.2;hud.pkT=pt?'방탄판 +1':'탄창 획득!';
+        tk||G.sfx.play('pick');hud.pk=1.2;hud.pkT=pt?'방탄판 +1':'탄창 획득!'; // AKM 을 가져가면 take() 가 소리를 냄
       }else if(of==='sw'){AR.take('akm',30,0);near.gun=0;near.P.gun=0;hud.pk=1.2;hud.pkT='';}
       return null;
     }

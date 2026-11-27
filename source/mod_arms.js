@@ -13,10 +13,10 @@
   const def=(id,n,sh,o)=>W[id]=Object.assign({id,n,sh,slot:'P',cal:'556',mag:30,rate:.075,md:['auto','burst','semi'],dmg:40,sp:.013,ad:.3,kick:.02,rl:2,fv:.8,zm:1,ov:'',mv:1,pk:[30,60],sc:1,tr:1,fl:.02,snd:'r556',cls:'rifle',fb:'rifle',ch:1},o);
   def('k2','K2 소총','K2',{rate:.08,sp:.014,kick:.021,rl:2.1});
   def('k2c1','K2C1 소총','K2C1',{kick:.018});
-  def('k2c','K2C 카빈','K2C',{rate:.072,dmg:37,sp:.012,ad:.26,kick:.017,rl:1.9,fv:.72,mv:1.03,dot:1,as:1.3});
+  def('k2c','K2C 카빈','K2C',{rate:.072,dmg:37,sp:.012,ad:.26,kick:.017,rl:1.9,fv:.72,mv:1.03,dot:1,as:1.3,snd:'r556c'});
   def('k2a','K2A 소총','K2A',{sp:.012,kick:.019,rl:1.9});
-  def('m16','M16 소총','M16',{rate:.07,md:['burst','semi'],dmg:44,sp:.01,ad:.25,kick:.019,rl:2.2,fv:.74,mv:.97});
-  def('aug','AUG A1 소총','AUG',{rate:.085,md:['auto','semi'],sp:.011,ad:.22,kick:.016,rl:2.6,zm:1.5,ov:'ring',sc:2,cls:'bullpup'});
+  def('m16','M16 소총','M16',{rate:.07,md:['burst','semi'],dmg:44,sp:.01,ad:.25,kick:.019,rl:2.2,fv:.74,mv:.97,snd:'r556l'});
+  def('aug','AUG A1 소총','AUG',{rate:.085,md:['auto','semi'],sp:.011,ad:.22,kick:.016,rl:2.6,zm:1.5,ov:'ring',sc:2,cls:'bullpup',snd:'r556b'});
   def('akm','AKM 소총','AKM',{cal:'762r',rate:.1,md:['auto','semi'],dmg:46,sp:.016,kick:.024,rl:2.3,mv:.98,snd:'r762',fb:'ak'});
   def('k14','K14 저격소총','K14',{cal:'762n',mag:5,rate:1.25,md:['bolt'],dmg:150,sp:.05,ad:.016,kick:.09,rl:3,zm:6,ov:'scope',sc:2,mv:.9,pk:[5,10],fl:.015,snd:'k14',pen:1});
   def('k7','K7 기관단총','K7',{slot:'S',cal:'9',rate:.06,dmg:26,sp:.011,ad:.45,kick:.012,rl:1.8,fv:.85,mv:1.06,sc:0,tr:0,fl:.008,snd:'smg9s',cls:'smg',fb:'pistol',quiet:1});
@@ -28,6 +28,7 @@
   const SLOTS={P:[0,2],S:[1],H:[3]},HEAVY=id=>W[id]&&W[id].slot==='H';
   const ON={free:1,fire:1,ads:1,sw:1,use:1,rl:1},OFF={free:0,fire:0,ads:0,sw:0,use:0,rl:0};
   const ID=Object.keys(W).filter(k=>k!=='k5'); // 바닥에 놓이는 11종
+  const OV0={pgo:.3,ring:.45}; // 겹침이 시작되는 조준 정도 (기본 .6)
 
   /* ── 상태 ── */
   const inv={slot:[null,null,null,null],cur:0,mag:{},pool:{},mode:{},scope:{},last:{P:0,S:1,H:3}};
@@ -55,7 +56,7 @@
   function reset(){
     inv.slot=[null,null,null,null];inv.cur=0;inv.mag={};inv.pool={};inv.mode={};inv.scope={};inv.last={P:0,S:1,H:3};
     Object.assign(st,{cd:0,rl:0,sw:0,bn:0,trig:0,cyc:0,spin:0,acc:0,ft:0,spr:0,kick:0,ads:0,so:0,shake:0,lf:'',lfT:-9,br:2,brk:0,note:'',noteT:0,msg:'',msgT:0});
-    rocketOff();loops(0,0);
+    rocketOff();sndOff();
   }
   function canTake(id){ // 'own' 탄약만 · 'free' 빈 칸 · 'swap' 교체
     if(inv.slot.includes(id))return'own';
@@ -63,7 +64,7 @@
   }
   function take(id,loaded,res){ // 줍기 규칙 §3.7: 손에 든 총은 바뀌지 않는다 (교체할 때만)
     const w=W[id];if(!w)return'';
-    if(inv.slot.includes(id)){addPool(w.cal,loaded+res);snd('reload',{gain:.5,rate:1.4});return'own';}
+    if(inv.slot.includes(id)){addPool(w.cal,loaded+res);snd('pick');return'own';}
     const ss=SLOTS[w.slot],fr=ss.find(i=>!inv.slot[i]);
     let s=fr,r='free';
     if(fr==null){ // 칸이 차 있음: 손에 든 같은 분류 총, 아니면 마지막에 쓴 총과 교체 → 발밑에 떨어뜨림 (장전 수 유지)
@@ -73,7 +74,7 @@
     }
     inv.slot[s]=id;inv.mag[id]=loaded;inv.mode[id]=0;inv.scope[id]=0;addPool(w.cal,res);
     if(r==='free')say(`${w.n} 획득 — [${s+1}] 으로 교체`,2.5);
-    snd('swap');return r;
+    snd(r==='swap'?'swap':'pick');return r;
   }
   function dropGun(id){
     if(!id||!A)return;
@@ -106,7 +107,7 @@
   function reload(){
     const id=cur();if(!id)return;const w=W[id],m=inv.mag[id]|0,p=inv.pool[w.cal]|0;
     if(st.rl>0||st.sw>0||p<=0||m>=w.mag+(w.ch&&m>0?1:0))return;
-    st.rc=w.ch&&m>0?1:0;st.rl=st.rlT=w.rl;st.bn=0;st.cyc=0;snd('reload',{rate:id==='m134'?.7:1}); // 탄창에 남아 있으면 약실 +1
+    st.rc=w.ch&&m>0?1:0;st.rl=st.rlT=w.rl;st.bn=0;st.cyc=0;snd(id==='m134'?'rlb':id==='rpg7'?'rlr':'reload'); // 탄창에 남아 있으면 약실 +1 · 탄띠 6초 · 로켓 4초
   }
   function reloadDone(){
     const id=cur(),w=W[id],m=inv.mag[id]|0,n=min(w.mag+(st.rc?1:0)-m,inv.pool[w.cal]|0);
@@ -183,7 +184,7 @@
     }
     G.fx.trail(rk.p,rk.v,'missile',dt);
     if(rk.prop){const m=M4.fromDir(rk.p,nrm(rk.v));rk.prop.M=m;}
-    const c=G.cam.pos;G.sfx&&G.sfx.loop('rocket',1,{gain:cl(1-hypot(rk.p[0]-c[0],rk.p[2]-c[2])/150,.1,1)});
+    const c=G.cam.pos,k=cl(1-hypot(rk.p[0]-c[0],rk.p[2]-c[2])/150,0,1);G.sfx&&G.sfx.loop('rocket',1,{gain:max(.1,k),rate:k}); // 가까울수록 밝게
   }
   const blastF=d=>d<3.5?400-d*40:max(30,400*(1-d/7)**2); // 3.5 m 안 즉사권 · 7 m 까지 부상
   function impact(p,h){
@@ -194,10 +195,11 @@
       return;
     }
     D.blasts++;
-    G.fx.burst('explosion',p,{size:.6});G.fx.burst('flash',p,{size:.6});G.addLight(p,[1,.55,.25],25,18,.25);snd('explosion',{pos:p});
+    G.fx.burst('explosion',p,{size:.6});G.fx.burst('flash',p,{size:.6});G.addLight(p,[1,.55,.25],25,18,.25);
     const q=v3(p,[0,.3,0]);
     if(A.hits==='enemy'&&A.onBlast){const k=A.onBlast(q,7,blastF)|0;if(k)D.kw.rpg7=(D.kw.rpg7||0)+k;}
     const me=A.me(),c=v3(me.p,[0,1,0]),dd=hypot(c[0]-p[0],c[1]-p[1],c[2]-p[2]);
+    snd(dd<60?'boom':'boomf',{pos:p});dd<5&&snd('ring',{gain:cl(1.6-dd/4,.4,1)}); // 60 m 밖은 먹먹한 폭음 · 아주 가까우면 귀울림
     st.shake=max(st.shake,cl(1.2-dd/25,0,1.2));
     if(dd<7&&A.hurtSelf){const dv=V3.sub(c,q),L=hypot(...dv);
       if(A.solid(q,nrm(dv),L)>=L-.15){D.selfHits++;dd<2.5?A.hurtSelf(100,1):A.hurtSelf(90-(dd-2.5)/4.5*80,0);}}
@@ -205,11 +207,12 @@
 
   /* ── M134 루프 소리 ── */
   let lpS=0,lpF=0;
-  function loops(spin,fire){
+  function loops(spin,fire,live){ // 방아쇠가 잠긴 동안(스토리 2/4 · 방탄판 교체 · 전사)은 새로 켜지 않음 (이미 돌던 회전음은 스핀다운)
     if(!G.sfx||!G.sfx.loop)return;
-    if(spin>.01){G.sfx.loop('m134s',1,{rate:.4+.6*spin,gain:.55*spin});lpS=1;}else if(lpS){G.sfx.loop('m134s',0);lpS=0;}
-    if(fire){G.sfx.loop('m134f',1,{gain:.85});lpF=1;}else if(lpF){G.sfx.loop('m134f',0);lpF=0;}
+    if(spin>.01&&(lpS||live)){G.sfx.loop('m134s',1,{rate:spin,gain:.55});lpS=1;}else if(lpS){G.sfx.loop('m134s',0);lpS=0;} // rate = 회전 (음높이 · 음량은 지속음 쪽에서)
+    if(fire&&(lpF||live)){G.sfx.loop('m134f',1,{gain:.85});lpF=1;}else if(lpF){G.sfx.loop('m134f',0,{fade:.04});lpF=0;} // 사격 끝은 짧게
   }
+  function sndOff(){lpS=lpF=0;if(G.sfx&&G.sfx.loop){G.sfx.loop('m134f',0,{fade:.04});G.sfx.loop('m134s',0);G.sfx.loop('rocket',0);}} // 정지 · 해제 · 처음 화면
 
   /* ── 입력 (장치 → inp; 봇은 inp 를 직접 채운다) ── */
   const kp={};
@@ -229,12 +232,12 @@
       T+=dt;readInput();
       const al=A.allow()||ON,me=A.me(),id=cur(),w=id&&W[id],dead=!al.free;
       st.cd-=dt;st.sw=max(0,st.sw-dt);st.spr=max(0,st.spr-dt*.09);st.kick=max(0,st.kick-dt*7);st.shake=max(0,st.shake-dt*2.2);
-      if(st.cyc>0)st.cyc=min(1,st.cyc+dt/.95),st.cyc>=1&&(st.cyc=0);
+      if(st.cyc>0){const c0=st.cyc;st.cyc=min(1,st.cyc+dt/.95);c0<.155&&st.cyc>=.155&&snd('bolt');st.cyc>=1&&(st.cyc=0);} // K14 노리쇠 소리: 사격 .15초 뒤 (같은 프레임 아님)
       // 교체 · 모드 · 스코프
       const sl=edge('slot',inp.slot)?inp.slot:0;
       if(al.sw&&!dead&&!pres){if(sl)sw(sl-1);if(inp.wh){cycle(inp.wh>0?1:-1);}}
       inp.wh=0;
-      if(edge('mode',inp.mode)&&w&&al.sw&&!pres){if(w.md.length>1){inv.mode[id]=((inv.mode[id]|0)+1)%w.md.length;snd('mode');snd('click',{gain:.6,rate:1.6});say(MODE[w.md[inv.mode[id]]],1);st.bn=0;}}
+      if(edge('mode',inp.mode)&&w&&al.sw&&!pres){if(w.md.length>1){inv.mode[id]=((inv.mode[id]|0)+1)%w.md.length;snd('mode');say(MODE[w.md[inv.mode[id]]],1);st.bn=0;}}
       if(edge('scope',inp.scope)&&w&&al.sw&&!pres&&st.rl<=0){
         if(w.sc===1){inv.scope[id]^=1;st.cd=st.sw=st.swT=.45;snd('click',{gain:1.4});}
         else say(w.sc===2?'조준경 일체형':`${w.n}에는 스코프를 달 수 없다`);
@@ -247,7 +250,7 @@
       const adsOK=inp.ads&&al.ads&&!me.run&&st.rl<=0&&!w.noads&&!pres&&!fpOff();
       st.ads+=((adsOK?1:0)-st.ads)*min(1,dt*(zoomOf(id)>1?8:11)*(w.as||1));
       if(!al.ads||pres||fpOff())st.ads=0; // 조준 금지 · 1인칭 꺼짐 → 즉시 해제 (겹침도 꺼짐)
-      st.so=ovOf(id)&&ovOf(id)!=='dot'?cl((st.ads-.6)*4,0,1):0;
+      const ov=ovOf(id);st.so=ov&&ov!=='dot'?cl((st.ads-(OV0[ov]??.6))*4,0,1):0; // 일체형 광학(PGO-7 · AUG)은 일찍: 시점이 모델 안으로 들어가기 전에 숨김
       // K14 숨 참기 · 흔들림 (양각대: 웅크리고 멈춤 → 없음)
       if(id==='k14'&&st.so>.5){
         const bip=(me.cr||0)>.5&&(me.mv||0)<.3,hold=inp.breath&&st.br>0&&!st.brk;
@@ -258,7 +261,9 @@
         st.swx=sx;st.swy=sy;if(A.recoil)A.recoil(ds[1],ds[0]);else{me.yaw+=ds[0];me.pit+=ds[1];}
       }
       // 방아쇠
-      const press=edge('fire',inp.fire),live=A.hits==='enemy'&&al.fire&&!pres;
+      // 방아쇠: 조작 불가(!free: 컷신 · 전사 · 끝)는 소리 · 글자 없음 · 방탄판 교체(fire 0)는 그냥 안 나감 · 안전(스토리 2/4)은 딸깍 + 글자
+      const press=edge('fire',inp.fire),safe=A.hits!=='enemy',live=!safe&&al.free&&al.fire&&!pres;
+      if(press&&al.free&&(safe||pres)){D.blocked++;D.dry++;snd('dry');note('지금은 쏠 수 없다');}
       const busy=st.rl>0||st.sw>0||st.cyc>0||me.run;
       let firing=0;
       if(id==='m134'){
@@ -267,25 +272,23 @@
         st.spin=want?min(1,st.spin+dt/.5):max(0,st.spin-dt/1.2);
         if(want&&st.spin>=1&&!D.spinUp)D.spinUp=T-st.sT0;
         st.spa+=st.spin*40*dt;
-        if(inp.fire&&!live&&press){D.blocked++;D.dry++;snd('click',{rate:.8});note('지금은 쏠 수 없다');}
         if(inp.fire&&live&&st.spin>=1&&st.rl<=0){
-          if((inv.mag[id]|0)<=0){if((st.dryT-=dt)<=0){st.dryT=.18;snd('click',{rate:1.3,gain:.5});D.dry++;}}
+          if((inv.mag[id]|0)<=0){if((st.dryT-=dt)<=0){st.dryT=.18;snd('dry',{rate:1.3,gain:.5});D.dry++;}}
           else{st.acc+=dt;let n=0;while(st.acc>=w.rate&&inv.mag[id]>0){st.acc-=w.rate;shoot(id,n<4?1:0);n++;}D.maxRays=max(D.maxRays,min(n,4));firing=1;st.ft+=dt;st.shake=max(st.shake,.25);}
         }else{st.acc=0;st.ft=max(0,st.ft-dt*2);}
-        loops(st.spin,firing&&inv.mag[id]>0);
+        loops(st.spin,firing&&inv.mag[id]>0,live);
       }else{
         loops(0,0);
         const md=w.md[inv.mode[id]|0],m=inv.mag[id]|0;
-        if(press&&!live){D.blocked++;D.dry++;snd('click',{rate:.8});note('지금은 쏠 수 없다');}
-        else if(live&&!busy&&!(id==='rpg7'&&rk.on)){
+        if(live&&!busy&&!(id==='rpg7'&&rk.on)){
           if(md==='burst'&&press&&st.cd<=0&&st.bn<=0)st.bn=3;
           const want=md==='auto'?inp.fire:md==='burst'?st.bn>0:press;
           if(want&&st.cd<=0){
-            if(m<=0){snd('click');st.cd=.3;st.bn=0;D.dry++;} // 빈 탄창: 딸깍 (자동 재장전 없음)
+            if(m<=0){snd('dry');st.cd=.3;st.bn=0;D.dry++;} // 빈 탄창: 딸깍 (자동 재장전 없음)
             else{
               shoot(id);st.cd=w.rate;firing=1;
               if(md==='burst'){st.bn--;if(st.bn<=0)st.cd=max(w.rate,.3);}
-              if(md==='bolt'){st.cyc=.001;snd('bolt');} // 노리쇠 조작 .95초 (사격의 일부)
+              if(md==='bolt')st.cyc=.001; // 노리쇠 조작 .95초 (사격의 일부) · 소리는 .15초 뒤
             }
           }
         }
@@ -358,13 +361,14 @@
     }
     D.drops=drops.list.length;return acc;
   }
-  function dropAll(){ // ?drops=all: 11종을 플레이어 둘레에 하나씩
-    if(!A)return;const me=A.me();let k=0;
+  function dropAll(){ // ?drops=all: 11종을 플레이어 둘레에 하나씩 — 벽 안 · 사람 1.2 m 안은 건너뜀 (자리가 없으면 그 총은 생략)
+    if(!A)return;const me=A.me(),L=PP().list||[],away=[...(A.people()||[]),...L.map(P=>P.M?M4.point(P.M,P.p):P.p)].map(q=>[q[0],0,q[2],1.2]);let k=0;
     for(const id of ID){
       let p=null;
-      for(let t=0;t<14&&!p;t++){const a=k*.57+t*.9,r=1.4+((k+t)%4)*.55,x=me.p[0]+sin(a)*r,z=me.p[2]+cos(a)*r,q=[x,A.ground(x,z,me.p[1]),z];if(okPt(q,{},[],.5)||t===13)p=q;}
-      add(id,p,R()*2*PI,W[id].pk[0],W[id].pk[1]);k++;
+      for(let t=0;t<60&&!p;t++){const a=k*.57+t*.9,r=1.4+((k+t)%4)*.55+(t/12|0)*.6,x=me.p[0]+sin(a)*r,z=me.p[2]+cos(a)*r,q=[x,A.ground(x,z,me.p[1]),z];if(okPt(q,{away},[],.5))p=q;}
+      p&&add(id,p,R()*2*PI,W[id].pk[0],W[id].pk[1]);k++;
     }
+    D.drops=drops.list.length;
   }
 
   /* ── 줍기 (E 만 · 밟아서 줍지 않음) · 표지 ── */
@@ -452,7 +456,7 @@
     me:()=>({p:G.cam.pos,yaw:0,pit:0,mv:0,cr:0,run:0,air:0}),hits:'safe',onHit:null,onBlast:null,hurtSelf:null,allow:()=>ON,busyE:()=>false,people:()=>[],hud:'lite',ray:null,frame:null};
   function bind(o){clear();rocketOff();A=Object.assign({},DEF,o);pres=null; // 새 시작 = 새 바닥 배치
    st.k0={};for(const k in D)D[k]=typeof D[k]==='object'?{}:0;ui.wa&&(ui.wa.style.display='block');}
-  function unbind(){clear();rocketOff();loops(0,0);A=null;pres=null;st.ads=st.so=0;Object.assign(view,{fovK:1,zoom:1,ov:'',ovA:0,kick:0,hide:0,sens:1,mv:1,ads:0,lock:0,scope:0});
+  function unbind(){clear();rocketOff();sndOff();A=null;pres=null;st.ads=st.so=0;Object.assign(view,{fovK:1,zoom:1,ov:'',ovA:0,kick:0,hide:0,sens:1,mv:1,ads:0,lock:0,scope:0});
     const fp=PP().fp;if(fp){fp.hide=fp.scope=0;fp.cyc=fp.spin=fp.bip=fp.dot=fp.fire=0;fp.loaded=1;}ui.wa&&(ui.wa.style.display='none');}
 
   const api=G.arms={W,inv,inp,view,D,drops,CAP,MODE,ID,kit,bind,unbind,step,take,canTake,addPool,give,spread,cancel(){st.rl=0;st.bn=0;},
@@ -463,7 +467,7 @@
     dbg:{give:id=>give(id,1),state:()=>({slot:inv.slot.slice(),cur:inv.cur,id:cur(),mag:{...inv.mag},pool:{...inv.pool},mode:{...inv.mode},scope:{...inv.scope},rl:st.rl,sw:st.sw,cd:st.cd,spin:st.spin,ads:st.ads,cyc:st.cyc,rocket:!!rk.on,view:{...view}}),
       drops:()=>drops.list.map(i=>({id:i.id,p:i.p.map(v=>+v.toFixed(2)),loaded:i.loaded,res:i.res,pl:i.pl})),
       fire(n=1){const id=cur();let k=0;for(let i=0;i<n&&id&&(inv.mag[id]|0)>0;i++,k++)shoot(id);return k;},
-      place(){clear();dropAll();return drops.list.length;}}};
+      place(){clear();dropAll();return drops.list.length;},ad:()=>A}};
 
   G.register('arms',{
     init(){
