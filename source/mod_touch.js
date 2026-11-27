@@ -245,7 +245,7 @@ html.touch #ov .tk{grid-column:1;grid-row:5;margin-top:.9em;max-width:42vw;font-
 html.touch #ov .ch{grid-column:2;grid-row:1/span 5;margin:0}html.touch #ov .ch>div{margin:.3em 0;padding:.45em 0 .45em .9em;min-height:44px;box-sizing:border-box}
 html.touch #ov .ch p{margin:0;font-size:clamp(13px,1.6vw,19px);line-height:1.4}html.touch #ov .ch p+p{font-size:clamp(11px,1.25vw,15px)}
 html.touch #ov .lng{position:static;grid-column:2;grid-row:6;justify-self:end;margin-top:.3em;font-size:13px}html.touch #ov .lng span{padding:.65em 1.2em}html.touch #ov .dkv{left:calc(5vw + var(--sl));right:auto;bottom:calc(6px + var(--sb))}
-html.touch #perf{right:calc(10px + var(--sr));top:calc(8px + var(--st))}html.touch #perf button{padding:7px 12px;font-size:13px}
+html.touch #perf{right:calc(10px + var(--sr));top:calc(8px + var(--st))}html.touch #perf button{padding:7px 12px;font-size:13px}html.touch #perf .d{background:#011a28f0}
 html.touch #dl{bottom:calc(max(10px,3vh) + var(--sb));width:min(620px,calc(100vw - 404px - var(--sl) - var(--sr)));min-width:220px;padding:.5em 1em .6em;font-size:clamp(14px,4.1vh,21px);line-height:1.4}
 html.touch #cap{top:calc(max(34px,10vh) + var(--st));width:min(760px,74vw);font-size:clamp(14px,4.1vh,22px);line-height:1.5}
 html.touch #ttl{left:calc(68px + var(--sl));top:calc(14px + var(--st));font-size:clamp(12px,3.2vh,18px)}

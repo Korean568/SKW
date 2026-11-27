@@ -2,8 +2,8 @@
   "version": "1.3.0",
   "label": "0.13",
   "file": "game.gz",
-  "sha256": "8caed1bcd9ece02c94c54bc1fe0ebeab6a4d9caed926bca917c4ed449b3d1f2c",
-  "size": 254408,
+  "sha256": "0ed333911a9e47ff9015bc9e395df2295229c4e97f90f0e578f0e054e392f1ff",
+  "size": 254708,
   "minShell": "1.2.0",
-  "date": "2026-11-26T11:43:39.734Z"
+  "date": "2026-11-26T12:04:18.816Z"
 }

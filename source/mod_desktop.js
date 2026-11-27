@@ -34,7 +34,7 @@
     /* ── 상태 ── */
     const story = () => G.story && G.story.S && G.story.S.on ? 1 : [2, 3, 4].find(n => G['story' + n] && G['story' + n].on) || 0; // 진행 중인 스토리 번호 (0 = 타이틀)
     const ov = () => document.getElementById('ov');
-    let ui, menu = '', from = '', sel = 0;
+    let ui, menu = '', from = '', sel = 0, fsWant = null;
 
     const touch = () => !!(G.touch && G.touch.on); // 터치(휴대폰·안드로이드 앱): 메뉴 구성과 자막 크기를 손가락·작은 화면에 맞춤 (mod_touch 가 뒤에 로드되므로 쓸 때 확인)
     const sub = () => ui.sub.textContent = touch()
@@ -108,14 +108,14 @@
       r.querySelector('[data-k=sc] output').textContent = scOut(cfg.scale || Math.round(G.dyn * 100));
       r.querySelector('[data-k=vol] input').value = Math.round(cfg.vol * 100); r.querySelector('[data-k=vol] output').textContent = Math.round(cfg.vol * 100) + ' %';
       r.querySelector('[data-k=sens] input').value = cfg.sens; r.querySelector('[data-k=sens] output').textContent = cfg.sens.toFixed(1) + 'x';
-      fsGet().then(v => { if (menu === 'set') seg('fs', v ? 1 : 0); });
+      fsGet().then(v => { if (menu === 'set') seg('fs', fsWant && performance.now() - fsWant.t < 1500 ? fsWant.v : v ? 1 : 0); }); // 막 바꾼 직후엔 고른 값 (창 전환 애니메이션 동안 macOS · Linux 는 아직 예전 상태를 알려 줌)
     }
     // 렌더 배율 출력: "75 % (자동) · 1440×810" — 배율은 등급의 기본 배율(초표본 등급은 1 보다 큼)에 곱해지므로 실제 렌더 해상도를 같이 보여 줌
     const scOut = v => v + ' %' + (cfg.scale ? '' : ' (자동)') + (G.targets && G.targets.w ? ` · ${G.targets.w}×${G.targets.h}` : '');
     function onSet(k, v, input) {
       if (k === 'q') { cfg.q = v; quality(v); }
       if (k === 'sc') { cfg.scale = v === 'auto' ? 0 : +v; scale(); }
-      if (k === 'fs') { cfg.fs = v === '1'; fsSet(cfg.fs); setTimeout(sync, 400); }
+      if (k === 'fs') { cfg.fs = v === '1'; fsWant = { v: cfg.fs ? 1 : 0, t: performance.now() }; fsSet(cfg.fs); setTimeout(() => menu === 'set' && sync(), 1600); } // 전환이 끝난 뒤 실제 상태로 다시 표시
       if (k === 'vol') { cfg.vol = v / 100; vol(); }
       if (k === 'sens') cfg.sens = +v;
       if (k === 'sub') { cfg.sub = v; sub(); }
@@ -199,7 +199,9 @@ ${G.i18n ? '<span>언어</span><div data-k=lang><button data-v=ko data-i18n-skip
           start && start.after(bar);
           G.el('button', { textContent: '설정', onclick: () => settings('title') }, bar);
           canQuit && G.el('button', { textContent: '게임 종료', onclick: quit }, bar);
-          G.el('div', { className: 'dkv', textContent: D ? 'v' + (D.gameVersion || D.version) : 'dev · browser' }, o);
+          // 보이는 번호 = 0.xx (G.LABEL: 빌드가 게임 안에 넣음 — 옛 앱(1.2.0)이 받은 새 게임도 맞게) · 내부 semver(D.gameVersion)는 마우스를 올리면
+          const lab = G.LABEL || (D && D.label);
+          G.el('div', { className: 'dkv', textContent: D || lab ? 'v' + (lab || D.gameVersion || D.version) : 'dev · browser', title: D ? (D.gameVersion || D.version) + '' : '' }, o);
           const a = o.querySelector('a.tb');
           if (a && D && D.openExternal) a.addEventListener('click', e => { e.preventDefault(); quiet(D.openExternal(a.href)); });
           marks();
