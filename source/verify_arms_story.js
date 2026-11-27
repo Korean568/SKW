@@ -103,14 +103,14 @@ const PLACE = `(st)=>{const L=G.arms.drops.list,col=st===2?G.village.collide:G.r
   for (const w of ['', 'm134']) {
     if (!want('s4' + w) && !want('s4')) continue;
     const [p, logs] = await open(w ? '&wep=' + w : '');
-    const r = await p.evaluate(`(()=>{const S4=G.story4,S=S4.S,me=S4.me,A=G.arms,I=A.inp,F=G.people.fp;S4.start();S4.bot=true;
+    const r = await p.evaluate(`(()=>{const S4=G.story4,S=S4.S,me=S4.me,A=G.arms,I=A.inp,F=G.people.fp;S4.start();S4.bot=true; // 줍기 시험은 중화기가 아닌 총 (M134 를 든 채 RPG 로 바뀌면 조준 검사가 흔들림)
       const zone=()=>{const u0=G.ruins.K,lz=u0.lz,st=u0.start,dx=lz[0]-st[0],dz=lz[2]-st[2],n=Math.hypot(dx,dz);return A.drops.list.map(it=>({id:it.id,d:+Math.hypot(it.p[0]-me.o[0],it.p[2]-me.o[2]).toFixed(2),fwd:+(((it.p[0]-me.o[0])*dx+(it.p[2]-me.o[2])*dz)/n).toFixed(2)}));};
       const o={beats:[],cur:A.cur,zone:zone(),place:(${PLACE})(4),freeF:0,fireT:0,spinMax:0,adsFovK:1,cutVis:0,cutF:0,picked:null};let last='',i=0,pk=0;
       for(;i<6000;i++){
         for(const k in I)I[k]=0;
         const free=S.cm==='fp'&&S.bk<.5&&!S.cut&&S.beat!=='end'&&F.on;
         if(free){o.freeF++;I.ads=(i%60)<30?1:0;if(i%23===0){I.fire=1;o.fireT++;}if(i%60===29)o.adsFovK=Math.min(o.adsFovK,A.view.fovK);
-          if(S.beat==='talk'&&!pk&&A.drops.list.length){pk=1;const it=A.drops.list[0],a=Math.atan2(it.p[0]-me.p[0],it.p[2]-me.p[2]);me.p=[it.p[0]-Math.sin(a)*.6,it.p[1],it.p[2]-Math.cos(a)*.6];me.yaw=a;
+          if(S.beat==='talk'&&!pk&&A.drops.list.length){pk=1;const it=A.drops.list.find(d=>d.id!=='rpg7'&&d.id!=='m134')||A.drops.list[0],a=Math.atan2(it.p[0]-me.p[0],it.p[2]-me.p[2]);me.p=[it.p[0]-Math.sin(a)*.6,it.p[1],it.p[2]-Math.cos(a)*.6];me.yaw=a;
             const before=A.inv.slot.slice(),pool=JSON.stringify(A.inv.pool);I.use=1;${STEP}for(const k in I)I[k]=0;${STEP}o.picked={id:it.id,before,after:A.inv.slot.slice(),cur:A.cur,poolChanged:pool!==JSON.stringify(A.inv.pool),left:A.drops.list.includes(it)};me.p=me.o.slice();}}
         if(S.cut){o.cutF++;o.cutVis+=A.drops.list.filter(it=>it.prop.vis).length+(F.on?1:0);}
         o.spinMax=Math.max(o.spinMax,A.st.spin);
