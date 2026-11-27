@@ -499,7 +499,7 @@ return vec4f(fogAt(c,i.w),1.0);
   let A=f.ads;if(F.scope&&M&&M.pt.mount)A=[A[0],.153-(M.pt.mount[1]-.02),A[2]]; // T 조준경: 조준경 중심 = mount.y − .02
   a.fill(0);a[1]=-.63;a[2]=.12;
   const jx=hp&&F.fire?(Math.random()-.5)*.008:0,jy=hp&&F.fire?(Math.random()-.5)*.008:0;
-  S3(a,15,L(f.hip[0],A[0],ad)+cos(bb*.5)*.004+.03*rl,L(f.hip[1],A[1],ad)+sin(bb)*.006-.07*rl+.01*kk-(sh?.08*rl:0),L(f.hip[2],A[2],ad)-.045*kk);
+  S3(a,15,L(f.hip[0],A[0],ad)+(cos(bb*.5)-1)*.004+.03*rl,L(f.hip[1],A[1],ad)+sin(bb)*.006-.07*rl+.01*kk-(sh?.08*rl:0),L(f.hip[2],A[2],ad)-.045*kk);
   S3(a,24,sw[0]*.4+.22*rl*!sh+d[0]*(1-ad)+jx,sw[1]*.4+.05*kk+.3*rl*!sh+d[1]*(1-ad)-.35*lw-(sh?.25*rl:0)+jy,1);a[27]=1-rl*!sh;S3(a,12,-.2,-.2,.3);
   if(F.gun==='akm'||F.gun==='ak')a[28]=.15;
   if(sh&&rl>0){a[27]=1-rl;S3(a,12,.05,-.05,.45);} // RPG 재장전: 관을 숙이고 왼손을 총구 쪽으로
