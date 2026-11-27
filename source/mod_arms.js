@@ -486,10 +486,10 @@
 #wpg{background:radial-gradient(circle,#2a2a1808 0,#0000 24vmin,#000a 36vmin,#000 40vmin)}
 .wmk{position:absolute;left:-40px;top:-34px;width:80px;text-align:center;font:700 12px system-ui;display:none;color:#fe9;text-shadow:0 0 2px #000,0 1px 3px #000}.wmk:after{content:'▼';display:block;font-size:13px}
 #wh{position:absolute;right:4vw;bottom:max(5vh,calc(2vh + 34px));text-align:right;font-size:16px;color:#cde;display:none}
-#wh b,#am b{font-weight:700;color:#fff}#wh b{font-size:30px}#wh small,#am small{display:block;font-size:13px;letter-spacing:.12em;color:#9bc}
+#wh b,#am b{font-weight:700;color:#fff}#wh b{font-size:30px}#wh small,#am small{display:block;font-size:13px;letter-spacing:.12em;color:#bcd;text-shadow:0 0 2px #000,0 1px 3px #000}
 #wh small span+span:before,#am small span+span:before{content:' · '}#wh em,#am em{display:block;font:600 12px system-ui;color:#fc8;font-style:normal}#wh em span+span:before,#am em span+span:before{content:' · '}
 #wh u,#am u{display:flex;gap:7px;justify-content:flex-end;margin-top:4px;text-decoration:none;font:600 12px system-ui;color:#fffc;text-shadow:0 0 2px #000,0 1px 3px #000}#wh u .on,#am u .on{color:#fe9;background:#000a;border-radius:3px;padding:0 3px}#wh u i,#am u i{font-style:normal}
-#whp{position:absolute;left:50%;top:62%;transform:translateX(-50%);font-size:18px;color:#fe9;display:none;text-shadow:0 0 2px #000,0 1px 3px #000}`);
+#whp{position:absolute;left:50%;top:62%;transform:translateX(-50%);font-size:18px;color:#fe9;display:none;text-shadow:0 0 2px #000,0 0 2px #000,0 1px 3px #000}`);
       ui.wa=G.el('div',{id:'wa'});
       const svg=b=>`<svg viewBox="-50 -50 100 100" stroke=#000 fill=none>${b}</svg>`;
       ui.sc=G.el('div',{id:'wsc',className:'ov',innerHTML:svg('<path d="M-50 0H50M0-50V50" stroke-width=.22 /><path d="M-25 0H25M0-25V25" stroke-width=1.3 stroke-dasharray="0 5" stroke-linecap=round /><path d="M-50 0H-30M30 0H50M0 30V50" stroke-width=1.4 /><circle r=49.5 stroke-width=1.5 stroke=#0008 />')},ui.wa); // 스코프: 밀도트 조준선
