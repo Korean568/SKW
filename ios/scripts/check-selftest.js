@@ -55,7 +55,10 @@ if (m) {
   say(n.audioCategory === 'AVAudioSessionCategoryAmbient', '앱: 오디오 세션 .ambient', n.audioCategory);
   say(n.idleTimerDisabled === true, '앱: 앞에 있는 동안 화면 꺼짐 막음', n.idleTimerDisabled);
   say(n.statusBarHidden === true && n.homeIndicatorAutoHidden === true && n.landscape === true, '앱: 상태 막대 숨김 · 홈 표시줄 자동 숨김 · 가로', { screen: n.screen, safeArea: n.safeArea });
-  say(n.bundleId === 'com.secondkoreanwars.game' && n.shortVersion === m.label && /^\d+$/.test(String(n.build)), '앱: 번들 ID · 버전', { id: n.bundleId, name: n.displayName, v: n.shortVersion, build: n.build, shell: n.shellVersion });
+  // 앱 번호(Info.plist)는 앱에 든 게임의 번호 — 띄운 게임은 자동 업데이트로 더 새것일 수 있다 (CI 도중에 새 버전이 나오면 실제로 그렇게 됨)
+  say(n.bundleId === 'com.secondkoreanwars.game' && /^\d+\.\d\d$/.test(String(n.shortVersion)) && /^\d+$/.test(String(n.build)) && n.shellVersion === m.shell,
+    '앱: 번들 ID · 버전', { id: n.bundleId, name: n.displayName, v: n.shortVersion, build: n.build, shell: n.shellVersion });
+  if (n.served && n.served.downloaded) say(null, '앱: GitHub 에서 받은 더 새 게임을 띄움 (켤 때 자동 업데이트)', { served: n.served, applied: (m.updateStatus || {}).applied });
   say(null, '기기', { model: n.model, system: n.system, ua: m.ua, viewport: m.viewport, langs: n.preferredLanguages });
   // 뒤로 보냈을 때(sceneWillResignActive) 앱이 부른 window.__skwIOS.pause() 의 답 (콘솔: "[SKW] lifecycle pause: <멈춘 소리 수>")
   let con = '';

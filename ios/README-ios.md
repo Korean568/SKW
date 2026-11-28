@@ -36,7 +36,23 @@ GitHub 저장소 → **Actions** → 왼쪽 **iOS build**. `ios/` 를 고쳐 `cl
 
 ### Simulator 에서 확인한 것
 
-<!-- SMOKE-RESULTS -->
+CI 실행 기록에서 확인한 결과입니다 (iPhone 17 Pro · iOS 26.5 Simulator, 2026-11-28, `ios/scripts/check-selftest.js` 의 판정 — 모두 통과).
+
+| 확인한 것 | 결과 |
+|---|---|
+| 게임 주소 · 보안 출처 | `skw://game/index.html` 로 뜨고 `isSecureContext = true` (WebGPU 가 켜지는 조건) · `crypto.subtle` · `DecompressionStream` 있음 |
+| WebGPU | `navigator.gpu` 는 **있음**. 하지만 `requestAdapter()` 가 **null** → 게임이 스스로 "사용 가능한 GPU 어댑터가 없습니다" 안내 화면을 보여 줌 (멈추지 않음). 원인은 아래 7번: GitHub 의 Mac 은 가상 머신이라 GPU 가 WebGPU 를 못 씀 |
+| WebGPU 가 아예 없는 기기 | `navigator.gpu` 를 지운 채로 켜면 "WebGPU 를 사용할 수 없습니다" 안내 화면 · 다리(skwDesktop)는 그대로 |
+| 다리 | `skwDesktop.platform = 'ios'` · 앱 1.6.0 · 게임 1.6.0 · 보이는 번호 0.16 · `window.__skwIOS` 있음 |
+| 자동 업데이트 | `update.status()` 가 약속한 모양(S) · `update.check()` 가 실제 GitHub 두 주소에 물어 **latest** 로 끝난 뒤 돌아옴 (seq 2) |
+| 진짜 업데이트 받기 · 적용 | 앱 번호를 1.5.0 으로 속여 켜면(`--skw-selftest-shell`) GitHub 의 **진짜 피드**에서 게임을 받아 gzip 풀기 · sha256 확인 · 저장 뒤 **켤 때 바로 적용** (`S.applied = true`). 받은 게임도 같은 `skw://game` 출처라 **localStorage 가 그대로**이고, 다시 확인하면 latest. 또 시험 도중 실제로 0.17 이 피드에 올라오자(2026-11-28 01:32), 그 뒤에 켠 iPad 시험의 앱(0.16 이 든 앱)이 **0.17 을 받아 켤 때 바로 바꿔** 띄웠습니다 |
+| localStorage | 쓰고 → 다른 앱(설정)으로 보내고 → 앱을 끄고 → 다시 켜도 **그대로** |
+| 일시정지 고리 | 다른 앱으로 넘어갈 때 앱이 `window.__skwIOS.pause()` 를 부름 (콘솔 `[SKW] lifecycle pause: 0`) |
+| 앱 설정 | 오디오 세션 `.ambient` · 화면 꺼짐 막음(앞에 있을 때) · 상태 막대 숨김 · 홈 표시줄 자동 숨김 · 가로 (874x402, 안전 영역 좌우 62 · 아래 20) · 번들 ID · 버전 0.16 (빌드 10600) |
+| iPad | iPad Pro 13형 Simulator 에서도 같은 시험 통과 (1376x1032 가로) |
+| JS 오류 | 안내 화면의 `[SKW fatal]` 기록 말고는 없음 |
+| 단위 시험 | XCTest 18개 모두 통과 (가짜 서버 · Node 의 gzip · 저장소의 진짜 `game.gz`) |
+| 기기용 빌드 | `iphoneos` Release arm64 컴파일 성공 (서명 없음) · 최소 iOS 26.0 · 앱 크기 약 0.9 MB |
 
 ### 버전 번호
 
@@ -124,7 +140,7 @@ App Store Connect → 앱 → **iOS 앱 › 버전** 화면:
 | 지원 URL | `https://whgkwns.itch.io/second-korean-wars` |
 | 개인정보 처리방침 URL | `https://korean568.github.io/SKW/privacy.html` (iPhone 앱 내용 포함) |
 | **앱 개인정보 보호** | **데이터를 수집하지 않음** (계정 · 광고 · 분석 없음. 자동 업데이트는 GitHub 의 공개 파일을 받기만 함) |
-| **연령 등급** | 설문에 **사실대로**: 전쟁 배경의 **사실적 폭력**(총격전 · 사망 · 처형 장면) 잦음/강함, **가려서 표기한 비속어** 드묾. 성적 내용 · 도박 · 약물 · 이용자 간 대화 · 구매 없음. 높은 연령 등급(17+/18+ 수준)이 나올 것으로 예상합니다 |
+| **연령 등급** | 설문에 **사실대로**: 전쟁 배경의 **사실적 폭력**(총격전 · 사망 · 처형 장면) 잦음/강함, **가려서 표기한 비속어** 드묾. 성적 내용 · 도박 · 약물 · 이용자 간 대화 · 구매 없음. 높은 연령 등급(16+ 또는 18+)이 나올 것으로 예상합니다 |
 | 카테고리 | **게임 › 액션** (보조: 게임 › 롤플레잉 또는 비워 둠) |
 | 가격 | 무료 |
 | 수출 규정 | 앱에 이미 "아니요"(비면제 암호화 없음)로 들어 있음 |
@@ -175,4 +191,21 @@ PC판 · Android 와 **같은 업데이트 파일**(`desktop/update/latest.json`
 | `../.github/workflows/ios.yml` | 자동 빌드 · 시험 · (선택) TestFlight |
 | `../privacy.html` | 개인정보처리방침 (iPhone 앱 포함) |
 
-<!-- TECH-NOTES -->
+## 7. 기술 메모 (확인한 것 · 한계)
+
+- **러너**: `macos-26` (macOS 26.7 · Apple M1 가상 머신 · Xcode 26.6 기본 · iOS 26.5 SDK · Simulator 런타임 iOS 26.2 · 26.4 · 26.5). `macos-15` 러너에도 Xcode 26 과 iOS 26.0~26.2 Simulator 가 있지만 더 새로운 `macos-26` 을 씁니다. 최소 iOS 를 26.0 으로 둔 까닭은 WebGPU.
+- **게임을 띄우는 방법 — `skw://` (WKURLSchemeHandler) 를 고름.** Simulator 에서 `file://`(loadFileURL)도 `isSecureContext = true` 였지만(비교 시험 `file`), `file://` 은 앱에 든 게임(앱 묶음 안)과 받은 게임(Application Support)의 주소가 달라지고 출처가 `file://` 하나로 뭉뚱그려집니다. `skw://game` 은 어느 게임을 띄우든 같은 출처라 **업데이트해도 진행 · 설정(localStorage)이 남습니다** (시험 `update` 에서 확인).
+- **WebGPU 는 GitHub 러너에서 확인할 수 없습니다 (증거).** 러너 Mac 의 Metal 장치는 `Apple Paravirtual device` 이고 `apple7=false · apple9=false · metal3=false` 입니다. 같은 러너의 **macOS WKWebView 에서도** `navigator.gpu` 는 있지만 `requestAdapter()` 가 null 입니다 (`ios/scripts/webgpu-host-probe.swift`, CI 의 "WebGPU on the runner itself" 단계). 그래서 Simulator 의 null 어댑터는 앱 문제가 아니라 가상 GPU 의 한계입니다. 실제 iPhone(iOS 26)에서 WebGPU 어댑터가 나오는지 · 처음 화면 · 설정의 버전 줄은 실제 기기에서만 볼 수 있고, 같은 화면은 PC 의 헤드리스 Chromium 에서 진짜 `ios-shim.js` 로 시험했습니다 (한국어 · 영어, 버전 줄 · 게임 종료 없음 · 전체 화면 줄 없음 · App Store 안내 · `G.i18n.miss` 비어 있음).
+- **WKWebView 의 사용자 에이전트**는 iOS 26.5 에서도 `iPhone OS 18_7` 로 나옵니다 (WebKit 이 번호를 묶어 둠). 게임은 기기 판별에 `iPhone|iPad` 만 보므로 상관없습니다.
+- **소리**: 오디오 세션 `.ambient` — 무음 스위치를 켜면 소리가 안 나고, 듣던 음악과 섞입니다. 게임 소리를 무음 스위치와 관계없이 내고 싶으면 `AppDelegate.swift` 에서 `.playback` 으로 바꾸면 됩니다.
+- **iPadOS 26**: `UIRequiresFullScreen`(iPad 전체 화면 고정)은 iPadOS 26 에서 "앞으로 무시될 예정" 경고가 납니다. 지금은 넣어 두었고, 창 크기가 바뀌어도 게임은 크기에 맞춰 다시 그립니다.
+- **WKWebView 설정**: `mediaTypesRequiringUserActionForPlayback = []` (터치 없이 소리), 스크롤 · 확대 · 링크 미리보기 끔, 안전 영역까지 그림(`contentInsetAdjustmentBehavior = .never`, 게임이 `env(safe-area-inset-*)` 사용), 앱 밖 주소로 이동 금지(사용자가 누른 http/https 만 Safari 로), 웹 프로세스가 죽으면 다시 불러옴(30초 안에 3번이면 안내).
+
+직접 빌드 (Mac · Xcode 26 · Node.js 22 · `brew install xcodegen`):
+
+```
+cd desktop && ELECTRON_SKIP_BINARY_DOWNLOAD=1 npm ci && cd ..   # 게임 빌드 도구(esbuild)
+node ios/scripts/prepare-resources.js                            # 게임 · 아이콘 · 버전 → ios/SKW/Game · Config/Version.xcconfig
+cd ios && xcodegen generate                                      # SecondKoreanWars.xcodeproj
+xcodebuild test -project SecondKoreanWars.xcodeproj -scheme SecondKoreanWars -destination 'platform=iOS Simulator,name=iPhone 17 Pro'
+```

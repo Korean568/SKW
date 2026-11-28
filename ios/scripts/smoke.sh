@@ -86,6 +86,8 @@ sleep 2
 shot nogpu
 stop nogpu
 
+# 앞의 실행이 이미 받아 둔 게임(피드가 앱보다 새것일 때)이 있으면 지워서, 이번 실행이 직접 받고 적용하는지 보게 한다
+rm -rf "$DATA/Library/Application Support/game" "$DATA/Library/Application Support/update-seen"
 launch update --skw-selftest-shell=1.5.0 --skw-selftest-wait=40
 stop update
 
