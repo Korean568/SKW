@@ -29,21 +29,21 @@ GitHub 저장소 → **Actions** → 왼쪽 **iOS build**. `ios/` 를 고쳐 `cl
 
 1. 게임을 소스에서 빌드해 앱에 넣고 (`ios/scripts/prepare-resources.js` — PC판 · Android 와 똑같은 게임 파일), 앱 아이콘 · 버전 번호를 만들고, XcodeGen 으로 Xcode 프로젝트를 만듭니다.
 2. **자동 업데이트 단위 시험** (XCTest, 가짜 서버): 새 버전 → 받아서 준비됨 · 가장 높은 버전을 고름 · 막히거나 실패하거나 옛것을 주는 주소가 있어도 늦어지지 않음 · sha256 이 틀리면 아무것도 저장하지 않음 · 앱이 너무 옛것(minShell)이면 받지 않음 · 낮은 버전으로 내려가지 않음 · 확인은 한 번에 하나 · 기록 200줄 · 버전 비교(1.10.0 > 1.9.0) · Node 가 만든 gzip 과 저장소의 진짜 `desktop/update/game.gz` 풀기.
-3. **Simulator 연기 시험** (`ios/scripts/smoke.sh`): 가상 iPhone 17 Pro 에 설치해 네 번 켜 보고(`--skw-selftest`) 결과를 판정합니다 (`ios/scripts/check-selftest.js`) — 아래 표. 화면 사진은 실행 기록에 작은 JPEG 로 찍힙니다.
+3. **Simulator 연기 시험** (`ios/scripts/smoke.sh`): 가상 iPhone 17 Pro 에 설치해 다섯 번 켜 보고(`--skw-selftest` — 보통 실행에서는 아무 일도 안 함), 가상 iPad Pro 13형에서도 한 번 켜서 결과를 판정합니다 (`ios/scripts/check-selftest.js`) — 아래 표. 화면 사진은 실행 기록 맨 끝에 작은 JPEG(base64)로 찍히고, 요약(단위 시험 · 판정 · WebGPU 진단)이 그 뒤에 나옵니다.
 4. **실제 기기용(iphoneos) 빌드** — 서명 없이 컴파일만 (서명이 없어서 설치는 안 됩니다).
 
 결과 파일: 실행 기록 맨 아래 **Artifacts → second-korean-wars-ios** (서명 없는 앱 zip · 시험 결과 JSON · 화면 사진 · 콘솔 기록).
 
 ### Simulator 에서 확인한 것
 
-CI 실행 기록에서 확인한 결과입니다 (iPhone 17 Pro · iOS 26.5 Simulator, 2026-11-28, `ios/scripts/check-selftest.js` 의 판정 — 모두 통과).
+CI 실행 기록에서 확인한 결과입니다 (iPhone 17 Pro · iPad Pro 13형 · iOS/iPadOS 26.5 Simulator, 2026-11-28, Actions 실행 46090179923 · 46091252363 · 46094143941, `ios/scripts/check-selftest.js` 의 판정 — 모두 통과).
 
 | 확인한 것 | 결과 |
 |---|---|
 | 게임 주소 · 보안 출처 | `skw://game/index.html` 로 뜨고 `isSecureContext = true` (WebGPU 가 켜지는 조건) · `crypto.subtle` · `DecompressionStream` 있음 |
 | WebGPU | `navigator.gpu` 는 **있음**. 하지만 `requestAdapter()` 가 **null** → 게임이 스스로 "사용 가능한 GPU 어댑터가 없습니다" 안내 화면을 보여 줌 (멈추지 않음). 원인은 아래 7번: GitHub 의 Mac 은 가상 머신이라 GPU 가 WebGPU 를 못 씀 |
 | WebGPU 가 아예 없는 기기 | `navigator.gpu` 를 지운 채로 켜면 "WebGPU 를 사용할 수 없습니다" 안내 화면 · 다리(skwDesktop)는 그대로 |
-| 다리 | `skwDesktop.platform = 'ios'` · 앱 1.6.0 · 게임 1.6.0 · 보이는 번호 0.16 · `window.__skwIOS` 있음 |
+| 다리 | `skwDesktop.platform = 'ios'` · 앱(껍데기) 1.6.0 · 게임 번호와 보이는 번호가 띄운 게임과 같음 (앱에 든 1.6.0/0.16, 받은 1.7.0/0.17) · `window.__skwIOS` 있음 |
 | 자동 업데이트 | `update.status()` 가 약속한 모양(S) · `update.check()` 가 실제 GitHub 두 주소에 물어 **latest** 로 끝난 뒤 돌아옴 (seq 2) |
 | 진짜 업데이트 받기 · 적용 | 앱 번호를 1.5.0 으로 속여 켜면(`--skw-selftest-shell`) GitHub 의 **진짜 피드**에서 게임을 받아 gzip 풀기 · sha256 확인 · 저장 뒤 **켤 때 바로 적용** (`S.applied = true`). 받은 게임도 같은 `skw://game` 출처라 **localStorage 가 그대로**이고, 다시 확인하면 latest. 또 시험 도중 실제로 0.17 이 피드에 올라오자(2026-11-28 01:32), 그 뒤에 켠 iPad 시험의 앱(0.16 이 든 앱)이 **0.17 을 받아 켤 때 바로 바꿔** 띄웠습니다 |
 | localStorage | 쓰고 → 다른 앱(설정)으로 보내고 → 앱을 끄고 → 다시 켜도 **그대로** |
@@ -51,6 +51,7 @@ CI 실행 기록에서 확인한 결과입니다 (iPhone 17 Pro · iOS 26.5 Simu
 | 앱 설정 | 오디오 세션 `.ambient` · 화면 꺼짐 막음(앞에 있을 때) · 상태 막대 숨김 · 홈 표시줄 자동 숨김 · 가로 (874x402, 안전 영역 좌우 62 · 아래 20) · 번들 ID · 버전 0.16 (빌드 10600) |
 | iPad | iPad Pro 13형 Simulator 에서도 같은 시험 통과 (1376x1032 가로) |
 | JS 오류 | 안내 화면의 `[SKW fatal]` 기록 말고는 없음 |
+| 화면 사진 | 가로 · 전체 화면(상태 막대 없음), 왼쪽에 Dynamic Island, 게임의 "WebGPU is not available" 안내 상자가 안전 영역 안 가운데에 — 앱이 원하는 대로 그려짐. (그 실행은 피드에서 받은 0.17 을 띄워서, 이 가지에서 고친 '다른 앱 안에서 열었다면 Safari 로' 줄이 아직 보였음 — 이 가지가 배포되면 앱 안에서는 사라짐) |
 | 단위 시험 | XCTest 18개 모두 통과 (가짜 서버 · Node 의 gzip · 저장소의 진짜 `game.gz`) |
 | 기기용 빌드 | `iphoneos` Release arm64 컴파일 성공 (서명 없음) · 최소 iOS 26.0 · 앱 크기 약 0.9 MB |
 
