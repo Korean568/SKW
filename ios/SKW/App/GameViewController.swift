@@ -18,7 +18,7 @@ final class GameViewController: UIViewController {
     static let host = "game"
     static let startURL = URL(string: "skw://game/index.html")!
     static let background = UIColor(red: 5 / 255, green: 8 / 255, blue: 12 / 255, alpha: 1) // 게임 배경 #05080c
-    private static let startupWait: TimeInterval = 4      // 켤 때 업데이트 확인 · 받기를 기다리는 최대 시간
+    private static let startupWait: TimeInterval = 4      // 켤 때 업데이트 확인 · 받기를 기다리는 최대 시간 (자동 시험은 바꿀 수 있음)
     private static let recheckEvery: TimeInterval = 30 * 60 // 앞에 있는 동안 다시 확인하는 간격
     private static let crashWindow: TimeInterval = 30      // 이 시간 안에 웹 프로세스가 3번 죽으면 자동 다시 불러오기를 멈춤
 
@@ -30,7 +30,7 @@ final class GameViewController: UIViewController {
     private let bundledLabel: String   // 앱에 든 게임의 보이는 번호 (skwLabel)
     private let bundledURL: URL?
     private let shimTemplate: String?
-    let selfTest = SelfTest.fromArguments()
+    let selfTest: SelfTest?
     private var started = false        // 게임 페이지를 처음 불러왔는가 (켤 때 업데이트 확인을 기다리는 동안 false)
     private var active = false
     private var lastCheck: TimeInterval = -.greatestFiniteMagnitude
@@ -42,6 +42,8 @@ final class GameViewController: UIViewController {
 
     init() {
         let b = Bundle.main
+        let st = SelfTest.fromArguments()
+        selfTest = st
         bundledURL = b.url(forResource: "index", withExtension: "html", subdirectory: "Game")
         // Game/version.json (prepare-resources.js 가 씀): {내부 번호, 보이는 번호}. 없으면 Info.plist 에서
         var v: String?, l = ""
@@ -50,7 +52,7 @@ final class GameViewController: UIViewController {
             v = Updater.cleanVersion(j["version"])
             l = Updater.cleanLabel(j["label"])
         }
-        shell = v ?? Updater.cleanVersion(b.object(forInfoDictionaryKey: "SKWShellVersion")) ?? "0.0.0"
+        shell = st?.shellOverride ?? v ?? Updater.cleanVersion(b.object(forInfoDictionaryKey: "SKWShellVersion")) ?? "0.0.0"
         bundledLabel = l.isEmpty ? Updater.cleanLabel(b.object(forInfoDictionaryKey: "CFBundleShortVersionString")) : l
         shimTemplate = b.url(forResource: "ios-shim", withExtension: "js").flatMap { try? String(contentsOf: $0, encoding: .utf8) }
         super.init(nibName: nil, bundle: nil)
@@ -92,7 +94,7 @@ final class GameViewController: UIViewController {
         if startCheck("start") > 0 {
             let w = DispatchWorkItem { [weak self] in self?.startGame() } // 늦어도 4초 뒤에는 지금 게임으로 시작
             startWork = w
-            DispatchQueue.main.asyncAfter(deadline: .now() + Self.startupWait, execute: w)
+            DispatchQueue.main.asyncAfter(deadline: .now() + (selfTest?.startupWait ?? Self.startupWait), execute: w)
         } else {
             startGame()
         }
@@ -236,7 +238,7 @@ final class GameViewController: UIViewController {
         if started { return }
         started = true
         if let up = updater, up.busy() {
-            up.log("켬: \(Int(Self.startupWait * 1000))ms 안에 확인이 끝나지 않아 지금 게임으로 시작 (확인은 계속)")
+            up.log("켬: \(Int((selfTest?.startupWait ?? Self.startupWait) * 1000))ms 안에 확인이 끝나지 않아 지금 게임으로 시작 (확인은 계속)")
         }
         loadGame()
     }

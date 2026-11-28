@@ -9,6 +9,8 @@ import WebKit
 ///   --skw-selftest-write=<값>          localStorage 'skw-selftest-nonce' 에 값을 쓴다 (다시 켰을 때 남아 있는지 보려고)
 ///   --skw-selftest-nogpu               navigator.gpu 를 지운 채로 (WebGPU 가 없는 기기의 안내 화면 시험)
 ///   --skw-selftest-file                skw:// 대신 file:// 로 띄운다 (보안 출처 비교용)
+///   --skw-selftest-shell=<버전>        앱(껍데기) 번호를 이 값으로 속인다 (예 1.5.0 → 진짜 업데이트 주소에서 지금 게임을 받아 적용하는지 시험)
+///   --skw-selftest-wait=<초>           켤 때 업데이트를 기다리는 시간 (기본 4초)
 ///
 /// 게임이 뜨면(G.ready 또는 G.dead) 페이지 안에서 확인할 것을 모아 JSON 한 줄로 stdout 에 "SKW-SELFTEST {…}" 로 찍고 같은 내용을 파일로도 쓴다.
 final class SelfTest {
@@ -16,14 +18,19 @@ final class SelfTest {
     let write: String?
     let noGPU: Bool
     let serveFile: Bool
+    var shellOverride: String?
+    var startupWait: TimeInterval?
     private var attached = false
     private let t0 = Date()
 
     static func fromArguments(_ args: [String] = ProcessInfo.processInfo.arguments) -> SelfTest? {
         guard args.contains("--skw-selftest") else { return nil }
         let val = { (k: String) -> String? in args.first { $0.hasPrefix(k + "=") }.map { String($0.dropFirst(k.count + 1)) } }
-        return SelfTest(name: val("--skw-selftest-out") ?? "main", write: val("--skw-selftest-write"),
-                        noGPU: args.contains("--skw-selftest-nogpu"), serveFile: args.contains("--skw-selftest-file"))
+        let t = SelfTest(name: val("--skw-selftest-out") ?? "main", write: val("--skw-selftest-write"),
+                         noGPU: args.contains("--skw-selftest-nogpu"), serveFile: args.contains("--skw-selftest-file"))
+        t.shellOverride = Updater.cleanVersion(val("--skw-selftest-shell"))
+        t.startupWait = val("--skw-selftest-wait").flatMap { Double($0) }.map { min(max($0, 1), 120) }
+        return t
     }
 
     init(name: String, write: String?, noGPU: Bool, serveFile: Bool) {
@@ -43,7 +50,7 @@ final class SelfTest {
     func attach(to vc: GameViewController, web: WKWebView) {
         if attached { return }
         attached = true
-        say("start \(name) write=\(write ?? "-") nogpu=\(noGPU) file=\(serveFile)")
+        say("start \(name) write=\(write ?? "-") nogpu=\(noGPU) file=\(serveFile) shell=\(shellOverride ?? "-")")
         poll(vc, web, tries: 0)
     }
 
@@ -161,7 +168,7 @@ final class SelfTest {
       try {
         r.updateStatus = await T(D.update.status(), 5000);
         r.updateCheck = await T(D.update.check(), 90000);
-        r.updateLog = String(await T(D.update.log(), 5000) || '').split('\\n').filter(Boolean).slice(-12);
+        r.updateLog = String(await T(D.update.log(), 5000) || '').split('\\n').filter(Boolean).slice(-20);
       } catch (e) { r.updateError = String(e); }
     }
     try {

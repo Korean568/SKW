@@ -1,5 +1,5 @@
 #!/bin/bash
-# iOS Simulator 연기 시험 (CI: .github/workflows/ios.yml) — 앱을 설치하고 자동 시험 인자(--skw-selftest, SelfTest.swift)로 네 번 켠다.
+# iOS Simulator 연기 시험 (CI: .github/workflows/ios.yml) — 앱을 설치하고 자동 시험 인자(--skw-selftest, SelfTest.swift)로 다섯 번 켠다.
 #
 #   bash ios/scripts/smoke.sh <시뮬레이터 UDID> <SecondKoreanWars.app 경로> [결과 폴더 (기본 build/smoke)] [full | quick]
 #   (quick: 1) 만 — iPad 처럼 다른 기기에서 켜지는지만 볼 때)
@@ -8,7 +8,9 @@
 #                → 화면 사진 → 다른 앱(설정)으로 넘겨 뒤로 보냄(일시정지 고리) → 앱 끄기
 #   2) relaunch  다시 켜서 1) 에서 쓴 localStorage 표시가 남아 있는지
 #   3) nogpu     navigator.gpu 를 지운 채로 → 게임의 "WebGPU 를 사용할 수 없습니다" 안내 화면 + 화면 사진
-#   4) file      비교용: skw:// 대신 file:// 로 띄웠을 때의 보안 출처 · WebGPU (실패해도 시험은 계속)
+#   4) update    앱 번호를 1.5.0 으로 속여 켬 → 진짜 업데이트 주소(GitHub)에서 지금 게임을 받아(gzip · sha256) 켤 때 바로 적용하고
+#                같은 skw://game 출처로 띄우는지 · 1) 에서 쓴 localStorage 가 그대로인지 (업데이트해도 진행이 남는지)
+#   5) file      비교용: skw:// 대신 file:// 로 띄웠을 때의 보안 출처 · WebGPU (실패해도 시험은 계속)
 # 결과 JSON 은 앱이 Library/Caches/skw-selftest-<이름>.json 에 쓰고(콘솔에도 SKW-SELFTEST 한 줄), check-selftest.js 가 판정한다.
 # 화면 사진은 결과 폴더에 작은 JPEG(480px)로 두고, ios.yml 의 마지막 단계가 base64 로 로그에 찍는다 (로그만 보고도 풀어 볼 수 있게).
 set -uo pipefail
@@ -84,10 +86,13 @@ sleep 2
 shot nogpu
 stop nogpu
 
+launch update --skw-selftest-shell=1.5.0 --skw-selftest-wait=40
+stop update
+
 launch file --skw-selftest-file || true
 stop file
 
-for n in main relaunch nogpu file; do
+for n in main relaunch nogpu update file; do
   echo "::group::콘솔 ($n)"
   grep -v '^SKW-SELFTEST ' "$OUT/console-$n.log" 2>/dev/null | tail -n 80
   echo "::endgroup::"

@@ -12,7 +12,7 @@ const path = require('path');
 const [dir = 'build/smoke', nonce = ''] = process.argv.slice(2).filter((a) => !a.startsWith('--'));
 const quick = process.argv.includes('--quick'); // main 만 (다른 기기에서 켜지는지)
 const read = (n) => { try { return JSON.parse(fs.readFileSync(path.join(dir, n + '.json'), 'utf8')); } catch (e) { return null; } };
-const R = { main: read('main'), relaunch: read('relaunch'), nogpu: read('nogpu'), file: read('file') };
+const R = { main: read('main'), relaunch: read('relaunch'), nogpu: read('nogpu'), update: read('update'), file: read('file') };
 let bad = 0;
 const say = (ok, what, detail) => {
   if (ok === null) console.log('INFO ' + what + (detail !== undefined ? ' — ' + JSON.stringify(detail) : ''));
@@ -77,6 +77,18 @@ const g = R.nogpu;
 say(!!g && g.gpuType === 'undefined' && g.screen === 'unsupported' && /WebGPU/.test(g.fatal || '') && g.isSecureContext === true,
   'nogpu: WebGPU 가 없는 기기 → 게임의 "WebGPU 를 사용할 수 없습니다" 안내', g && { screen: g.screen, fatal: g.fatal });
 say(!!g && g.platform === 'ios' && g.hasUpdate === true, 'nogpu: 안내 화면에서도 다리는 그대로', g && g.platform);
+
+const u = R.update;
+if (u) {
+  const sv = (u.native || {}).served || {}, us = u.updateStatus || {}, log = (u.updateLog || []).join('\n');
+  say(!u.probeError && u.shell === '1.5.0', 'update: 앱 번호를 1.5.0 으로 속여 켬', u.probeError || u.shell);
+  say(sv.downloaded === true && us.applied === true && us.current && us.current.version === sv.version && u.gameVersion === sv.version,
+    'update: 진짜 주소에서 받은 게임으로 켤 때 바로 바꿈 (S.applied)', { served: sv, current: us.current, applied: us.applied });
+  say(/sha256 맞음/.test(log) && /켬: 새 게임을 받아서 바로 그걸로 시작/.test(log), 'update: 받기 · sha256 확인 · 저장 · 적용 기록', (u.updateLog || []).slice(-20));
+  say(u.origin === 'skw://game' && u.isSecureContext === true, 'update: 받은 게임도 같은 skw://game 출처', u.origin);
+  say(u.lsBefore === nonce && !!nonce, 'update: 받은 게임으로 바뀌어도 localStorage(진행 · 설정)가 그대로', { before: u.lsBefore, want: nonce });
+  say(u.updateCheck && u.updateCheck.state === 'latest', 'update: 바꾼 뒤 다시 확인하면 최신', u.updateCheck && u.updateCheck.state);
+} else say(false, 'update: 결과 없음');
 
 const f = R.file;
 say(null, 'file (비교용 file://)', f && { href: f.href, origin: f.origin, isSecureContext: f.isSecureContext, gpu: f.gpuType, adapter: f.adapter, screen: f.screen, err: f.probeError });
