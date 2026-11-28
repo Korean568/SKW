@@ -1,12 +1,13 @@
 'use strict';
 { /* ═══ TOUCH — 휴대폰·태블릿 터치 조작 (스토리 게임 · 안드로이드 앱) ═══
-     켜지는 경우: 주소에 ?touch · window.skwDesktop.platform === 'android' · 주 입력이 손가락(pointer:coarse)인 기기. 그 밖에는 아무 것도 하지 않음.
+     켜지는 경우: 주소에 ?touch · window.skwDesktop.platform 이 'android' · 'ios'(앱) · 주 입력이 손가락(pointer:coarse)인 기기. 그 밖에는 아무 것도 하지 않음.
      방식: 스토리 모듈을 고치지 않고 입력을 흉내 낸다 — 가상 조이스틱 → W/A/S/D(+Shift) 키 이벤트, 화면 밀기 → mousemove(movementX/Y),
      버튼 → mousedown/up · 키 · 휠. 포인터 고정은 "항상 고정됨"으로 보이게 해서 PC용 안내·자동 일시정지가 끼어들지 않게 한다.
      시점 감도는 mod_desktop 이 MouseEvent.movementX/Y 에 거는 배율을 그대로 탄다. */
   const D = window.skwDesktop;
   let coarse = false; try { coarse = matchMedia('(pointer:coarse)').matches && navigator.maxTouchPoints > 0; } catch (e) { }
-  const on = G.mode === 'story' && (G.params.has('touch') || !!(D && D.platform === 'android') || coarse);
+  const app = !!(D && /^(android|ios)$/.test(D.platform)); // 휴대폰 · 태블릿 앱 (가로 고정 · 늘 전체 화면)
+  const on = G.mode === 'story' && (G.params.has('touch') || app || coarse);
   const T = G.touch = { on };
   if (on) {
     const $ = id => document.getElementById(id), now = () => performance.now();
@@ -219,8 +220,8 @@
     }
     /* ── 세로 화면: 웹(iPhone Safari · 안드로이드 Chrome)은 화면 방향을 고정할 수 없다 → "가로로 돌려 주세요" 화면으로 덮고,
           진행 중인 장면은 메뉴 없이 멈춤 (mod_desktop 의 같은 일시정지 경로 G.desktop.hold). 가로로 돌리면 그 자리에서 이어서.
-          안드로이드 앱은 가로 고정이라 뜨지 않음 (앱에서는 아예 끔) ── */
-    const rotOK = !(D && D.platform === 'android');
+          안드로이드 · iOS 앱은 가로 고정이라 뜨지 않음 (앱에서는 아예 끔) ── */
+    const rotOK = !app;
     let mqP = null, rotOn = false, ownHold = 0; try { mqP = matchMedia('(orientation: portrait)'); } catch (e) { }
     const portrait = () => rotOK && (mqP ? mqP.matches : innerHeight > innerWidth);
     function hold(v) {

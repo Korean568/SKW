@@ -22,7 +22,7 @@
       '화면이 돌아가지 않으면 세로 화면 고정(자동 회전) 설정을 확인해 주세요': 'If the screen does not turn, check the rotation lock (auto-rotate) setting',
       '자막 크기': 'Subtitle Size', '작게': 'Small', '보통': 'Medium', '크게': 'Large',
       '언어': 'Language', '돌아가기': 'Back', '돌아가기 ·': 'Back ·',
-      /* ── 게임 업데이트 (mod_desktop: 설정의 버전 줄 · 처음 화면 알림 — PC · Android 앱) ── */
+      /* ── 게임 업데이트 (mod_desktop: 설정의 버전 줄 · 처음 화면 알림 — PC · Android · iPhone/iPad 앱) ── */
       '버전': 'Version', '업데이트 확인': 'Check for Updates', '지금 적용': 'Apply Now', '그래도 적용': 'Apply Anyway', '닫기': 'Close',
       '확인 중…': 'Checking…', '최신 버전입니다': 'You have the latest version',
       '확인 실패 — 인터넷 연결을 확인하세요': 'Check failed — please check your internet connection',
@@ -61,6 +61,7 @@
       [/^새 버전 (\S+) 준비됨$/, 'Version $1 is ready'],
       [/^새 버전 (\S+) 으로 업데이트했습니다$/, 'Updated to version $1'],
       [/^새 버전 (\S+) 은 앱을 새로 받아야 합니다$/, 'Version $1 needs a new app — get it from itch.io'],
+      [/^새 버전 (\S+) 은 App Store 에서 앱을 업데이트해야 합니다$/, 'Version $1 needs an app update — please update the app from the App Store'],
       [/^새 버전 (\S+) 이 나왔습니다 — 앱을 껐다 켜 주세요$/, 'Version $1 is out — please restart the app'],
       [/^새 버전 (\S+) 이 나왔습니다 — 새 APK 를 받아 주세요$/, 'Version $1 is out — please download the new APK'],
       [/^새 버전 (\S+) 이 나왔습니다 — itch\.io 에서 새 앱을 받아 주세요$/, 'Version $1 is out — please download the new app from itch.io'],

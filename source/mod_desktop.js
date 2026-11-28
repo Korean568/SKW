@@ -4,7 +4,8 @@
   const D = window.skwDesktop;
   if (D || G.params.has('desktop')) {
     // 브라우저판(itch.io HTML5 · web/web-shim.js, platform 'web'): "게임 종료" 없음 · 전체 화면은 되는 곳에서만(iPhone 안 됨) · F11 은 브라우저 몫
-    const web = !!(D && D.platform === 'web'), canQuit = !web, canFs = !web || !!D.canFullscreen;
+    // iPhone · iPad 앱(ios/SKW/Web/ios-shim.js, platform 'ios'): 앱은 스스로 끄지 않음(Apple 규칙) → "게임 종료" 없음 · 늘 전체 화면 → 전체 화면 줄 · F11 없음
+    const web = !!(D && D.platform === 'web'), ios = !!(D && D.platform === 'ios'), canQuit = !web && !ios, canFs = !web && !ios || !!(D && D.canFullscreen);
     const KEY = 'skw-desktop-settings', PKEY = 'skw-progress', TITLE = 'Second Korean Wars · 제 2차 한국전쟁';
     const ls = (k, v) => { try { if (v === undefined) return JSON.parse(localStorage.getItem(k)); localStorage.setItem(k, JSON.stringify(v)); } catch (e) { return null; } };
     // 설정: q 그래픽('auto' | 등급 이름 'Very Low'…'Ultra' — 예전 저장값 LOW/MEDIUM/HIGH 도 G.tierOf 로 읽음) · scale 렌더 배율(0 = 자동 동적 해상도, 50~100 수동) · fs 전체 화면 · vol 소리 · sens 마우스 감도 · sub 자막(s|m|l)
@@ -125,10 +126,12 @@
       save(); if (!input || k !== 'sc') sync(); else { ui.s.querySelector('[data-k=sc] output').textContent = scOut(v); ui.s.querySelector('[data-k=sc] button').classList.remove('on'); } // 밀면 바로 수동 (자동 표시를 끔)
     }
 
-    /* ── 게임 업데이트 표시 — 받는 일은 앱 껍데기가 한다 (PC main.js · Android MainActivity → skwDesktop.update) ──
+    /* ── 게임 업데이트 표시 — 받는 일은 앱 껍데기가 한다 (PC main.js · Android MainActivity · iOS GameViewController → skwDesktop.update) ──
        설정의 "버전" 줄 + 처음 화면 오른쪽 아래 작은 알림. 알림은 #ov 안에 두어 스토리 중에는 처음 화면과 함께 숨고(방해 안 함) 처음 화면에 돌아오면 보인다.
        옛 앱(update 없음): 게임이 직접 latest.json 을 보고 새 버전이 있으면 알려만 준다. 웹판(platform 'web') · ?desktop 은 아무것도 안 보임 */
     const UP = (!web && D && D.update) || null, ITCH = 'https://whgkwns.itch.io/second-korean-wars';
+    // App Store 의 이 앱 주소 — 앱을 올린 뒤 'https://apps.apple.com/app/id<번호>' 로 채운다. 비어 있으면 iPhone · iPad 앱에서는 스토어 버튼을 숨김 (itch.io 로 보내지 않음)
+    const APP_STORE = '', STORE = ios ? APP_STORE : ITCH, STORE_BTN = ios ? 'App Store ↗' : 'itch.io ↗';
     const oldApp = !UP && !web && !!D && /^(win32|darwin|linux|android)$/.test(D.platform);
     const FEED = ['https://raw.githubusercontent.com/Korean568/SKW/main/desktop/update/', 'https://korean568.github.io/SKW/desktop/update/'];
     const vn = v => String(v || '0').split('.').map(n => parseInt(n, 10) || 0);
@@ -138,7 +141,7 @@
     const shellOld = s => !!s && s.state === 'error' && /^minShell/.test(s.error || ''); // 새 게임이 이 앱보다 새 껍데기를 요구
     const uText = s => !s ? '' : ({
       checking: '확인 중…', downloading: `새 버전 ${uLab(s)} 받는 중…`, ready: `새 버전 ${uLab(s)} 준비됨`, latest: '최신 버전입니다',
-      error: shellOld(s) ? `새 버전 ${uLab(s)} 은 앱을 새로 받아야 합니다` : '확인 실패 — 인터넷 연결을 확인하세요',
+      error: shellOld(s) ? (ios ? `새 버전 ${uLab(s)} 은 App Store 에서 앱을 업데이트해야 합니다` : `새 버전 ${uLab(s)} 은 앱을 새로 받아야 합니다`) : '확인 실패 — 인터넷 연결을 확인하세요',
       old: D.platform === 'android' ? `새 버전 ${uLab(s)} 이 나왔습니다 — 새 APK 를 받아 주세요` : s.need ? `새 버전 ${uLab(s)} 이 나왔습니다 — itch.io 에서 새 앱을 받아 주세요` : `새 버전 ${uLab(s)} 이 나왔습니다 — 앱을 껐다 켜 주세요`,
     })[s.state] || '';
     const put = (e, t) => { if (e && e._t !== t) { e._t = t; e.textContent = t; } }; // 같은 글자면 다시 쓰지 않음
@@ -149,7 +152,7 @@
       put($('.ue'), st === 'error' && s.error && !shellOld(s) ? '(' + s.error + ')' : '');
       put($('[data-a=upapp]'), uask ? '그래도 적용' : '지금 적용');
       $('[data-a=upapp]').style.display = st === 'ready' ? '' : 'none';
-      $('[data-a=upitch]').style.display = st === 'old' || shellOld(s) ? '' : 'none';
+      $('[data-a=upitch]').style.display = (st === 'old' || shellOld(s)) && STORE ? '' : 'none';
       $('[data-a=upchk]').classList.toggle('busy', st === 'checking' || st === 'downloading');
       if (cur) { sel = items().indexOf(cur); sel < 0 && (sel = bk()); hi(); } // 버튼이 나타나거나 숨어도 고른 것 그대로 (숨으면 '돌아가기')
     }
@@ -169,7 +172,7 @@
       if (!v || v === uSeen || !(s.state === 'ready' || s.state === 'old' || shellOld(s))) return;
       uSeen = v;
       if (s.state === 'ready') toast([`새 버전 ${uLab(s)} 준비됨`], ['지금 적용', uApply]);
-      else toast(s.state === 'old' && !s.need && D.platform !== 'android' ? [uText(s), '그래도 안 바뀌면 itch.io 에서 새로 받아 주세요'] : [uText(s)], ['itch.io ↗', uItch]);
+      else toast(s.state === 'old' && !s.need && D.platform !== 'android' ? [uText(s), '그래도 안 바뀌면 itch.io 에서 새로 받아 주세요'] : [uText(s)], STORE ? [STORE_BTN, uItch] : null);
     };
     const uApplied = s => { // 이번 실행에서 새로 받은 게임으로 바뀌었으면 한 번 알림 (같은 버전은 다시 알리지 않음)
       const c = (s && s.current) || {}, v = c.version || G.VERSION;
@@ -197,11 +200,11 @@
       uask = 0;
       UP && quiet(UP.apply().then(ok => ok || UP.status().then(uSet)));
     }
-    function uItch() { D && quiet(D.openExternal(ITCH)); }
+    function uItch() { D && STORE && quiet(D.openExternal(STORE)); } // 새 앱 받기: PC · Android = itch.io, iOS = App Store (주소가 있을 때만)
 
     /* ── 입력 ── */
     addEventListener('keydown', e => {
-      if (e.code === 'F11' && !web) { e.preventDefault(); e.stopPropagation(); if (!e.repeat) fsGet().then(v => { cfg.fs = !v; save(); fsSet(cfg.fs); }); return; }
+      if (e.code === 'F11' && !web && !ios) { e.preventDefault(); e.stopPropagation(); if (!e.repeat) fsGet().then(v => { cfg.fs = !v; save(); fsSet(cfg.fs); }); return; }
       if (e.code === 'Escape' && (menu || story())) { // 타이틀(진행 중인 스토리 없음)에서는 아무 일 없음
         e.preventDefault(); e.stopPropagation();
         if (menu === 'set') back();
@@ -264,10 +267,10 @@ html.touch #ov .dkup{right:calc(5vw + var(--sr,0px));bottom:calc(28px + var(--sb
 <span>마우스 감도</span><div data-k=sens><input type=range min=.3 max=3 step=.1><output></output></div>
 <span>자막 크기</span><div data-k=sub><button data-v=s>작게</button><button data-v=m>보통</button><button data-v=l>크게</button></div>
 ${G.i18n ? '<span>언어</span><div data-k=lang><button data-v=ko data-i18n-skip>한국어</button><button data-v=en data-i18n-skip>English</button></div>' : ''}
-${UP || oldApp ? `<span>버전</span><div data-k=up><output data-i18n-skip></output><span class=us></span><span class=ue data-i18n-skip></span><button data-a=upchk>업데이트 확인</button><button data-a=upapp>지금 적용</button><button data-a=upitch>itch.io ↗</button></div>` : ''}
-</div><button class=bk data-a=back>돌아가기</button><div class=h><b>Esc</b> 돌아가기${web ? '' : ' · <b>F11</b> 전체 화면'}</div></div>`;
+${UP || oldApp ? `<span>버전</span><div data-k=up><output data-i18n-skip></output><span class=us></span><span class=ue data-i18n-skip></span><button data-a=upchk>업데이트 확인</button><button data-a=upapp>지금 적용</button><button data-a=upitch>${STORE_BTN}</button></div>` : ''}
+</div><button class=bk data-a=back>돌아가기</button><div class=h><b>Esc</b> 돌아가기${web || ios ? '' : ' · <b>F11</b> 전체 화면'}</div></div>`;
         ui = { root, p: root.querySelector('.p'), s: root.querySelector('.s'), st: root.querySelector('.st'), sub: G.el('style', {}, document.head) };
-        if (touch() || !canFs) { // 터치: 전체 화면 줄은 뜻이 없고(앱은 늘 전체 화면) 감도는 손가락 시점 감도 · 브라우저판: 전체 화면이 안 되는 곳(iPhone · 허락 없는 iframe)
+        if (touch() || !canFs) { // 터치: 전체 화면 줄은 뜻이 없고(앱은 늘 전체 화면) 감도는 손가락 시점 감도 · 브라우저판: 전체 화면이 안 되는 곳(iPhone · 허락 없는 iframe) · iOS 앱
           const f = root.querySelector('[data-k=fs]'); f.style.display = f.previousElementSibling.style.display = 'none';
         }
         if (touch()) root.querySelector('[data-k=sens]').previousElementSibling.textContent = '시점 감도';
@@ -299,7 +302,7 @@ ${UP || oldApp ? `<span>버전</span><div data-k=up><output data-i18n-skip></out
         if (sq && cfg.q !== sq.name) { cfg.q = sq.name; save(); }
         if (!G.params.get('q') && (cfg.q === 'auto' ? G.qManual : sq && (!G.qManual || sq.tier !== G.Q.tier))) quality(cfg.q);
         if (cfg.scale) scale();
-        if (cfg.fs !== null && D && !web && !touch()) fsSet(cfg.fs); // 브라우저는 사용자 입력 없이 전체 화면을 켤 수 없다
+        if (cfg.fs !== null && D && !web && !ios && !touch()) fsSet(cfg.fs); // 브라우저는 사용자 입력 없이 전체 화면을 켤 수 없다 (iOS 앱은 늘 전체 화면)
         vol();
       },
       onQuality(Q) { if (!G.params.get('q')) { cfg.q = G.qManual ? Q.name : 'auto'; save(); } menu === 'set' && sync(); }, // F2 · 성능 알약으로 바꾼 것도 기억

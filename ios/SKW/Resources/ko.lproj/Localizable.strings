@@ -1,0 +1,6 @@
+/* 앱이 직접 보여 주는 안내 (GameViewController.showNotice) — Android 의 values-ko/strings.xml 과 같은 글 */
+"load_title" = "게임을 불러오지 못했습니다";
+"load_body" = "앱 안의 게임 파일을 열 수 없습니다. 앱을 다시 설치해 주세요.";
+"crash_title" = "게임이 멈췄습니다";
+"crash_body" = "그래픽 처리 프로세스가 여러 번 연달아 멈췄습니다. 다른 앱을 닫고 다시 시도해 주세요. 계속 반복되면 이 기기의 메모리나 GPU 가 게임을 돌리기에 부족할 수 있습니다.";
+"btn_retry" = "다시 시도";

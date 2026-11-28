@@ -1,8 +1,28 @@
-# iOS 앱 (iPhone · iPad) — 임시: 러너 환경 알아보기 (곧 실제 빌드로 바뀜)
+# iPhone · iPad 앱 빌드 · 시험 (macOS 러너) — 자세한 설명: ios/README-ios.md
+#
+# build (늘):  스토리 게임을 소스에서 빌드해 앱에 넣고(ios/scripts/prepare-resources.js) XcodeGen 으로 프로젝트를 만든 뒤
+#   1) Simulator 용으로 빌드 · 자동 업데이트(Updater) 단위 시험 (XCTest, 가짜 서버)
+#   2) Simulator 연기 시험 (ios/scripts/smoke.sh): 앱을 설치해 켜고 보안 출처 · WebGPU · 다리 · 자동 업데이트 · localStorage 유지 ·
+#      WebGPU 가 없을 때의 안내 화면을 확인, 화면 사진은 로그에 base64 JPEG 로 (SKW-SCREENSHOT-BEGIN … END)
+#   3) 실제 기기(iphoneos)용 Release 빌드 — 서명 없이 (CODE_SIGNING_ALLOWED=NO, 컴파일되는지 확인용 · 설치는 안 됨)
+# testflight (선택): 수동 실행(Run workflow)이고, 시크릿 네 개(APPSTORE_KEY_ID · APPSTORE_ISSUER_ID · APPSTORE_KEY_P8_BASE64 ·
+#   APPLE_TEAM_ID)가 모두 있을 때만 — 자동 서명으로 보관(archive)해 TestFlight 에 올린다. 시크릿이 없으면 깨끗이 건너뜀.
+#   (Apple Developer 계정이 생기기 전에 쓴 것이라 아직 한 번도 돌려 보지 못했다)
+#
+# 러너: macos-26 (macOS 26 · Xcode 26.6 기본 · iOS 26.5 SDK · Simulator iOS 26.2/26.4/26.5 — 2026-11 확인). 앱의 최소 iOS 는 26.0 (WebGPU).
 name: iOS build
 
 on:
   workflow_dispatch:
+    inputs:
+      testflight:
+        description: "TestFlight 에 올리기 (App Store Connect 시크릿 네 개가 모두 있을 때만)"
+        type: boolean
+        default: true
+      build_number:
+        description: "CFBundleVersion(빌드 번호) 직접 지정. 비워 두면 내부 버전에서 계산 (1.6.0 → 10600). 같은 버전을 다시 올릴 때만"
+        type: string
+        default: ""
   push:
     branches: ['claude/**']
     paths:
@@ -13,33 +33,217 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
 jobs:
-  probe:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [macos-26, macos-15]
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
+  build:
+    runs-on: macos-26
+    timeout-minutes: 75
+    env:
+      SKW_BUILD_NUMBER: ${{ inputs.build_number }}
     steps:
-      - name: Environment
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+
+      - name: Tools
         run: |
-          sw_vers || true
-          uname -a
-          sysctl -n machdep.cpu.brand_string || true
-          ls -d /Applications/Xcode* || true
-          xcode-select -p || true
-          xcodebuild -version || true
-          xcodebuild -showsdks || true
-          xcrun simctl list runtimes || true
-          xcrun simctl list devicetypes | grep -E "iPhone|iPad" | head -40 || true
-          xcrun simctl list devices available | head -60 || true
-          brew --version || true
-          which xcodegen || echo "no xcodegen"
-          system_profiler SPDisplaysDataType || true
-          cat > /tmp/m.swift <<'EOF'
-          import Metal
-          let d = MTLCreateSystemDefaultDevice()
-          print("METAL:", d?.name ?? "none", d.map { "\($0.supportsFamily(.apple7)) \($0.supportsFamily(.mac2))" } ?? "")
+          sw_vers
+          xcodebuild -version
+          node --version
+          brew install xcodegen
+          xcodegen --version
+
+      # 게임 빌드에 쓰는 esbuild 는 PC판 · Android 와 같은 것(desktop/node_modules). Electron 실행 파일은 받지 않는다
+      - name: Install game build tools
+        working-directory: desktop
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+        run: npm ci
+
+      - name: Prepare resources (story game · icon · version)
+        run: node ios/scripts/prepare-resources.js
+
+      - name: Generate Xcode project (XcodeGen)
+        working-directory: ios
+        run: xcodegen generate
+
+      - name: Simulator
+        id: sim
+        run: |
+          # 가장 새 iOS 26 이상 런타임에 iPhone 17 Pro (없으면 아무 iPhone)
+          RT=$(xcrun simctl list runtimes -j | python3 -c '
+          import json,sys
+          rs=[r for r in json.load(sys.stdin)["runtimes"] if r.get("isAvailable") and r.get("platform","iOS")=="iOS" and int(r["version"].split(".")[0])>=26]
+          rs.sort(key=lambda r:[int(x) for x in r["version"].split(".")])
+          print(rs[-1]["identifier"] if rs else "")')
+          [ -n "$RT" ] || { echo "::error::iOS 26 이상 Simulator 런타임이 없습니다"; xcrun simctl list runtimes; exit 1; }
+          DT=com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro
+          xcrun simctl list devicetypes | grep -q "$DT" || DT=$(xcrun simctl list devicetypes -j | python3 -c 'import json,sys;print([d["identifier"] for d in json.load(sys.stdin)["devicetypes"] if "iPhone" in d["name"]][-1])')
+          UDID=$(xcrun simctl create skw-smoke "$DT" "$RT")
+          echo "Simulator: $DT · $RT · $UDID"
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+
+      - name: Build for testing (Simulator, Debug)
+        working-directory: ios
+        run: |
+          xcodebuild build-for-testing -project SecondKoreanWars.xcodeproj -scheme SecondKoreanWars -configuration Debug \
+            -destination "id=${{ steps.sim.outputs.udid }}" -derivedDataPath ../build/dd -quiet
+
+      - name: Unit tests (Updater, XCTest)
+        working-directory: ios
+        env:
+          TEST_RUNNER_SKW_REPO: ${{ github.workspace }}
+        run: |
+          xcodebuild test-without-building -project SecondKoreanWars.xcodeproj -scheme SecondKoreanWars -configuration Debug \
+            -destination "id=${{ steps.sim.outputs.udid }}" -derivedDataPath ../build/dd -resultBundlePath ../build/unit-tests.xcresult 2>&1 \
+            | grep -E "Test (Suite|Case)|error:|failed|passed|skipped|Executed|\*\* TEST" | grep -v "^\s*$"
+
+      - name: Simulator smoke test
+        run: bash ios/scripts/smoke.sh "${{ steps.sim.outputs.udid }}" build/dd/Build/Products/Debug-iphonesimulator/SecondKoreanWars.app build/smoke
+
+      - name: Device build (iphoneos, Release, unsigned)
+        working-directory: ios
+        run: |
+          xcodebuild build -project SecondKoreanWars.xcodeproj -scheme SecondKoreanWars -configuration Release \
+            -destination 'generic/platform=iOS' -derivedDataPath ../build/dd-device CODE_SIGNING_ALLOWED=NO -quiet
+          APP=../build/dd-device/Build/Products/Release-iphoneos/SecondKoreanWars.app
+          lipo -info "$APP/SecondKoreanWars"
+          for k in CFBundleIdentifier CFBundleDisplayName CFBundleShortVersionString CFBundleVersion MinimumOSVersion SKWShellVersion SKWAutoUpdate UIDeviceFamily ITSAppUsesNonExemptEncryption UIRequiresFullScreen; do
+            printf '%-32s %s\n' "$k" "$(/usr/libexec/PlistBuddy -c "Print :$k" "$APP/Info.plist" 2>&1 | tr '\n' ' ')"
+          done
+          plutil -p "$APP/ko.lproj/InfoPlist.strings" || true
+          ls -l "$APP/Game" "$APP/ios-shim.js"
+          cmp "$APP/Game/index.html" SKW/Game/index.html && echo "Game/index.html 이 앱에 들어 있음"
+          du -sh "$APP"
+          mkdir -p ../build/out && (cd "$(dirname "$APP")" && zip -qry "$GITHUB_WORKSPACE/build/out/SecondKoreanWars-iphoneos-unsigned.zip" SecondKoreanWars.app)
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: second-korean-wars-ios
+          if-no-files-found: ignore
+          path: |
+            build/out/*.zip
+            build/smoke/*.json
+            build/smoke/*.jpg
+            build/smoke/console-*.log
+
+  # TestFlight 시크릿이 있는지 (수동 실행일 때만 본다). 없으면 testflight 는 건너뜀
+  gate:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    outputs:
+      ok: ${{ steps.g.outputs.ok }}
+    steps:
+      - id: g
+        env:
+          K1: ${{ secrets.APPSTORE_KEY_ID }}
+          K2: ${{ secrets.APPSTORE_ISSUER_ID }}
+          K3: ${{ secrets.APPSTORE_KEY_P8_BASE64 }}
+          K4: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [ -n "$K1" ] && [ -n "$K2" ] && [ -n "$K3" ] && [ -n "$K4" ]; then echo "ok=true" >> "$GITHUB_OUTPUT"
+          else echo "ok=false" >> "$GITHUB_OUTPUT"; echo "App Store Connect 시크릿이 모두 있지 않아 TestFlight 업로드를 건너뜁니다 (ios/README-ios.md 4번)."; fi
+
+  # 자동 서명(App Store Connect API 키)으로 보관 → TestFlight 업로드. 아직 시험해 보지 못함 (계정이 생기면 첫 실행에서 확인)
+  testflight:
+    needs: [build, gate]
+    if: needs.gate.outputs.ok == 'true' && inputs.testflight
+    runs-on: macos-26
+    timeout-minutes: 60
+    env:
+      SKW_BUILD_NUMBER: ${{ inputs.build_number }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+
+      - name: Tools
+        run: |
+          xcodebuild -version
+          brew install xcodegen
+
+      - name: Install game build tools
+        working-directory: desktop
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+        run: npm ci
+
+      - name: Prepare resources and project
+        run: |
+          node ios/scripts/prepare-resources.js
+          cd ios && xcodegen generate
+
+      - name: App Store Connect API key
+        env:
+          APPSTORE_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
+          APPSTORE_KEY_P8_BASE64: ${{ secrets.APPSTORE_KEY_P8_BASE64 }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/asc" && chmod 700 "$RUNNER_TEMP/asc"
+          KEY="$RUNNER_TEMP/asc/AuthKey_$APPSTORE_KEY_ID.p8"
+          printf '%s' "$APPSTORE_KEY_P8_BASE64" | base64 --decode > "$KEY" 2>/dev/null || true
+          chmod 600 "$KEY"
+          if ! grep -q "BEGIN PRIVATE KEY" "$KEY"; then
+            rm -f "$KEY"; echo "::error::APPSTORE_KEY_P8_BASE64 를 풀 수 없습니다 (.p8 파일 전체를 base64 로 바꾼 글자인지 확인)"; exit 1
+          fi
+          echo "ASC_KEY_PATH=$KEY" >> "$GITHUB_ENV"
+
+      - name: Archive (automatic signing)
+        working-directory: ios
+        env:
+          APPSTORE_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
+          APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          xcodebuild archive -project SecondKoreanWars.xcodeproj -scheme SecondKoreanWars -configuration Release \
+            -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/SecondKoreanWars.xcarchive" \
+            -allowProvisioningUpdates -authenticationKeyPath "$ASC_KEY_PATH" \
+            -authenticationKeyID "$APPSTORE_KEY_ID" -authenticationKeyIssuerID "$APPSTORE_ISSUER_ID" \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" CODE_SIGN_STYLE=Automatic -quiet
+
+      - name: Upload to TestFlight
+        env:
+          APPSTORE_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
+          APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>upload</string>
+            <key>teamID</key><string>${APPLE_TEAM_ID}</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>uploadSymbols</key><true/>
+            <key>manageAppVersionAndBuildNumber</key><false/>
+          </dict>
+          </plist>
           EOF
-          swift /tmp/m.swift || true
+          xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/SecondKoreanWars.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" -exportPath "$RUNNER_TEMP/export" \
+            -allowProvisioningUpdates -authenticationKeyPath "$ASC_KEY_PATH" \
+            -authenticationKeyID "$APPSTORE_KEY_ID" -authenticationKeyIssuerID "$APPSTORE_ISSUER_ID"
+          echo "TestFlight 에 올렸습니다. App Store Connect → 앱 → TestFlight 에서 처리(수 분~수십 분)가 끝나면 시험할 수 있습니다."
+
+      - name: Remove key
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/asc" "$RUNNER_TEMP/ExportOptions.plist"

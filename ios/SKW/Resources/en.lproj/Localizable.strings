@@ -1,0 +1,6 @@
+/* Native notices of the iOS app (GameViewController.showNotice) */
+"load_title" = "The game could not be loaded";
+"load_body" = "The game files inside the app could not be opened. Please reinstall the app.";
+"crash_title" = "The game stopped";
+"crash_body" = "The graphics process stopped several times in a row. Close other apps and try again. If it keeps happening, this device may not have enough memory or GPU support for the game.";
+"btn_retry" = "Try again";

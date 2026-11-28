@@ -133,7 +133,7 @@ G.gpuTips = () => {
       '<b>PC</b>: a current <b>Chrome or Edge</b>; on a Mac also <b>Safari 26</b> or later (Firefox 141+ on Windows)'),
   };
   // iPhone · iPad: 카카오톡 · 인스타그램 등 앱 안의 브라우저(WKWebView)는 WebGPU 가 꺼져 있을 때가 많음 → Safari 로 열기
-  const inApp = os === 'ios' ? L('<li>카카오톡 등 다른 앱 안에서 열었다면 Safari 로 열어 주세요</li>', '<li>If you opened this inside another app (KakaoTalk, Instagram…), open it in Safari.</li>') : '';
+  const inApp = os === 'ios' && !(window.skwDesktop && window.skwDesktop.platform === 'ios') ? L('<li>카카오톡 등 다른 앱 안에서 열었다면 Safari 로 열어 주세요</li>', '<li>If you opened this inside another app (KakaoTalk, Instagram…), open it in Safari.</li>') : ''; // 이 게임의 iOS 앱 안에서는 뜻이 없음
   const pc = os === 'desktop' ? L('<li>브라우저 설정에서 <b>하드웨어 가속</b> 켜기 → 브라우저 재시작 · 그래픽 드라이버 업데이트 · 주소창 <code>chrome://gpu</code> 에서 WebGPU 상태 확인 (Linux Chrome 은 <code>chrome://flags/#enable-unsafe-webgpu</code>)</li>',
     '<li>Turn on <b>hardware acceleration</b> in the browser settings and restart it · update the graphics driver · check WebGPU at <code>chrome://gpu</code> (Linux Chrome: <code>chrome://flags/#enable-unsafe-webgpu</code>)</li>') : '';
   return `<p>${L('이 게임은 <b>WebGPU</b> 가 필요합니다.', 'This game needs <b>WebGPU</b>.')}</p><ul><li>${T[os]}</li>${inApp}${pc}${['ios', 'android', 'desktop'].filter(k => k !== os).map(k => `<li style="opacity:.7">${T[k]}</li>`).join('')}</ul>`;

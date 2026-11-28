@@ -1,0 +1,72 @@
+# XcodeGen 설정 — Xcode 프로젝트(SecondKoreanWars.xcodeproj)는 저장소에 없고 이 파일로 만든다:
+#   brew install xcodegen && node ios/scripts/prepare-resources.js && cd ios && xcodegen generate
+# (prepare-resources.js 가 먼저: 게임 파일 SKW/Game/ · 앱 아이콘 · Config/Version.xcconfig 를 만든다)
+name: SecondKoreanWars
+options:
+  deploymentTarget:
+    iOS: "26.0"            # WebGPU 가 iOS 26 부터 (Safari 26 · WKWebView)
+  developmentLanguage: en
+  createIntermediateGroups: true
+  groupSortPosition: top
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    IPHONEOS_DEPLOYMENT_TARGET: "26.0"
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    DEAD_CODE_STRIPPING: YES
+targets:
+  SecondKoreanWars:
+    type: application
+    platform: iOS
+    configFiles:
+      Debug: Config/Version.xcconfig       # MARKETING_VERSION (= skwLabel) · CURRENT_PROJECT_VERSION · SKW_SHELL_VERSION (= version)
+      Release: Config/Version.xcconfig
+    sources:
+      - path: SKW/App
+      - path: SKW/Resources
+      - path: SKW/Web
+        buildPhase: resources            # ios-shim.js (앱이 읽어 WKUserScript 로 넣음)
+      - path: SKW/Game
+        type: folder                     # 게임 index.html + version.json → 앱 안 Game/ 폴더 그대로
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.secondkoreanwars.game
+        PRODUCT_NAME: SecondKoreanWars
+        INFOPLIST_FILE: SKW/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        TARGETED_DEVICE_FAMILY: "1,2"    # iPhone + iPad
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS: NO
+        SUPPORTS_MACCATALYST: NO
+        SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: NO
+        SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD: NO
+        CODE_SIGN_STYLE: Automatic
+        ENABLE_PREVIEWS: NO
+        LOCALIZATION_PREFERS_STRING_CATALOGS: NO
+  SecondKoreanWarsTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: SKWTests
+      - path: SKW/App/Updater.swift      # 앱 없이(호스트 없음) Updater 만 컴파일해 시험한다
+        group: SKWTests
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.secondkoreanwars.game.tests
+        GENERATE_INFOPLIST_FILE: YES
+        TARGETED_DEVICE_FAMILY: "1,2"
+        CODE_SIGN_STYLE: Automatic
+schemes:
+  SecondKoreanWars:
+    build:
+      targets:
+        SecondKoreanWars: all
+        SecondKoreanWarsTests: [test]
+    test:
+      config: Debug
+      gatherCoverageData: false
+      targets:
+        - SecondKoreanWarsTests
+    archive:
+      config: Release

@@ -1,0 +1,2 @@
+/* 홈 화면 아이콘 아래 이름 (기기 언어가 한국어일 때) — Android 의 values-ko/strings.xml app_name 과 같음 */
+"CFBundleDisplayName" = "제 2차 한국전쟁";
