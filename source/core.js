@@ -124,7 +124,17 @@ G.fatal = (title, html, detail) => {
 };
 // WebGPU 가 없을 때의 안내: 지금 기기에 맞는 줄을 맨 위(굵게), 나머지 기기는 아래 (짧게)
 G.gpuTips = () => {
-  const L = G.L, os = G.os, T = {
+  const L = G.L, os = G.os;
+  // 이 게임의 iPhone · iPad 앱(ios/SKW/Web/ios-shim.js, platform 'ios') 안: 그 앱에 맞는 안내만. Safari · 다른 기기 · 다른 스토어 이야기는
+  // 앱 안에서는 뜻이 없고 App Store 심사 지침 2.3.10(다른 모바일 플랫폼 · 앱 마켓 이름 금지)에도 어긋난다
+  if (window.skwDesktop && window.skwDesktop.platform === 'ios') return `<p>${L('이 게임은 <b>WebGPU</b> 가 필요합니다.', 'This game needs <b>WebGPU</b>.')}</p><ul>`
+    + L('<li><b>iPhone · iPad</b>: iOS / iPadOS <b>26 이상</b>이 필요합니다 (설정 › 일반 › 소프트웨어 업데이트)</li>'
+      + '<li>차단 모드(Lockdown Mode)를 켰다면 이 앱을 예외로 두세요 (설정 › 개인정보 보호 및 보안 › 차단 모드 › 웹 브라우징 구성). 저전력 모드에서는 느려질 수 있습니다</li>'
+      + '<li>다른 앱을 닫고 아래 <b>다시 시작</b>을 눌러 보세요. 그래도 안 되면 이 기기에서는 게임을 실행할 수 없습니다</li>',
+      '<li><b>iPhone · iPad</b>: needs iOS / iPadOS <b>26 or later</b> (Settings › General › Software Update)</li>'
+      + '<li>If Lockdown Mode is on, exclude this app (Settings › Privacy &amp; Security › Lockdown Mode › Configure Web Browsing). Low Power Mode may slow the game down</li>'
+      + '<li>Close other apps and tap <b>Reload</b> below. If it still does not work, this device cannot run the game</li>') + '</ul>';
+  const T = {
     ios: L('<b>iPhone · iPad</b>: iOS / iPadOS <b>26 이상</b>의 Safari (설정 › 일반 › 소프트웨어 업데이트). 저전력 모드에서는 느려질 수 있고, 차단 모드(Lockdown Mode)에서는 WebGPU 가 꺼집니다.',
       '<b>iPhone · iPad</b>: Safari on iOS / iPadOS <b>26 or later</b> (Settings › General › Software Update). Low Power Mode may slow it down; Lockdown Mode turns WebGPU off.'),
     android: L('<b>Android</b>: Android <b>12 이상</b> + 최신 Chrome (Play 스토어에서 Chrome · Android System WebView 업데이트)',
@@ -133,7 +143,7 @@ G.gpuTips = () => {
       '<b>PC</b>: a current <b>Chrome or Edge</b>; on a Mac also <b>Safari 26</b> or later (Firefox 141+ on Windows)'),
   };
   // iPhone · iPad: 카카오톡 · 인스타그램 등 앱 안의 브라우저(WKWebView)는 WebGPU 가 꺼져 있을 때가 많음 → Safari 로 열기
-  const inApp = os === 'ios' && !(window.skwDesktop && window.skwDesktop.platform === 'ios') ? L('<li>카카오톡 등 다른 앱 안에서 열었다면 Safari 로 열어 주세요</li>', '<li>If you opened this inside another app (KakaoTalk, Instagram…), open it in Safari.</li>') : ''; // 이 게임의 iOS 앱 안에서는 뜻이 없음
+  const inApp = os === 'ios' ? L('<li>카카오톡 등 다른 앱 안에서 열었다면 Safari 로 열어 주세요</li>', '<li>If you opened this inside another app (KakaoTalk, Instagram…), open it in Safari.</li>') : '';
   const pc = os === 'desktop' ? L('<li>브라우저 설정에서 <b>하드웨어 가속</b> 켜기 → 브라우저 재시작 · 그래픽 드라이버 업데이트 · 주소창 <code>chrome://gpu</code> 에서 WebGPU 상태 확인 (Linux Chrome 은 <code>chrome://flags/#enable-unsafe-webgpu</code>)</li>',
     '<li>Turn on <b>hardware acceleration</b> in the browser settings and restart it · update the graphics driver · check WebGPU at <code>chrome://gpu</code> (Linux Chrome: <code>chrome://flags/#enable-unsafe-webgpu</code>)</li>') : '';
   return `<p>${L('이 게임은 <b>WebGPU</b> 가 필요합니다.', 'This game needs <b>WebGPU</b>.')}</p><ul><li>${T[os]}</li>${inApp}${pc}${['ios', 'android', 'desktop'].filter(k => k !== os).map(k => `<li style="opacity:.7">${T[k]}</li>`).join('')}</ul>`;

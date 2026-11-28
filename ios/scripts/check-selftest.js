@@ -14,6 +14,10 @@ const quick = process.argv.includes('--quick'); // main 만 (다른 기기에서
 const read = (n) => { try { return JSON.parse(fs.readFileSync(path.join(dir, n + '.json'), 'utf8')); } catch (e) { return null; } };
 const R = { main: read('main'), relaunch: read('relaunch'), nogpu: read('nogpu'), update: read('update'), file: read('file') };
 let bad = 0;
+// iOS 앱 안의 "WebGPU 없음" 안내: 이 앱에 맞는 줄만 (다른 기기 · 브라우저 · 스토어 이름 없음 — App Store 심사 2.3.10). 이 가지에서 빌드한 게임일 때만 본다
+const OTHER = /Android|Play|Chrome|Edge|Firefox|Windows|\bPC\b|Safari|KakaoTalk|카카오톡|Instagram|안드로이드|크롬/;
+const tipsOK = (x) => !!x && typeof x.fatalTips === 'string' && /26/.test(x.fatalTips) && !OTHER.test(x.fatalTips);
+const near = (a, b) => typeof a === 'number' && typeof b === 'number' && Math.abs(a - b) <= 1;
 const say = (ok, what, detail) => {
   if (ok === null) console.log('INFO ' + what + (detail !== undefined ? ' — ' + JSON.stringify(detail) : ''));
   else { if (!ok) bad++; console.log((ok ? 'PASS ' : 'FAIL ') + what + (detail !== undefined ? ' — ' + JSON.stringify(detail) : '')); }
@@ -33,6 +37,12 @@ if (m) {
   if (gpuOK) say(m.screen === 'title' && m.ready && !m.dead, 'main: 어댑터 있음 → 처음 화면 (G.ready)', { screen: m.screen, ready: m.ready, dead: m.dead, frame: m.frame });
   else say(m.screen === 'unsupported' && /WebGPU|GPU/.test(m.fatal || ''), 'main: 어댑터 없음 → 게임의 안내 화면', { screen: m.screen, fatal: m.fatal });
   say(m.platform === 'ios', "main: skwDesktop.platform 'ios'", m.platform);
+  if (n.served && n.served.downloaded === false && m.screen === 'unsupported')
+    say(tipsOK(m), 'main: 안내 화면은 iOS 앱에 맞는 줄만 (다른 기기 · Safari · 스토어 이름 없음)', m.fatalTips);
+  // 안전 영역: 페이지가 받는 env(safe-area-inset-*) = 앱의 창 safeAreaInsets (노치 · Dynamic Island · 홈 표시줄 쪽 여백 — 게임의 --sl/--sr/--sb)
+  const css = m.safeAreaCss || {}, win = n.safeAreaInsets || {};
+  say(['top', 'left', 'bottom', 'right'].every((k) => near(css[k], win[k])) && (n.model !== 'iPhone' || (css.left > 0 && css.right > 0)) && /viewport-fit=cover/.test(m.viewportMeta || ''),
+    '앱: 페이지의 env(safe-area-inset-*) 가 창의 안전 영역과 같음' + (n.model === 'iPhone' ? ' (iPhone 가로: 좌우 > 0)' : ''), { css, window: win, web: n.webSafeAreaInsets, err: m.safeAreaError, meta: m.viewportMeta });
   say(m.shell === n.shellVersion && m.gameVersion === m.gVersion && m.label === m.gLabel && !!m.label, 'main: 다리의 번호 (앱 · 게임 · 보이는 번호)', { shell: m.shell, game: m.gameVersion, label: m.label, G: [m.gVersion, m.gLabel] });
   say(m.pauseHook === true, 'main: window.__skwIOS (일시정지 고리)', m.audio);
   const us = m.updateStatus || {}, uc = m.updateCheck || {};
@@ -44,6 +54,7 @@ if (m) {
     say(vr.shown && vr.version === m.label && vr.buttons && vr.buttons.some((b) => /업데이트 확인|Check for Updates/.test(b)), '설정: 버전 줄 (업데이트 확인)', vr);
     say(m.pauseQuitItem === false && Array.isArray(m.titleButtons) && !m.titleButtons.some((b) => /게임 종료|Quit|Exit/i.test(b)), "설정 · 처음 화면: '게임 종료' 없음", m.titleButtons);
     say(m.fullscreenRowShown === false, '설정: 전체 화면 줄 숨김', m.fullscreenRowShown);
+    say(/개인정보처리방침|Privacy Policy/.test(m.privacyButton || ''), '설정: 개인정보처리방침 링크 (App Store 지침 5.1.1)', m.privacyButton);
     say(m.menuClosed === true && !m.settingsError, '설정: 열고 닫기', m.settingsError);
   } else {
     say(null, '설정 화면 시험은 건너뜀 (WebGPU 가 없어 게임이 안내 화면에서 멈춤 — 같은 시험을 PC 의 Playwright 로 함)');
@@ -80,6 +91,8 @@ const g = R.nogpu;
 say(!!g && g.gpuType === 'undefined' && g.screen === 'unsupported' && /WebGPU/.test(g.fatal || '') && g.isSecureContext === true,
   'nogpu: WebGPU 가 없는 기기 → 게임의 "WebGPU 를 사용할 수 없습니다" 안내', g && { screen: g.screen, fatal: g.fatal });
 say(!!g && g.platform === 'ios' && g.hasUpdate === true, 'nogpu: 안내 화면에서도 다리는 그대로', g && g.platform);
+if (g && g.native && g.native.served && g.native.served.downloaded === false) say(tipsOK(g), 'nogpu: 안내 화면은 iOS 앱에 맞는 줄만 (다른 기기 · Safari · 스토어 이름 없음)', g.fatalTips);
+else say(null, 'nogpu: 받은 게임을 띄워 안내 글 확인은 건너뜀', g && g.native && g.native.served);
 
 const u = R.update;
 if (u) {

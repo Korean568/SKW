@@ -23,6 +23,7 @@
       '자막 크기': 'Subtitle Size', '작게': 'Small', '보통': 'Medium', '크게': 'Large',
       '언어': 'Language', '돌아가기': 'Back', '돌아가기 ·': 'Back ·',
       /* ── 게임 업데이트 (mod_desktop: 설정의 버전 줄 · 처음 화면 알림 — PC · Android · iPhone/iPad 앱) ── */
+      '개인정보': 'Privacy', '개인정보처리방침 ↗': 'Privacy Policy ↗', // iPhone · iPad 앱의 설정 (App Store 지침 5.1.1)
       '버전': 'Version', '업데이트 확인': 'Check for Updates', '지금 적용': 'Apply Now', '그래도 적용': 'Apply Anyway', '닫기': 'Close',
       '확인 중…': 'Checking…', '최신 버전입니다': 'You have the latest version',
       '확인 실패 — 인터넷 연결을 확인하세요': 'Check failed — please check your internet connection',

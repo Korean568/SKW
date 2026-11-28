@@ -29,8 +29,9 @@ GitHub 저장소 → **Actions** → 왼쪽 **iOS build**. `ios/` 를 고쳐 `cl
 
 1. 게임을 소스에서 빌드해 앱에 넣고 (`ios/scripts/prepare-resources.js` — PC판 · Android 와 똑같은 게임 파일), 앱 아이콘 · 버전 번호를 만들고, XcodeGen 으로 Xcode 프로젝트를 만듭니다.
 2. **자동 업데이트 단위 시험** (XCTest, 가짜 서버): 새 버전 → 받아서 준비됨 · 가장 높은 버전을 고름 · 막히거나 실패하거나 옛것을 주는 주소가 있어도 늦어지지 않음 · sha256 이 틀리면 아무것도 저장하지 않음 · 앱이 너무 옛것(minShell)이면 받지 않음 · 낮은 버전으로 내려가지 않음 · 확인은 한 번에 하나 · 기록 200줄 · 버전 비교(1.10.0 > 1.9.0) · Node 가 만든 gzip 과 저장소의 진짜 `desktop/update/game.gz` 풀기.
-3. **Simulator 연기 시험** (`ios/scripts/smoke.sh`): 가상 iPhone 17 Pro 에 설치해 다섯 번 켜 보고(`--skw-selftest` — 보통 실행에서는 아무 일도 안 함), 가상 iPad Pro 13형에서도 한 번 켜서 결과를 판정합니다 (`ios/scripts/check-selftest.js`) — 아래 표. 화면 사진은 실행 기록 맨 끝에 작은 JPEG(base64)로 찍히고, 요약(단위 시험 · 판정 · WebGPU 진단)이 그 뒤에 나옵니다.
-4. **실제 기기용(iphoneos) 빌드** — 서명 없이 컴파일만 (서명이 없어서 설치는 안 됩니다).
+3. **Simulator 연기 시험** (`ios/scripts/smoke.sh`): 가상 iPhone 17 Pro 에 설치해 다섯 번 켜 보고(`--skw-selftest` — 보통 실행에서는 아무 일도 안 함), 가상 iPad Pro 13형에서도 한 번 켜서 결과를 판정합니다 (`ios/scripts/check-selftest.js`) — 아래 표. 처음 세 번(main · relaunch · nogpu)은 `--skw-selftest-bundled` 로 켜서, 피드에 더 새 게임이 있어도 **이 가지에서 빌드해 앱에 넣은 게임**을 시험합니다 (받아서 바꾸는 길은 네 번째 update 가 봅니다). 화면 사진은 실행 기록 맨 끝에 작은 JPEG(base64)로 찍히고, 요약(단위 시험 · 판정 · WebGPU 진단)이 그 뒤에 나옵니다.
+4. **실제 기기용(iphoneos) 빌드** — 서명 없이 컴파일만 (서명이 없어서 설치는 안 됩니다). 앱 안에 게임 · 다리 스크립트 · 개인정보 보호 매니페스트(`PrivacyInfo.xcprivacy`)가 있는지, 매니페스트에 없는 "이유가 필요한 API"(systemUptime · 파일 시각)를 쓰지 않는지 확인하고, 하나라도 틀리면 실패합니다.
+   (`source/` · `desktop/package.json` · 게임 빌드 도구를 고쳐도 돕니다 — 앱에 게임 전체가 들어가므로)
 
 결과 파일: 실행 기록 맨 아래 **Artifacts → second-korean-wars-ios** (서명 없는 앱 zip · 시험 결과 JSON · 화면 사진 · 콘솔 기록).
 
@@ -93,13 +94,16 @@ Apple Developer Program 없이도 **Mac + 무료 Apple ID** 로 내 iPhone 에 �
 
 1. https://developer.apple.com/programs/ → **Enroll**. Apple ID 는 **이중 인증**이 켜져 있어야 합니다.
 2. 유형 **개인(Individual)**. 가입비 **연 99달러** (해마다 갱신 — 끊기면 App Store 에서 앱이 내려갑니다).
-3. **가입자는 만 18세 이상의 성인이어야 합니다.** 미성년자라면 **보호자 이름 · 보호자 Apple ID 로 가입**해야 하고, App Store 에 판매자 이름으로 **보호자의 실명**이 보입니다.
+3. **가입자는 사는 나라의 성년이어야 합니다 (한국은 만 19세 — 민법 제4조).** 그보다 어리면 **보호자가 보호자의 Apple 계정으로 가입**하고 그 계정을 함께 씁니다 (Apple 안내: https://developer.apple.com/programs/enroll/ 의 "legal age of majority in your region"). 그때 App Store 의 판매자 이름은 **보호자의 실명**입니다.
 4. 승인까지 며칠 걸릴 수 있습니다.
 
 ### 4-2. 번들 ID 와 앱 등록 (한 번만)
 
 1. https://developer.apple.com/account → **Certificates, Identifiers & Profiles** → **Identifiers** → **+** → **App IDs** → **App** → Bundle ID **Explicit** 에 `com.secondkoreanwars.game` → 기능(Capabilities)은 아무것도 켜지 않음 → **Register**.
-2. https://appstoreconnect.apple.com → **앱** → **+** → **신규 앱**: 플랫폼 **iOS**, 이름 `제 2차 한국전쟁` (App Store 전체에서 겹치지 않아야 함 — 이미 있으면 `Second Korean Wars` 등), 기본 언어 **한국어**, 번들 ID `com.secondkoreanwars.game`, SKU `skw-ios` (아무 글자), 사용자 액세스 **전체 액세스**.
+2. **기기 하나 등록 (첫 TestFlight 실행 전에 꼭)**: 같은 화면의 **Devices** → **+** → 플랫폼 iOS, 이름(아무 글자), **기기 ID(UDID)** 를 넣고 **Register**.
+   CI 의 자동 서명은 보관(archive)할 때 개발용 프로비저닝 프로파일을 먼저 만드는데, 팀에 등록된 기기가 하나도 없으면 "Your team has no devices from which to generate a provisioning profile" 로 실패합니다 (제 기억에 따른 것이고 계정이 없어 직접 확인하지 못함 — 4-4 의 첫 실행에서 확인).
+   UDID 찾기: iPhone 을 Mac 에 연결 → Finder 에서 iPhone 을 고르고 기기 이름 아래 글자를 눌러 **UDID** 가 보이면 오른쪽 클릭 › 복사. Windows 는 **Apple 기기**(Apple Devices) 앱에서 같은 방법입니다.
+3. https://appstoreconnect.apple.com → **앱** → **+** → **신규 앱**: 플랫폼 **iOS**, 이름 `제 2차 한국전쟁` (App Store 전체에서 겹치지 않아야 함 — 이미 있으면 `Second Korean Wars` 등), 기본 언어 **한국어**, 번들 ID `com.secondkoreanwars.game`, SKU `skw-ios` (아무 글자), 사용자 액세스 **전체 액세스**.
 
 ### 4-3. App Store Connect API 키 → GitHub 시크릿 네 개 (한 번만)
 
@@ -138,22 +142,24 @@ App Store Connect → 앱 → **iOS 앱 › 버전** 화면:
 |---|---|
 | 스크린샷 | 가로 화면 스크린샷 — **iPhone 6.9형** 과 **iPad 13형** 크기가 필요합니다. 말씀해 주시면 게임 화면을 렌더해 만들어 드립니다 |
 | 이름 · 부제 · 설명 · 키워드 | `ios/store/ko/` (한국어) · `ios/store/en/` (영어, **현지화** 에서 English 추가) |
-| 지원 URL | `https://whgkwns.itch.io/second-korean-wars` |
-| 개인정보 처리방침 URL | `https://korean568.github.io/SKW/privacy.html` (iPhone 앱 내용 포함) |
+| 지원 URL | `https://korean568.github.io/SKW/support.html` (저장소 맨 위 `support.html` — 문의 = GitHub 이슈. 이메일로 받고 싶으면 그 파일에 주소를 더해 주세요). 다른 앱 장터(itch.io)를 가리키지 않습니다 (지침 1.5 · 2.3.10) |
+| 개인정보 처리방침 URL | `https://korean568.github.io/SKW/privacy.html` (iPhone 앱 내용 포함). 앱 안에도 링크가 있습니다: 게임의 **설정 › 개인정보 › 개인정보처리방침 ↗** (지침 5.1.1(i)) |
 | **앱 개인정보 보호** | **데이터를 수집하지 않음** (계정 · 광고 · 분석 없음. 자동 업데이트는 GitHub 의 공개 파일을 받기만 함) |
 | **연령 등급** | 설문에 **사실대로**: 전쟁 배경의 **사실적 폭력**(총격전 · 사망 · 처형 장면) 잦음/강함, **가려서 표기한 비속어** 드묾. 성적 내용 · 도박 · 약물 · 이용자 간 대화 · 구매 없음. 높은 연령 등급(16+ 또는 18+)이 나올 것으로 예상합니다 |
 | 카테고리 | **게임 › 액션** (보조: 게임 › 롤플레잉 또는 비워 둠) |
 | 가격 | 무료 |
 | 수출 규정 | 앱에 이미 "아니요"(비면제 암호화 없음)로 들어 있음 |
 | 앱 심사 정보 › 메모 | `ios/store/review-notes.txt` 의 영어 글을 그대로 붙여 넣기 (로그인 없음 · 오프라인 동작 · 자동 업데이트 설명) |
+| 개인정보 보호 매니페스트 | 이미 앱에 들어 있음 (`ios/SKW/Resources/PrivacyInfo.xcprivacy` — 추적 없음 · 수집 없음 · 이유가 필요한 API 는 "부팅 뒤 흐른 시간" 하나, 이유 35F9.1 = 앱 안의 시간 간격 재기). 없으면 App Store Connect 가 빌드를 거절합니다(ITMS-91053). CI 의 기기용 빌드가 앱 안에 있는지 확인합니다 |
 
-> **한국 등급 주의.** 한국 App Store 에 게임을 내려면 등급분류가 필요합니다. App Store Connect 의 연령 등급 설문과 한국 등급(게임물관리위원회) 사이의 관계는 제가 확인하지 못했습니다. 등급 화면의 안내를 따르시고, 막히면 캡처해 보내 주세요.
+> **한국 등급.** 게임물관리위원회(GRAC) 등급분류를 따로 받을 필요는 없습니다. Apple 이 연령 등급 설문의 답으로 한국 App Store 용 등급(전체 · 12+ · 15+ · 19+)을 스스로 정합니다 (게임 · 엔터테인먼트 카테고리). 이 게임은 **19+** 가 나올 가능성이 큽니다. GRAC 등급을 따로 받은 경우에만, 다음 버전 제출 때 연령 등급 화면의 **Override › Korea, Republic of** 에 GRAC 등급분류번호(RCN)를 넣어 바꿀 수 있습니다.
+> 출처: Apple Developer 소식 "Updates to age ratings for the Republic of Korea" (2026-08-12) https://developer.apple.com/news/?id=oj3r9pvw
 
 ### 4-6. 심사에서 걸릴 수 있는 것 (미리 알아 두기)
 
 | 가이드라인 | 걱정 | 대비 |
 |---|---|---|
-| **2.5.2** 앱은 스스로 완결되어야 하고, 기능을 바꾸는 코드를 받아 실행하면 안 됨 | 자동 업데이트가 게임(HTML · JavaScript)을 받는다 | 규칙에 "WebKit(WKWebView) 이 실행하는 코드는 앱의 주된 목적을 바꾸지 않으면 허용" 이라는 예외가 있고, 이 앱은 그 경우입니다(같은 게임의 새 버전만, sha256 확인). 심사에서 문제 삼으면 **`ios/SKW/Info.plist` 의 `SKWAutoUpdate` 를 `<false/>` 로 바꿔** 다시 올리면 코드 수정 없이 자동 업데이트가 꺼집니다 (그때는 게임 내용도 App Store 업데이트로만 바뀝니다) |
+| **2.5.2** 앱은 스스로 완결되어야 하고, 기능을 바꾸는 코드를 받아 실행하면 안 됨 | 자동 업데이트가 게임(HTML · JavaScript)을 받는다 | 2.5.2 자체에는 예외가 없습니다. 근거는 **Apple Developer Program 사용권 계약(DPLA) 3.3.1(B) Executable Code** 입니다: 받은 **해석되는 코드(interpreted code)** 는 (a) 앱의 주된 목적을 바꾸지 않고 (b) 서명 · 샌드박스 등 보안을 우회하지 않고 (c) 다른 앱의 장터를 만들지 않으면 허용 (2026-11-28 확인). 이 앱이 받는 것은 같은 게임의 새 버전뿐이고, 고정된 개발자 주소(GitHub)에서만, SHA-256 확인 뒤 WebKit 안에서만 실행합니다. 심사 메모(`ios/store/review-notes.txt`)도 2.5.2 가 아니라 이 조항을 듭니다. 4.7(미니 앱 · 미니 게임)은 남의 게임을 모아 파는 앱용이라 들지 않습니다. 심사에서 문제 삼으면 **`ios/SKW/Info.plist` 의 `SKWAutoUpdate` 를 `<false/>` 로 바꿔** 다시 올리면 코드 수정 없이 자동 업데이트가 꺼집니다 (그때는 게임 내용도 App Store 업데이트로만 바뀝니다) |
 | **4.2** 최소 기능 (웹사이트를 감싼 것뿐인 앱) | 화면이 WKWebView 하나 | 웹사이트를 띄우는 것이 아니라 게임 전체가 앱 안에 들어 있고 인터넷 없이 동작, 가로 고정 · 전체 화면 · 백그라운드 일시정지 · 화면 꺼짐 방지 · 자체 업데이트 등 앱 기능이 있습니다. 그래도 심사자의 판단이라 반려될 수 있습니다 |
 | **1.1** 불쾌한 콘텐츠 — 게임 속 '적' 이 실제 국가 · 정부만을 겨냥하면 안 된다는 조항 | 적이 북한군 | 이야기는 남과 북 양쪽 시점이고 플레이어가 북한군 병사로도 진행합니다 (심사 메모에 적어 둠). 그래도 반려되면 사유를 보내 주세요 |
 | 연령 등급 | 처형 장면 · 사실적 폭력 | 설문에 사실대로 답하면 높은 등급이 나오고, 그것으로 괜찮습니다 |
@@ -162,7 +168,7 @@ App Store Connect → 앱 → **iOS 앱 › 버전** 화면:
 
 PC판 · Android 와 **같은 업데이트 파일**(`desktop/update/latest.json` + `game.gz`, `cd desktop && npm run publish-update`)과 **같은 규칙**입니다. 새 버전을 낼 때 iPhone 을 위해 따로 할 일은 없습니다.
 
-- **언제 확인하나**: 앱을 켤 때 · 앞에 켜 둔 동안 30분마다(다른 앱을 보는 동안은 쉬고, 돌아왔을 때 30분이 지났으면 바로) · 설정의 **업데이트 확인** 을 누를 때.
+- **언제 확인하나**: 앱을 켤 때 · 앞에 켜 둔 동안 30분마다(다른 앱을 보는 동안은 쉬고, 돌아왔을 때 30분이 지났으면 바로 — 기기가 잠긴 시간도 셉니다, Android 와 같게) · 설정의 **업데이트 확인** 을 누를 때.
 - **어디서 받나**: `raw.githubusercontent.com` 과 `korean568.github.io` 두 곳에 동시에 묻고 **더 높은 버전**을 고릅니다. 한 곳이 이 앱에 맞는 새 버전을 알려 주면 다른 곳은 1초만 더 기다립니다. 시간 제한 latest.json 10초 · game.gz 90초, 실패하면 1.5초 쉬고 한 번 더 (404 같은 4xx 는 다시 하지 않음). 캐시를 피하려고 주소에 `?t=` 를 붙입니다.
 - **켤 때**: 최대 4초 기다려 새 게임을 다 받으면 바로 새 게임으로 시작하고 "새 버전 0.xx 으로 업데이트했습니다" 를 보여 줍니다. 늦으면 지금 게임으로 시작하고 뒤에서 받아 "새 버전 0.xx 준비됨 · 지금 적용" (안 누르면 다음에 켤 때 새 게임).
 - **안전**: 풀어서(gzip) sha256 이 맞을 때만 저장하고(임시 파일 → 이름 바꾸기), 켤 때도 다시 확인합니다. 낮은 버전으로는 바꾸지 않습니다. 인터넷이 없어도 게임은 그대로 켜집니다.
@@ -183,14 +189,15 @@ PC판 · Android 와 **같은 업데이트 파일**(`desktop/update/latest.json`
 | `SKW/App/AppDelegate.swift` | 앱 시작 · 오디오 세션(.ambient) · 창 · 화면 꺼짐 방지 |
 | `SKW/App/SelfTest.swift` | CI 의 Simulator 자동 시험 (Debug 빌드에서 실행 인자 `--skw-selftest` 가 있을 때만 — Release · App Store 빌드는 무시) |
 | `SKW/Web/ios-shim.js` | 게임이 쓰는 `window.skwDesktop` (platform `ios`, 자동 업데이트 `skwDesktop.update` 포함) — 앱이 문서 시작 때 끼워 넣음 |
-| `SKW/Info.plist` · `SKW/Resources/` | 앱 설정(가로 · 전체 화면 · `SKWAutoUpdate`), 이름(영어 · 한국어), 안내 글, 아이콘 · 시작 화면 색 |
+| `SKW/Info.plist` · `SKW/Resources/` | 앱 설정(가로 · 전체 화면 · `SKWAutoUpdate`), 이름(영어 · 한국어), 안내 글, 아이콘 · 시작 화면 색, 개인정보 보호 매니페스트(`PrivacyInfo.xcprivacy`) |
 | `SKW/Game/` · 아이콘 PNG · `Config/Version.xcconfig` | 저장소에 없음 — `scripts/prepare-resources.js` 가 빌드할 때 만듭니다 |
 | `SKWTests/UpdaterTests.swift` | 자동 업데이트 단위 시험 (가짜 서버) |
 | `scripts/prepare-resources.js` · `make-icon.js` | 게임 빌드(PC판 · Android 와 같은 `desktop/scripts/build-story.js`) · 아이콘 1024x1024(알파 없음) · 버전 |
 | `scripts/smoke.sh` · `check-selftest.js` | Simulator 연기 시험과 판정 |
 | `store/` | App Store 설명 글(한국어 · 영어) · 심사 메모 |
 | `../.github/workflows/ios.yml` | 자동 빌드 · 시험 · (선택) TestFlight |
-| `../privacy.html` | 개인정보처리방침 (iPhone 앱 포함) |
+| `../privacy.html` | 개인정보처리방침 (iPhone 앱 포함 — 앱 설정의 **개인정보처리방침 ↗** 가 여는 곳) |
+| `../support.html` | App Store 의 지원 URL (문의 = GitHub 이슈) |
 
 ## 7. 기술 메모 (확인한 것 · 한계)
 
@@ -199,7 +206,8 @@ PC판 · Android 와 **같은 업데이트 파일**(`desktop/update/latest.json`
 - **WebGPU 는 GitHub 러너에서 확인할 수 없습니다 (증거).** 러너 Mac 의 Metal 장치는 `Apple Paravirtual device` 이고 `apple7=false · apple9=false · metal3=false` 입니다. 같은 러너의 **macOS WKWebView 에서도** `navigator.gpu` 는 있지만 `requestAdapter()` 가 null 입니다 (`ios/scripts/webgpu-host-probe.swift`, CI 의 "WebGPU on the runner itself" 단계). 그래서 Simulator 의 null 어댑터는 앱 문제가 아니라 가상 GPU 의 한계입니다. 실제 iPhone(iOS 26)에서 WebGPU 어댑터가 나오는지 · 처음 화면 · 설정의 버전 줄은 실제 기기에서만 볼 수 있고, 같은 화면은 PC 의 헤드리스 Chromium 에서 진짜 `ios-shim.js` 로 시험했습니다 (한국어 · 영어, 버전 줄 · 게임 종료 없음 · 전체 화면 줄 없음 · App Store 안내 · `G.i18n.miss` 비어 있음).
 - **WKWebView 의 사용자 에이전트**는 iOS 26.5 에서도 `iPhone OS 18_7` 로 나옵니다 (WebKit 이 번호를 묶어 둠). 게임은 기기 판별에 `iPhone|iPad` 만 보므로 상관없습니다.
 - **소리**: 오디오 세션 `.ambient` — 무음 스위치를 켜면 소리가 안 나고, 듣던 음악과 섞입니다. 게임 소리를 무음 스위치와 관계없이 내고 싶으면 `AppDelegate.swift` 에서 `.playback` 으로 바꾸면 됩니다.
-- **iPadOS 26**: `UIRequiresFullScreen`(iPad 전체 화면 고정)은 iPadOS 26 에서 "앞으로 무시될 예정" 경고가 납니다. 지금은 넣어 두었고, 창 크기가 바뀌어도 게임은 크기에 맞춰 다시 그립니다.
+- **iPadOS 26**: `UIRequiresFullScreen`(iPad 전체 화면 고정)은 iPadOS 26 에서 "앞으로 무시될 예정" 경고가 납니다. Apple 문서에 따르면 이 키가 있으면 iPadOS 26 의 창 모드에서 사용자가 창 크기를 바꿔도 **시스템이 앱 화면을 통째로 줄이거나 늘려 보여 줄 뿐**(앱이 새 크기를 받지 않음) 화면을 돌리지도 않습니다. 그래서 창 모드에서는 게임이 작게 · 흐리게 보일 수 있습니다 (전체 화면에서는 문제 없음, 실제 iPad 에서는 확인 못 함).
+  나중에 할 일 (Apple TN3192): 이 키를 빼고 `GameViewController` 에서 가로 고정(`prefersInterfaceOrientationLocked`)과 최소 창 크기(`UIWindowScene.sizeRestrictions`)를 정한 뒤, 세로로 긴 iPad 창에서 게임이 어떻게 보이는지 확인 (앱에서는 mod_touch 의 "가로로 돌려 주세요" 화면이 꺼져 있으므로 그 경우의 대책도 필요).
 - **WKWebView 설정**: `mediaTypesRequiringUserActionForPlayback = []` (터치 없이 소리), 스크롤 · 확대 · 링크 미리보기 끔, 안전 영역까지 그림(`contentInsetAdjustmentBehavior = .never`, 게임이 `env(safe-area-inset-*)` 사용), 앱 밖 주소로 이동 금지(사용자가 누른 http/https 만 Safari 로), 웹 프로세스가 죽으면 다시 불러옴(30초 안에 3번이면 안내).
 
 직접 빌드 (Mac · Xcode 26 · Node.js 22 · `brew install xcodegen`):

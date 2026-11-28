@@ -22,6 +22,15 @@ final class GameViewController: UIViewController {
     private static let recheckEvery: TimeInterval = 30 * 60 // 앞에 있는 동안 다시 확인하는 간격
     private static let crashWindow: TimeInterval = 30      // 이 시간 안에 웹 프로세스가 3번 죽으면 자동 다시 불러오기를 멈춤
 
+    /// 지금 시각(초) — 기기가 잠든 동안에도 흐르는 단조 시계 (Android SystemClock.elapsedRealtime 과 같게).
+    /// ProcessInfo.systemUptime 은 잠든 동안 멈춰서, 몇 시간 잠갔다 돌아와도 30분 재확인이 바로 되지 않는다
+    static func clock() -> TimeInterval { TimeInterval(clock_gettime_nsec_np(CLOCK_MONOTONIC)) / 1e9 }
+
+    /// 다리 스크립트에 넣는 값: 앱이 이미 검사한 번호지만, 한 번 더 따옴표 · 줄바꿈 · 역슬래시가 절대 들어가지 않게 거른다
+    static func jsSafe(_ s: String) -> String {
+        String(s.unicodeScalars.filter { $0.isASCII && (CharacterSet.alphanumerics.contains($0) || "._+-".unicodeScalars.contains($0)) }.map(Character.init))
+    }
+
     private var web: WKWebView?
     private let schemeHandler = GameSchemeHandler()
     private var notice: UIView?
@@ -88,7 +97,7 @@ final class GameViewController: UIViewController {
                 DispatchQueue.main.async { self?.onUpdateStatus(json, done) }
             }
             updater = up
-            up.useCached()
+            if selfTest?.bundledOnly != true { up.useCached() } // 자동 시험 --skw-selftest-bundled: 앱에 든 게임만 띄움 (확인 · 받기는 그대로)
         }
         createWebView() // 게임은 startGame() 에서 불러온다
         if startCheck("start") > 0 {
@@ -167,7 +176,7 @@ final class GameViewController: UIViewController {
         guard let web else { return }
         var html: Data? = bundledURL.flatMap { try? Data(contentsOf: $0) }
         var ver = shell, lab = bundledLabel, downloaded = false
-        if let up = updater, let g = up.current(), let d = up.gameData(g) {
+        if selfTest?.bundledOnly != true, let up = updater, let g = up.current(), let d = up.gameData(g) {
             html = d
             ver = g.version
             lab = g.label
@@ -183,9 +192,9 @@ final class GameViewController: UIViewController {
         ucc.removeAllUserScripts()
         selfTest?.userScripts().forEach { ucc.addUserScript($0) }
         if let t = shimTemplate {
-            let src = t.replacingOccurrences(of: "__SKW_VERSION__", with: ver)
-                .replacingOccurrences(of: "__SKW_LABEL__", with: lab)
-                .replacingOccurrences(of: "__SKW_SHELL__", with: shell)
+            let src = t.replacingOccurrences(of: "__SKW_VERSION__", with: Self.jsSafe(ver))
+                .replacingOccurrences(of: "__SKW_LABEL__", with: Self.jsSafe(lab))
+                .replacingOccurrences(of: "__SKW_SHELL__", with: Self.jsSafe(shell))
                 .replacingOccurrences(of: "__SKW_UPDATE__", with: updater != nil ? "1" : "0")
             ucc.addUserScript(WKUserScript(source: src, injectionTime: .atDocumentStart, forMainFrameOnly: true))
         }
@@ -248,7 +257,7 @@ final class GameViewController: UIViewController {
         guard let up = updater else { return }
         if !started {
             guard done else { return }
-            if up.apply() { up.log("켬: 새 게임을 받아서 바로 그걸로 시작") } // 'ready' 일 때만 바뀐다 (S.applied = true)
+            if selfTest?.bundledOnly != true, up.apply() { up.log("켬: 새 게임을 받아서 바로 그걸로 시작") } // 'ready' 일 때만 바뀐다 (S.applied = true)
             startGame()
             return
         }
@@ -257,7 +266,7 @@ final class GameViewController: UIViewController {
 
     @discardableResult
     private func startCheck(_ why: String) -> Int {
-        lastCheck = ProcessInfo.processInfo.systemUptime
+        lastCheck = Self.clock()
         return updater?.check(why) ?? 0
     }
 
@@ -267,7 +276,7 @@ final class GameViewController: UIViewController {
         guard updater != nil, active else { return }
         let w = DispatchWorkItem { [weak self] in self?.onRecheck() }
         recheckWork = w
-        let wait = max(0, lastCheck + Self.recheckEvery - ProcessInfo.processInfo.systemUptime)
+        let wait = max(0, lastCheck + Self.recheckEvery - Self.clock())
         DispatchQueue.main.asyncAfter(deadline: .now() + wait, execute: w)
     }
 
@@ -378,7 +387,7 @@ extension GameViewController: WKNavigationDelegate, WKUIDelegate {
     /// 웹 프로세스가 죽으면(메모리 부족 · 충돌) 다시 불러온다. 30초 안에 3번이면 멈추고 안내
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
         guard webView == web else { return }
-        let now = ProcessInfo.processInfo.systemUptime
+        let now = Self.clock()
         crashCount = now - lastCrash < Self.crashWindow ? crashCount + 1 : 1
         lastCrash = now
         print("[SKW] web content process terminated (\(crashCount))")

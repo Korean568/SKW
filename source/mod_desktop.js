@@ -100,7 +100,9 @@
       for (const id of ['dl', 'cap', 'ttl']) { const e = document.getElementById(id); e && (e.style.opacity = 0); }
       marks();
     }
-    const ACT = { resume, set: () => settings('pause'), title: toTitle, quit, back, upchk: uCheck, upapp: uApply, upitch: uItch };
+    // 개인정보처리방침: App Store 심사 지침 5.1.1(i) — 앱 안에서 쉽게 열 수 있어야 함 → iPhone · iPad 앱의 설정에 링크 (기본 브라우저로 열림)
+    const PRIVACY = 'https://korean568.github.io/SKW/privacy.html';
+    const ACT = { resume, set: () => settings('pause'), title: toTitle, quit, back, upchk: uCheck, upapp: uApply, upitch: uItch, privacy: () => D && quiet(D.openExternal(PRIVACY)) };
 
     /* ── 설정 화면 갱신 ── */
     function sync() {
@@ -268,6 +270,7 @@ html.touch #ov .dkup{right:calc(5vw + var(--sr,0px));bottom:calc(28px + var(--sb
 <span>자막 크기</span><div data-k=sub><button data-v=s>작게</button><button data-v=m>보통</button><button data-v=l>크게</button></div>
 ${G.i18n ? '<span>언어</span><div data-k=lang><button data-v=ko data-i18n-skip>한국어</button><button data-v=en data-i18n-skip>English</button></div>' : ''}
 ${UP || oldApp ? `<span>버전</span><div data-k=up><output data-i18n-skip></output><span class=us></span><span class=ue data-i18n-skip></span><button data-a=upchk>업데이트 확인</button><button data-a=upapp>지금 적용</button><button data-a=upitch>${STORE_BTN}</button></div>` : ''}
+${ios ? '<span>개인정보</span><div data-k=pp><button data-a=privacy>개인정보처리방침 ↗</button></div>' : ''}
 </div><button class=bk data-a=back>돌아가기</button><div class=h><b>Esc</b> 돌아가기${web || ios ? '' : ' · <b>F11</b> 전체 화면'}</div></div>`;
         ui = { root, p: root.querySelector('.p'), s: root.querySelector('.s'), st: root.querySelector('.st'), sub: G.el('style', {}, document.head) };
         if (touch() || !canFs) { // 터치: 전체 화면 줄은 뜻이 없고(앱은 늘 전체 화면) 감도는 손가락 시점 감도 · 브라우저판: 전체 화면이 안 되는 곳(iPhone · 허락 없는 iframe) · iOS 앱

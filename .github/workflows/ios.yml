@@ -27,10 +27,13 @@ on:
         default: ""
   push:
     branches: ['claude/**']
-    paths:
+    paths:                       # 앱에 게임 전체가 들어가므로 게임 소스 · 버전 · 게임 빌드 도구가 바뀌어도 돈다
       - 'ios/**'
       - '.github/workflows/ios.yml'
-      - 'source/mod_desktop.js'
+      - 'source/**'
+      - 'desktop/package.json'
+      - 'desktop/package-lock.json'
+      - 'desktop/scripts/build-story.js'
 
 permissions:
   contents: read
@@ -151,7 +154,18 @@ jobs:
           done
           plutil -p "$APP/ko.lproj/InfoPlist.strings" || true
           ls -l "$APP/Game" "$APP/ios-shim.js"
-          cmp "$APP/Game/index.html" SKW/Game/index.html && echo "Game/index.html 이 앱에 들어 있음"
+          # (bash -e 는 && 목록 가운데의 실패로 멈추지 않으므로 || { …; exit 1; } 로 실패시킨다)
+          cmp "$APP/Game/index.html" SKW/Game/index.html || { echo "::error::앱 안의 Game/index.html 이 빌드한 게임과 다릅니다"; exit 1; }
+          echo "Game/index.html 이 앱에 들어 있음"
+          cmp "$APP/ios-shim.js" SKW/Web/ios-shim.js || { echo "::error::앱 안의 ios-shim.js 가 다릅니다"; exit 1; }
+          # 개인정보 보호 매니페스트 (없으면 App Store Connect 가 ITMS-91053 으로 거절) — 앱 맨 위에 있고 올바른 plist 인지
+          plutil -lint "$APP/PrivacyInfo.xcprivacy" || { echo "::error::앱에 PrivacyInfo.xcprivacy 가 없거나 깨졌습니다"; exit 1; }
+          plutil -p "$APP/PrivacyInfo.xcprivacy"
+          # 이유를 밝혀야 하는 API 를 앱 코드가 다시 쓰지 않는지 (매니페스트에 없는 것: systemUptime · attributesOfItemAtPath — 파일 시각)
+          for sym in systemUptime attributesOfItemAtPath; do
+            if strings -a "$APP/SecondKoreanWars" | grep -qx "$sym\(:error:\)\{0,1\}"; then echo "::error::앱 실행 파일이 $sym 을 씁니다 (PrivacyInfo.xcprivacy 에 이유를 적거나 다른 API 로)"; exit 1; fi
+          done
+          echo "이유가 필요한 API (참고): $(strings -a "$APP/SecondKoreanWars" | grep -E '^(systemUptime|mach_absolute_time|attributesOfItemAtPath:error:|creationDate|modificationDate|fileModificationDate|volumeAvailableCapacity.*|activeInputModes)$' | sort -u | tr '\n' ' ')(위에 없으면 없음) · $(nm -u "$APP/SecondKoreanWars" 2>/dev/null | grep -E '_(clock_gettime_nsec_np|mach_absolute_time|stat|fstat|lstat|getattrlist)$' | tr '\n' ' ')"
           du -sh "$APP"
           mkdir -p ../build/out && (cd "$(dirname "$APP")" && zip -qry "$GITHUB_WORKSPACE/build/out/SecondKoreanWars-iphoneos-unsigned.zip" SecondKoreanWars.app)
 
@@ -279,7 +293,8 @@ jobs:
             -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/SecondKoreanWars.xcarchive" \
             -allowProvisioningUpdates -authenticationKeyPath "$ASC_KEY_PATH" \
             -authenticationKeyID "$APPSTORE_KEY_ID" -authenticationKeyIssuerID "$APPSTORE_ISSUER_ID" \
-            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" CODE_SIGN_STYLE=Automatic -quiet
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" CODE_SIGN_STYLE=Automatic -quiet \
+            || { echo "::error::보관(archive) 실패. 'Your team has no devices from which to generate a provisioning profile' 이면 Apple Developer 의 Devices 에 iPhone 하나를 등록하고 다시 실행하세요 (ios/README-ios.md 4-2)"; exit 1; }
 
       - name: Upload to TestFlight
         env:

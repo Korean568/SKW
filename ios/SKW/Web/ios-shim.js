@@ -7,7 +7,7 @@
  * (WKScriptMessageHandlerWithReply: postMessage({op, arg}) returns a Promise with the native reply).
  *
  * Four slots in the code below (each written once as double underscore + SKW_<NAME> + double underscore) are filled
- * by the app before every page load (values are checked by the app, so they never need escaping):
+ * by the app before every page load (values are checked by the app and filtered to [0-9A-Za-z._+-], so they never need escaping):
  *   SKW_VERSION  internal semver of the game that is being served (e.g. 1.6.0)
  *   SKW_LABEL    shown number of that game (e.g. 0.16)
  *   SKW_SHELL    internal semver of the app itself (the shell, compared with minShell)
@@ -26,7 +26,10 @@
  *     the promise waits for a pushed S with seq >= that number that is no longer checking/downloading.
  *     apply() only works in state 'ready'; the app then reloads into the new game.
  *   window.__skwIOS.pause() / resume()   called by the app on sceneWillResignActive / sceneDidBecomeActive
- *     (same job as window.__skwAndroid: pause menu + silence Web Audio, then resume the contexts it stopped)
+ *     (same job as window.__skwAndroid: pause menu + silence Web Audio, then resume the contexts it stopped).
+ *     While a context is held, its 'statechange' events are hidden from the game: mod_audio resumes any context that
+ *     stops while the page is still visible (document.hidden is false under Control Center, Siri or a call banner),
+ *     which would undo pause() within a few milliseconds.
  */
 (function () {
   'use strict';
@@ -93,9 +96,11 @@
   /* Web Audio: remember every AudioContext the game creates so the app can silence it in the background */
   var ctxs = [], held = [];
   var AC = window.AudioContext;
+  var guard = function (e) { if (held.indexOf(e.target) >= 0) e.stopImmediatePropagation(); };
   if (AC) {
     window.AudioContext = class AudioContext extends AC {
-      constructor() { super(...arguments); ctxs.push(this); }
+      // the guard is added before the game sets onstatechange, so it runs first and can stop it while this context is held
+      constructor() { super(...arguments); ctxs.push(this); this.addEventListener('statechange', guard); }
     };
   }
   window.__skwIOS = {

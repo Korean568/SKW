@@ -11,6 +11,8 @@
 #   4) update    앱 번호를 1.5.0 으로 속여 켬 → 진짜 업데이트 주소(GitHub)에서 지금 게임을 받아(gzip · sha256) 켤 때 바로 적용하고
 #                같은 skw://game 출처로 띄우는지 · 1) 에서 쓴 localStorage 가 그대로인지 (업데이트해도 진행이 남는지)
 #   5) file      비교용: skw:// 대신 file:// 로 띄웠을 때의 보안 출처 · WebGPU (실패해도 시험은 계속)
+# 1) 2) 3) 은 --skw-selftest-bundled: 피드(main)에 이 가지보다 새 게임이 있어도 늘 이 가지에서 빌드해 앱에 넣은 게임을 띄운다
+#   (확인 · 받기는 그대로 하므로 check() 는 latest 또는 ready). 받아서 바꾸는 길은 4) 가 본다.
 # 결과 JSON 은 앱이 Library/Caches/skw-selftest-<이름>.json 에 쓰고(콘솔에도 SKW-SELFTEST 한 줄), check-selftest.js 가 판정한다.
 # 화면 사진은 결과 폴더에 작은 JPEG(480px)로 두고, ios.yml 의 마지막 단계가 base64 로 로그에 찍는다 (로그만 보고도 풀어 볼 수 있게).
 set -uo pipefail
@@ -62,7 +64,7 @@ shot() { # 화면 사진 → 480px JPEG (낮은 화질)
   echo "화면 사진 $1: $(stat -f%z "$OUT/$1.jpg") B"
 }
 
-launch main "--skw-selftest-write=$NONCE"
+launch main --skw-selftest-bundled "--skw-selftest-write=$NONCE"
 MAIN=$?
 sleep 3
 shot main
@@ -78,10 +80,10 @@ if [ "$MODE" = quick ]; then
   exit "${PIPESTATUS[0]}"
 fi
 
-launch relaunch
+launch relaunch --skw-selftest-bundled
 stop relaunch
 
-launch nogpu --skw-selftest-nogpu
+launch nogpu --skw-selftest-bundled --skw-selftest-nogpu
 sleep 2
 shot nogpu
 stop nogpu

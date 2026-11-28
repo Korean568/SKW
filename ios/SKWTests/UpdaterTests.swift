@@ -101,6 +101,34 @@ final class UpdaterTests: XCTestCase {
         XCTAssertEqual(Updater.cleanLabel("0.16"), "0.16")
         XCTAssertEqual(Updater.cleanLabel("<b>"), "")
         XCTAssertNil(Updater.cleanSha("abc"))
+        // 글자 전체가 맞아야 함 (Java Matcher.matches() 와 같게): ICU 의 $ 는 끝 줄바꿈 앞에서도 맞으므로 \A…\z
+        XCTAssertNil(Updater.cleanVersion("1.7.0\n"))
+        XCTAssertNil(Updater.cleanVersion("\n1.7.0"))
+        XCTAssertEqual(Updater.cleanLabel("0.17\n"), "")
+        XCTAssertEqual(Updater.cleanLabel("0.17\r\n"), "")
+        XCTAssertNil(Updater.cleanSha(String(repeating: "a", count: 64) + "\n"))
+        XCTAssertFalse(Updater.isFileName("game.gz\n"))
+        XCTAssertTrue(Updater.isFileName("game.gz"))
+        XCTAssertEqual(Updater.cleanVersion("1"), "1")
+    }
+
+    /// latest.json 의 label · version 끝에 줄바꿈이 붙어 와도 그 값은 쓰지 않는다 (다리 스크립트에 그대로 들어가지 않게)
+    func testTrailingNewlineInManifestIsRejected() {
+        let up = make()
+        publish(A, "1.7.0")
+        let body = html("1.7.0")
+        // JSON 의 "\n" = 줄바꿈 한 글자
+        StubProtocol.set(A + "latest.json", .init(body: Data(#"{"version":"1.7.0\n","label":"0.17","file":"game.gz","sha256":"\#(sha(body))"}"#.utf8)))
+        StubProtocol.set(B + "latest.json", .init(status: 404))
+        let s = runCheck(up)
+        XCTAssertEqual(s["state"] as? String, "error")
+        XCTAssertEqual(s["error"] as? String, "bad json, HTTP 404")
+        XCTAssertEqual(gameFiles(), [])
+        // label 만 줄바꿈이면 버전은 쓰되 label 은 비운다 (Java 와 같게)
+        StubProtocol.set(A + "latest.json", .init(body: Data(#"{"version":"1.7.0","label":"0.17\n","file":"game.gz","sha256":"\#(sha(body))"}"#.utf8)))
+        let s2 = runCheck(up)
+        XCTAssertEqual(s2["state"] as? String, "ready")
+        XCTAssertEqual((s2["latest"] as? [String: Any])?["label"] as? String, "")
     }
 
     func testGunzipMatchesNode() throws {

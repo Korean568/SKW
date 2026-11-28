@@ -11,6 +11,8 @@ import WebKit
 ///   --skw-selftest-file                skw:// 대신 file:// 로 띄운다 (보안 출처 비교용)
 ///   --skw-selftest-shell=<버전>        앱(껍데기) 번호를 이 값으로 속인다 (예 1.5.0 → 진짜 업데이트 주소에서 지금 게임을 받아 적용하는지 시험)
 ///   --skw-selftest-wait=<초>           켤 때 업데이트를 기다리는 시간 (기본 4초)
+///   --skw-selftest-bundled             받아 둔 · 새로 받은 게임 대신 늘 앱에 든 게임을 띄운다 (확인 · 받기는 그대로 —
+///                                      피드에 이 가지보다 새 게임이 있어도 이 가지에서 빌드한 게임을 시험하려고)
 ///
 /// 게임이 뜨면(G.ready 또는 G.dead) 페이지 안에서 확인할 것을 모아 JSON 한 줄로 stdout 에 "SKW-SELFTEST {…}" 로 찍고 같은 내용을 파일로도 쓴다.
 final class SelfTest {
@@ -18,6 +20,7 @@ final class SelfTest {
     let write: String?
     let noGPU: Bool
     let serveFile: Bool
+    var bundledOnly = false
     var shellOverride: String?
     var startupWait: TimeInterval?
     private var attached = false
@@ -30,6 +33,7 @@ final class SelfTest {
         let t = SelfTest(name: val("--skw-selftest-out") ?? "main", write: val("--skw-selftest-write"),
                          noGPU: args.contains("--skw-selftest-nogpu"), serveFile: args.contains("--skw-selftest-file"))
         t.shellOverride = Updater.cleanVersion(val("--skw-selftest-shell"))
+        t.bundledOnly = args.contains("--skw-selftest-bundled")
         t.startupWait = val("--skw-selftest-wait").flatMap { Double($0) }.map { min(max($0, 1), 120) }
         return t
         #else
@@ -54,7 +58,7 @@ final class SelfTest {
     func attach(to vc: GameViewController, web: WKWebView) {
         if attached { return }
         attached = true
-        say("start \(name) write=\(write ?? "-") nogpu=\(noGPU) file=\(serveFile) shell=\(shellOverride ?? "-")")
+        say("start \(name) write=\(write ?? "-") nogpu=\(noGPU) file=\(serveFile) shell=\(shellOverride ?? "-") bundled=\(bundledOnly)")
         poll(vc, web, tries: 0)
     }
 
@@ -111,10 +115,19 @@ final class SelfTest {
             "landscape": scene.map { $0.effectiveGeometry.interfaceOrientation.isLandscape } ?? false,
             "screen": vc.view.window.map { "\(Int($0.bounds.width))x\(Int($0.bounds.height))@\($0.traitCollection.displayScale)" } ?? "",
             "safeArea": vc.view.window.map { "\($0.safeAreaInsets)" } ?? "",
+            // 숫자로 (페이지의 env(safe-area-inset-*) 와 견주려고): 창 · 웹 보기
+            "safeAreaInsets": Self.insets(vc.view.window?.safeAreaInsets),
+            "webSafeAreaInsets": Self.insets(vc.view.subviews.first(where: { $0 is WKWebView })?.safeAreaInsets),
+            "bundledOnly": bundledOnly,
             "model": UIDevice.current.model,
             "system": "\(UIDevice.current.systemName) \(UIDevice.current.systemVersion)",
             "preferredLanguages": Locale.preferredLanguages.prefix(3).joined(separator: ","),
         ]
+    }
+
+    private static func insets(_ e: UIEdgeInsets?) -> Any {
+        guard let e else { return NSNull() }
+        return ["top": Double(e.top), "left": Double(e.left), "bottom": Double(e.bottom), "right": Double(e.right)]
     }
 
     private func emit(_ o: [String: Any]) {
@@ -163,6 +176,15 @@ final class SelfTest {
     const fatal = document.getElementById('fatal');
     r.screen = fatal ? 'unsupported' : document.getElementById('ov') ? 'title' : 'none';
     r.fatal = fatal ? fatal.innerText.replace(/\\s+/g, ' ').slice(0, 400) : null;
+    const tips = fatal && fatal.querySelector('ul'); r.fatalTips = tips ? tips.innerText.replace(/\\s+/g, ' ').slice(0, 600) : null;
+    try { // 페이지가 받는 안전 영역 (게임의 --sl/--sr/--sb 가 쓰는 env(safe-area-inset-*)) — 앱 쪽 safeAreaInsets 와 같아야 함
+      const sa = document.createElement('div');
+      sa.style.cssText = 'position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;pointer-events:none;padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)';
+      document.body.appendChild(sa); const cs = getComputedStyle(sa);
+      r.safeAreaCss = { top: parseFloat(cs.paddingTop), right: parseFloat(cs.paddingRight), bottom: parseFloat(cs.paddingBottom), left: parseFloat(cs.paddingLeft) };
+      sa.remove();
+      r.viewportMeta = (document.querySelector('meta[name=viewport]') || {}).content || null;
+    } catch (e) { r.safeAreaError = String(e); }
     r.platform = D ? D.platform : null; r.shell = D ? D.version : null; r.gameVersion = D ? D.gameVersion : null; r.label = D ? D.label : null;
     r.gVersion = G ? G.VERSION : null; r.gLabel = G ? G.LABEL : null;
     r.hasUpdate = !!(D && D.update); r.touch = !!(G && G.touch && G.touch.on); r.lang = G && G.i18n ? G.i18n.lang : null;
@@ -183,6 +205,7 @@ final class SelfTest {
           buttons: [...row.querySelectorAll('button')].filter(b => b.offsetParent).map(b => b.textContent) } : null;
         const fs = document.querySelector('#dk [data-k=fs]'); r.fullscreenRowShown = !!(fs && fs.offsetParent);
         r.pauseQuitItem = !!document.querySelector('#dk [data-a=quit]');
+        const pp = document.querySelector('#dk [data-a=privacy]'); r.privacyButton = pp && pp.offsetParent ? pp.textContent : null;
         r.titleButtons = [...document.querySelectorAll('#ov .dkb button')].map(b => b.textContent);
         G.desktop.back(); await wait(100);
         r.menuClosed = !G.desktop.menu;

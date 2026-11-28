@@ -125,26 +125,28 @@ final class Updater {
 
     static func newer(_ a: String, _ b: String) -> Bool { compare(a, b) > 0 }
 
-    private static func matches(_ pattern: String, _ s: String) -> Bool {
-        s.range(of: pattern, options: .regularExpression) != nil
+    /// 글자 전체가 pattern 과 맞는가 (Java 의 Matcher.matches() 와 같게). ^…$ 는 쓰지 않는다: ICU 의 $ 는 끝의 줄바꿈 앞에서도 맞아
+    /// "0.17\n" 같은 값이 통과하기 때문 → \A(?:…)\z 로 감싼다
+    static func matches(_ pattern: String, _ s: String) -> Bool {
+        s.range(of: "\\A(?:" + pattern + ")\\z", options: .regularExpression) != nil
     }
 
     static func cleanVersion(_ v: Any?) -> String? {
-        guard let s = v as? String, matches("^[0-9]{1,6}(\\.[0-9]{1,6}){0,3}$", s) else { return nil }
+        guard let s = v as? String, matches("[0-9]{1,6}(\\.[0-9]{1,6}){0,3}", s) else { return nil }
         return s
     }
 
     static func cleanLabel(_ v: Any?) -> String {
-        guard let s = v as? String, matches("^[0-9A-Za-z.+-]{1,24}$", s) else { return "" }
+        guard let s = v as? String, matches("[0-9A-Za-z.+-]{1,24}", s) else { return "" }
         return s
     }
 
     static func cleanSha(_ v: Any?) -> String? {
-        guard let s = (v as? String)?.lowercased(), matches("^[0-9a-f]{64}$", s) else { return nil }
+        guard let s = (v as? String)?.lowercased(), matches("[0-9a-f]{64}", s) else { return nil }
         return s
     }
 
-    static func isFileName(_ s: String) -> Bool { matches("^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$", s) }
+    static func isFileName(_ s: String) -> Bool { matches("[A-Za-z0-9][A-Za-z0-9._-]{0,63}", s) }
 
     /* ───────────────────────── 지금 게임 · 받아 둔 게임 ───────────────────────── */
 
@@ -624,7 +626,9 @@ final class Updater {
     /* ───────────────────────── 파일 · 기록 ───────────────────────── */
 
     static func readFile(_ f: URL, max: Int) throws -> Data {
-        let size = (try? FileManager.default.attributesOfItem(atPath: f.path)[.size] as? NSNumber)?.intValue ?? 0
+        var u = f
+        u.removeAllCachedResourceValues()
+        let size = (try? u.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0 // 크기만 (파일 시각은 읽지 않음 — PrivacyInfo.xcprivacy)
         if size > max { throw Fail("size") }
         do { return try Data(contentsOf: f) } catch { throw Fail("io") }
     }
@@ -637,7 +641,7 @@ final class Updater {
     /// 같은 폴더의 임시 파일에 다 쓰고(fsync) rename — 중간에 꺼져도 예전 파일이 그대로 남는다
     static func writeAtomic(_ f: URL, _ data: Data) throws {
         let tmp = f.deletingLastPathComponent()
-            .appendingPathComponent(f.lastPathComponent + "." + String(DispatchTime.now().uptimeNanoseconds, radix: 16) + ".tmp")
+            .appendingPathComponent(f.lastPathComponent + "." + UUID().uuidString.prefix(8).lowercased() + ".tmp")
         do {
             guard FileManager.default.createFile(atPath: tmp.path, contents: nil) else { throw Fail("disk") }
             let h = try FileHandle(forWritingTo: tmp)

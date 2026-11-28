@@ -24,6 +24,9 @@ targets:
     sources:
       - path: SKW/App
       - path: SKW/Resources
+        excludes: ["PrivacyInfo.xcprivacy"]
+      - path: SKW/Resources/PrivacyInfo.xcprivacy
+        buildPhase: resources            # 개인정보 보호 매니페스트 → 앱 맨 위 PrivacyInfo.xcprivacy (App Store Connect 가 확인)
       - path: SKW/Web
         buildPhase: resources            # ios-shim.js (앱이 읽어 WKUserScript 로 넣음)
       - path: SKW/Game
