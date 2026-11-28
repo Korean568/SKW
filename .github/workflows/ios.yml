@@ -1,0 +1,45 @@
+# iOS 앱 (iPhone · iPad) — 임시: 러너 환경 알아보기 (곧 실제 빌드로 바뀜)
+name: iOS build
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['claude/**']
+    paths:
+      - 'ios/**'
+      - '.github/workflows/ios.yml'
+      - 'source/mod_desktop.js'
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-26, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - name: Environment
+        run: |
+          sw_vers || true
+          uname -a
+          sysctl -n machdep.cpu.brand_string || true
+          ls -d /Applications/Xcode* || true
+          xcode-select -p || true
+          xcodebuild -version || true
+          xcodebuild -showsdks || true
+          xcrun simctl list runtimes || true
+          xcrun simctl list devicetypes | grep -E "iPhone|iPad" | head -40 || true
+          xcrun simctl list devices available | head -60 || true
+          brew --version || true
+          which xcodegen || echo "no xcodegen"
+          system_profiler SPDisplaysDataType || true
+          cat > /tmp/m.swift <<'EOF'
+          import Metal
+          let d = MTLCreateSystemDefaultDevice()
+          print("METAL:", d?.name ?? "none", d.map { "\($0.supportsFamily(.apple7)) \($0.supportsFamily(.mac2))" } ?? "")
+          EOF
+          swift /tmp/m.swift || true
