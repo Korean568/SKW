@@ -37,24 +37,26 @@ GitHub 저장소 → **Actions** → 왼쪽 **iOS build**. `ios/` 를 고쳐 `cl
 
 ### Simulator 에서 확인한 것
 
-CI 실행 기록에서 확인한 결과입니다 (iPhone 17 Pro · iPad Pro 13형 · iOS/iPadOS 26.5 Simulator, 2026-11-28, Actions 실행 46090179923 · 46091252363 · 46094143941, `ios/scripts/check-selftest.js` 의 판정 — 모두 통과).
+CI 실행 기록에서 확인한 결과입니다 (iPhone 17 Pro · iPad Pro 13형 · iOS/iPadOS 26.5 Simulator, 2026-11-28, Actions 실행 46090179923 · 46091252363 · 46094143941 · 검토 고침 뒤 46100372491, `ios/scripts/check-selftest.js` 의 판정 — 모두 통과).
 
 | 확인한 것 | 결과 |
 |---|---|
 | 게임 주소 · 보안 출처 | `skw://game/index.html` 로 뜨고 `isSecureContext = true` (WebGPU 가 켜지는 조건) · `crypto.subtle` · `DecompressionStream` 있음 |
 | WebGPU | `navigator.gpu` 는 **있음**. 하지만 `requestAdapter()` 가 **null** → 게임이 스스로 "사용 가능한 GPU 어댑터가 없습니다" 안내 화면을 보여 줌 (멈추지 않음). 원인은 아래 7번: GitHub 의 Mac 은 가상 머신이라 GPU 가 WebGPU 를 못 씀 |
 | WebGPU 가 아예 없는 기기 | `navigator.gpu` 를 지운 채로 켜면 "WebGPU 를 사용할 수 없습니다" 안내 화면 · 다리(skwDesktop)는 그대로 |
+| 안내 화면의 글 | 앱 안에서는 **이 앱에 맞는 세 줄만** (iOS · iPadOS 26 이상 · 차단 모드 예외 · 다시 시작). Safari · Android · PC · 다른 스토어 이야기 없음 (지침 2.3.10, 46100372491 — 이 가지에서 빌드한 게임으로 확인) |
+| 안전 영역 | 페이지가 받는 `env(safe-area-inset-*)` = 앱 창의 안전 영역: iPhone 가로 좌 62 · 우 62 · 아래 20, iPad 아래 25 (게임의 터치 버튼 여백 `--sl/--sr/--sb` 가 이 값을 씀) |
 | 다리 | `skwDesktop.platform = 'ios'` · 앱(껍데기) 1.6.0 · 게임 번호와 보이는 번호가 띄운 게임과 같음 (앱에 든 1.6.0/0.16, 받은 1.7.0/0.17) · `window.__skwIOS` 있음 |
-| 자동 업데이트 | `update.status()` 가 약속한 모양(S) · `update.check()` 가 실제 GitHub 두 주소에 물어 **latest** 로 끝난 뒤 돌아옴 (seq 2) |
+| 자동 업데이트 | `update.status()` 가 약속한 모양(S) · `update.check()` 가 실제 GitHub 두 주소에 물어 끝난 뒤 돌아옴 (seq 2 — 피드가 0.17 이고 앱에 든 게임이 0.16 이면 **ready**, 같으면 **latest**) |
 | 진짜 업데이트 받기 · 적용 | 앱 번호를 1.5.0 으로 속여 켜면(`--skw-selftest-shell`) GitHub 의 **진짜 피드**에서 게임을 받아 gzip 풀기 · sha256 확인 · 저장 뒤 **켤 때 바로 적용** (`S.applied = true`). 받은 게임도 같은 `skw://game` 출처라 **localStorage 가 그대로**이고, 다시 확인하면 latest. 또 시험 도중 실제로 0.17 이 피드에 올라오자(2026-11-28 01:32), 그 뒤에 켠 iPad 시험의 앱(0.16 이 든 앱)이 **0.17 을 받아 켤 때 바로 바꿔** 띄웠습니다 |
 | localStorage | 쓰고 → 다른 앱(설정)으로 보내고 → 앱을 끄고 → 다시 켜도 **그대로** |
-| 일시정지 고리 | 다른 앱으로 넘어갈 때 앱이 `window.__skwIOS.pause()` 를 부름 (콘솔 `[SKW] lifecycle pause: 0`) |
+| 일시정지 고리 | 다른 앱으로 넘어갈 때 앱이 `window.__skwIOS.pause()` 를 부름 (콘솔 `[SKW] lifecycle pause: 0`). 멈춘 소리는 화면이 보이는 동안(제어 센터 · Siri · 전화 배너)에도 게임이 다시 켜지 않음 — Simulator 에는 소리가 없어 PC 의 Playwright 에서 확인 (pause 뒤 1.5초 내내 `suspended`, resume 뒤 `running`) |
 | 앱 설정 | 오디오 세션 `.ambient` · 화면 꺼짐 막음(앞에 있을 때) · 상태 막대 숨김 · 홈 표시줄 자동 숨김 · 가로 (874x402, 안전 영역 좌우 62 · 아래 20) · 번들 ID · 버전 0.16 (빌드 10600) |
 | iPad | iPad Pro 13형 Simulator 에서도 같은 시험 통과 (1376x1032 가로) |
 | JS 오류 | 안내 화면의 `[SKW fatal]` 기록 말고는 없음 |
-| 화면 사진 | 가로 · 전체 화면(상태 막대 없음), 왼쪽에 Dynamic Island, 게임의 "WebGPU is not available" 안내 상자가 안전 영역 안 가운데에 — 앱이 원하는 대로 그려짐. (그 실행은 피드에서 받은 0.17 을 띄워서, 이 가지에서 고친 '다른 앱 안에서 열었다면 Safari 로' 줄이 아직 보였음 — 이 가지가 배포되면 앱 안에서는 사라짐) |
-| 단위 시험 | XCTest 18개 모두 통과 (가짜 서버 · Node 의 gzip · 저장소의 진짜 `game.gz`) |
-| 기기용 빌드 | `iphoneos` Release arm64 컴파일 성공 (서명 없음) · 최소 iOS 26.0 · 앱 크기 약 0.9 MB |
+| 화면 사진 | 가로 · 전체 화면(상태 막대 없음), 왼쪽에 Dynamic Island, 게임의 "WebGPU is not available" 안내 상자가 안전 영역 안 가운데에 — 앱이 원하는 대로 그려짐. 46100372491 부터는 앱에 든(이 가지의) 게임을 띄워 안내 상자에 iOS 앱용 세 줄만 보임 |
+| 단위 시험 | XCTest 19개 모두 통과 (가짜 서버 · Node 의 gzip · 저장소의 진짜 `game.gz` · latest.json 값 끝의 줄바꿈 거르기) |
+| 기기용 빌드 | `iphoneos` Release arm64 컴파일 성공 (서명 없음) · 최소 iOS 26.0 · 앱 크기 약 0.9 MB · 앱 맨 위 `PrivacyInfo.xcprivacy` 있음(plutil 확인) · 실행 파일에 `systemUptime` · `attributesOfItemAtPath` 없음 (시간은 `clock_gettime_nsec_np` 만) |
 
 ### 버전 번호
 
