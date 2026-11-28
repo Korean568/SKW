@@ -280,7 +280,7 @@ html[lang=en] #tc .b{font-size:11px;letter-spacing:.02em}html[lang=en] #tc .b[da
 #tch{position:absolute;left:calc(8vw + var(--sl));bottom:calc(11vh + var(--sb));width:96px;height:96px;border-radius:50%;border:2px dashed #fff4;display:none}#tch:after{content:'';position:absolute;inset:27px;border-radius:50%;background:#fff3}#tc.mv #tch{display:block}
 html.touch #lk,html.touch #s2h,html.touch #s3h,html.touch #s4h,html.touch #s3n,html.touch #ov .k,html.touch #fd button+small,html.touch #s3d button+small,html.touch #s2c small{display:none!important}
 html.touch #ov{grid-template-columns:auto minmax(0,1fr);column-gap:4vw;align-items:center;align-content:safe center;overflow-y:auto;padding:calc(36px + var(--st)) calc(5vw + var(--sr)) calc(10px + var(--sb)) calc(5vw + var(--sl));background:linear-gradient(90deg,#000d,#000a 60%,#0007)}
-html.touch #ov h1{grid-column:1;grid-row:2;font-size:clamp(32px,5.2vw,84px)}
+html.touch #ov .tb{grid-column:1;grid-row:1;margin:0 0 .9em;font-size:11px}html.touch #ov h1{grid-column:1;grid-row:2;font-size:clamp(32px,5.2vw,84px)}
 html.touch #ov>button{grid-column:1;grid-row:3;margin:.8em 0 .1em;padding:.6em 2.2em;font-size:clamp(17px,2vw,26px)}html.touch #ov .dkb{grid-column:1;grid-row:4}html.touch #ov .dkb button{min-height:44px;padding:.6em 1.4em;font-size:clamp(13px,1.3vw,17px)}
 html.touch #ov .tk{grid-column:1;grid-row:5;margin-top:.9em;max-width:42vw;font-size:clamp(11px,1.25vw,15px);line-height:1.6;color:#9fb1c4}html.touch #ov .tk b{color:#dfe8f2;font-weight:600}
 html.touch #ov .ch{grid-column:2;grid-row:1/span 5;margin:0}html.touch #ov .ch>div{margin:.3em 0;padding:.45em 0 .45em .9em;min-height:44px;box-sizing:border-box}
