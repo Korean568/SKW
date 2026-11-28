@@ -2,7 +2,7 @@ import AVFoundation
 import UIKit
 import WebKit
 
-/// 자동 시험 (CI 의 Simulator 연기 시험 전용 — 실행 인자가 없으면 아무 일도 하지 않는다).
+/// 자동 시험 (CI 의 Simulator 연기 시험 전용 — Debug 빌드에서 실행 인자가 있을 때만. Release · App Store 빌드는 인자를 무시한다).
 ///
 ///   --skw-selftest                     켜기
 ///   --skw-selftest-out=<이름>          결과 파일 이름 (Library/Caches/skw-selftest-<이름>.json, 기본 main)
@@ -24,6 +24,7 @@ final class SelfTest {
     private let t0 = Date()
 
     static func fromArguments(_ args: [String] = ProcessInfo.processInfo.arguments) -> SelfTest? {
+        #if DEBUG
         guard args.contains("--skw-selftest") else { return nil }
         let val = { (k: String) -> String? in args.first { $0.hasPrefix(k + "=") }.map { String($0.dropFirst(k.count + 1)) } }
         let t = SelfTest(name: val("--skw-selftest-out") ?? "main", write: val("--skw-selftest-write"),
@@ -31,6 +32,9 @@ final class SelfTest {
         t.shellOverride = Updater.cleanVersion(val("--skw-selftest-shell"))
         t.startupWait = val("--skw-selftest-wait").flatMap { Double($0) }.map { min(max($0, 1), 120) }
         return t
+        #else
+        return nil
+        #endif
     }
 
     init(name: String, write: String?, noGPU: Bool, serveFile: Bool) {

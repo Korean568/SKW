@@ -181,7 +181,7 @@ PC판 · Android 와 **같은 업데이트 파일**(`desktop/update/latest.json`
 | `SKW/App/GameViewController.swift` | 앱 본체: 전체 화면 WKWebView, `skw://` 서빙(WKURLSchemeHandler), 게임 ↔ 앱 다리(WKScriptMessageHandlerWithReply), 일시정지 · 다시 시작, 링크는 Safari 로, 불러오기 실패 · 반복 충돌 안내 |
 | `SKW/App/Updater.swift` | 게임 자동 업데이트 (5번) — Android `Updater.java` 를 옮긴 것 |
 | `SKW/App/AppDelegate.swift` | 앱 시작 · 오디오 세션(.ambient) · 창 · 화면 꺼짐 방지 |
-| `SKW/App/SelfTest.swift` | CI 의 Simulator 자동 시험 (실행 인자 `--skw-selftest` 가 없으면 아무것도 안 함) |
+| `SKW/App/SelfTest.swift` | CI 의 Simulator 자동 시험 (Debug 빌드에서 실행 인자 `--skw-selftest` 가 있을 때만 — Release · App Store 빌드는 무시) |
 | `SKW/Web/ios-shim.js` | 게임이 쓰는 `window.skwDesktop` (platform `ios`, 자동 업데이트 `skwDesktop.update` 포함) — 앱이 문서 시작 때 끼워 넣음 |
 | `SKW/Info.plist` · `SKW/Resources/` | 앱 설정(가로 · 전체 화면 · `SKWAutoUpdate`), 이름(영어 · 한국어), 안내 글, 아이콘 · 시작 화면 색 |
 | `SKW/Game/` · 아이콘 PNG · `Config/Version.xcconfig` | 저장소에 없음 — `scripts/prepare-resources.js` 가 빌드할 때 만듭니다 |

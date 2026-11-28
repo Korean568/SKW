@@ -44,6 +44,9 @@ targets:
         CODE_SIGN_STYLE: Automatic
         ENABLE_PREVIEWS: NO
         LOCALIZATION_PREFERS_STRING_CATALOGS: NO
+      configs:
+        Debug:
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG   # 자동 시험(SelfTest) · 웹 검사기는 Debug 빌드에서만
   SecondKoreanWarsTests:
     type: bundle.unit-test
     platform: iOS
