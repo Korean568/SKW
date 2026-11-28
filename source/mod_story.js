@@ -361,7 +361,6 @@
     init(){
       G.css(`#ov,#dl,#cap,#ttl,#vl,#bk,#sk,#end{position:absolute}
 #ov{inset:0;display:grid;align-content:center;justify-items:start;padding:0 7vw;background:linear-gradient(90deg,#000d,#0007 45%,#0000 78%);pointer-events:auto;color:#dfe8f2}
-#ov .tb{margin:0 0 1.1em;padding:.25em .9em .3em;font:600 max(11px,.95vw) system-ui;letter-spacing:.28em;color:#dfe8f2;text-decoration:none;border:1px solid #fff5;border-radius:999px;background:#0006}#ov .tb b{color:#fff}#ov .tb:hover{color:#fff;border-color:#fff}
 #ov h1{margin:0;font:800 6.2vw/.95 system-ui;letter-spacing:.05em;color:#fff}#ov h1 i{display:block;font-style:normal;color:#fff}
 #ov p{margin:.35em 0;font-size:max(15px,1.6vw)}
 #ov .ch{margin-top:.4em}#ov .ch>div{margin:.5em 0;padding:.1em 0 .1em 1em;border-left:3px solid #fff3;opacity:.5;cursor:pointer;pointer-events:auto;transition:opacity .3s,border-color .3s}#ov .ch>div.on{opacity:1;border-color:#fff}#ov .ch p{margin:.2em 0;font-size:max(13px,1.35vw)}#ov .ch p+p{font-size:max(11px,1.05vw);color:#aebccb}#ov .k{font-size:max(11px,1.05vw);color:#9fb1c4;line-height:1.7;margin-top:1.4em}#ov .k b{color:#dfe8f2;font-weight:600}
@@ -377,7 +376,7 @@ html:not(.touch) #dl{max-width:max(240px,calc(92vw - 356px - 2.8em))}/* 좁은 �
 #end h2{margin:0 0 .4em;font:800 5vw system-ui;letter-spacing:.08em}#end h2.r{color:#e03b3b}#end .c{font-style:italic;color:#aab8c6}`);
       const nh=G.params.has('nohud');
       ui.vl=G.el('div',{id:'vl'});ui.bk=G.el('div',{id:'bk'});
-      ui.ov=G.el('div',{id:'ov',innerHTML:`<a class=tb href="https://tribe3dgames.vercel.app/" target=_blank rel=noopener>TRIBE <b>3D</b> GAMES ↗</a><h1>SECOND<i>KOREAN WARS</i></h1><div class=ch><div class=on><p>스토리 1 — 서강시 : 전쟁의 시작 · 대한민국편</p><p>플레이어: 김민철 하사</p></div><div><p>스토리 2 — 북한 마을 : 5일전으로 · 조선민주주의인민공화국편</p><p>플레이어: 북한 군인(동무) · AKM 소총</p></div><div><p>스토리 3 — 북한 주석궁 : 다시 지금 북한으로 · 조선민주주의인민공화국편</p><p>플레이어: 리충성 · 투척단검 · 단검</p></div><div><p>스토리 4 — 폐허가 된 서강 : 고혁명의 배신 · 대한민국편</p><p>플레이어: 김민철 하사 · K2C1 소총</p></div></div><button>시 작</button><div class=k><b>컷신</b> 마우스: 둘러보기 · Space: 건너뛰기 (누르고 있으면 빨리 감기)<br><b>전투</b> WASD 이동 · 마우스 조준 · 왼쪽 클릭 사격 · 오른쪽 클릭 정조준 · R 재장전 · E 줍기 · Shift 달리기 · C 앉기<br><b>F2</b> 그래픽 설정 · Enter 시작</div>`});
+      ui.ov=G.el('div',{id:'ov',innerHTML:`<h1>SECOND<i>KOREAN WARS</i></h1><div class=ch><div class=on><p>스토리 1 — 서강시 : 전쟁의 시작 · 대한민국편</p><p>플레이어: 김민철 하사</p></div><div><p>스토리 2 — 북한 마을 : 5일전으로 · 조선민주주의인민공화국편</p><p>플레이어: 북한 군인(동무) · AKM 소총</p></div><div><p>스토리 3 — 북한 주석궁 : 다시 지금 북한으로 · 조선민주주의인민공화국편</p><p>플레이어: 리충성 · 투척단검 · 단검</p></div><div><p>스토리 4 — 폐허가 된 서강 : 고혁명의 배신 · 대한민국편</p><p>플레이어: 김민철 하사 · K2C1 소총</p></div></div><button>시 작</button><div class=k><b>컷신</b> 마우스: 둘러보기 · Space: 건너뛰기 (누르고 있으면 빨리 감기)<br><b>전투</b> WASD 이동 · 마우스 조준 · 왼쪽 클릭 사격 · 오른쪽 클릭 정조준 · R 재장전 · E 줍기 · Shift 달리기 · C 앉기<br><b>F2</b> 그래픽 설정 · Enter 시작</div>`});
       ui.dl=G.el('div',{id:'dl'});ui.cap=G.el('div',{id:'cap'});ui.ttl=G.el('div',{id:'ttl'});
       ui.sk=G.el('div',{id:'sk',textContent:'Space · 건너뛰기 ▸'});ui.end=G.el('div',{id:'end'});
       if(nh) for(const k of ['dl','cap','ttl','sk']) ui[k].style.visibility='hidden';
