@@ -9,6 +9,8 @@
 
 PC · Chrome/Edge 최신 버전 권장 (WebGPU 필요).
 
+스토리 게임의 판: **PC 앱**(Windows · macOS · Linux, `desktop/`) · **Android 앱**(`android/`) · **브라우저판**(`web/`) · **iPhone · iPad 앱**(`ios/`, iOS 26 이상 — 빌드와 Simulator 시험까지 됨, App Store · TestFlight 는 Apple 개발자 계정이 생긴 뒤: `ios/README-ios.md`). 세 앱(PC · Android · iPhone/iPad)은 같은 게임 내용 자동 업데이트(`desktop/update/`)를 씁니다.
+
 ## 해상대전 조작법
 | 키 | 동작 |
 |---|---|
@@ -76,6 +78,7 @@ Very Low 는 휴대폰·내장 그래픽용(배율 0.75 · MSAA 없음 · 그림
 | `source/mod_story2~4.js` · `mod_village.js` · `mod_palace.js` · `mod_ruins.js` | 스토리 2~4 진행과 장면 |
 | `source/mod_desktop.js` | PC판 전용: 일시정지·설정·진행 저장 |
 | `desktop/` | PC판(Electron) 포장 · itch.io 업로드 (`desktop/README-itch.md`) |
+| `android/` · `ios/` · `web/` | Android 앱 · iPhone/iPad 앱 · 브라우저판 포장 (`android/README-android.md` · `ios/README-ios.md` · `web/README-web.md`) |
 
 고친 뒤 다시 빌드 (Node.js 18 이상):
 ```

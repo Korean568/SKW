@@ -1,0 +1,20 @@
+Second Korean Wars (제 2차 한국전쟁) is a first-person story game that does not look at a war from one side only.
+
+A South Korean special forces sergeant on his way home on leave, a North Korean soldier following his orders, and Ri Chung-seong. You move between three people who stand in very different places, and live through the moment the war begins and what comes after.
+
+■ Features
+• A first-person story: cutscenes, dialogue, and firefights you fight yourself
+• One story followed from both sides, South and North
+• Korean and English (switch any time in Settings)
+• Touch controls for iPhone and iPad (a keyboard works on iPad too)
+• Plays offline; when you are online, new versions of the game content download automatically
+• No account, no ads, no in-app purchases, no data collection (automatic updates only download the public game files and send nothing)
+• New stories will keep being added
+
+■ Please note
+• The game shows gun combat, deaths and an execution scene in a war setting. Swearing is censored. It is intended for adult players.
+• All characters and events are fictional.
+
+■ Requirements
+• iOS / iPadOS 26 or later (the game draws with WebGPU, which iOS supports from version 26)
+• The graphics tier is chosen automatically for your device and can be changed in Settings

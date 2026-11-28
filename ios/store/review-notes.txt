@@ -1,0 +1,11 @@
+App Review notes (App Store Connect > App Review Information > Notes) - English for the reviewer
+
+Second Korean Wars is a first-person story game. The whole game (HTML + JavaScript, rendered with WebGPU) is bundled inside the app and runs fully offline in a WKWebView; no login, no accounts, no purchases, no ads, no tracking, no data collection.
+
+How to play: on the title screen choose a story (start with Story 1). Drag the left side of the screen to move and the right side to look; the buttons on the right fire, aim and pick up. Settings (graphics, sound, subtitles, language Korean/English) are on the title screen.
+
+Requirements: iOS / iPadOS 26 or later (WebGPU). On a device without WebGPU the game shows its own explanation screen instead of crashing.
+
+Content updates: when online, the app reads a small public JSON file (latest.json) from the game's public GitHub repository and may download an updated version of the same game content (HTML/JavaScript, verified with SHA-256). This code runs only inside WebKit (WKWebView), never as native code, and it does not change the primary purpose of the app (guideline 2.5.2). Nothing about the user is sent. If you prefer, we can ship a build with content updates switched off (Info.plist key SKWAutoUpdate = NO) so that every change comes through App Store updates.
+
+Content: the story is set in a fictional war on the Korean peninsula and is told from both sides - the player also plays a North Korean soldier. It contains gun combat, deaths and one execution scene; swearing is censored. All characters and events are fictional.

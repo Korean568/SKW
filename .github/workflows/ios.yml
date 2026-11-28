@@ -3,8 +3,10 @@
 # build (늘):  스토리 게임을 소스에서 빌드해 앱에 넣고(ios/scripts/prepare-resources.js) XcodeGen 으로 프로젝트를 만든 뒤
 #   1) Simulator 용으로 빌드 · 자동 업데이트(Updater) 단위 시험 (XCTest, 가짜 서버)
 #   2) Simulator 연기 시험 (ios/scripts/smoke.sh): 앱을 설치해 켜고 보안 출처 · WebGPU · 다리 · 자동 업데이트 · localStorage 유지 ·
-#      WebGPU 가 없을 때의 안내 화면을 확인, 화면 사진은 로그에 base64 JPEG 로 (SKW-SCREENSHOT-BEGIN … END)
+#      WebGPU 가 없을 때의 안내 화면을 확인
+#      + iPad Simulator 에서도 한 번 켜 봄 (quick) · 러너 Mac 자체의 Metal · WebKit WebGPU 진단 (Simulator 의 WebGPU 결과를 해석하려고)
 #   3) 실제 기기(iphoneos)용 Release 빌드 — 서명 없이 (CODE_SIGNING_ALLOWED=NO, 컴파일되는지 확인용 · 설치는 안 됨)
+#   로그 맨 끝: 화면 사진(base64 JPEG) · 요약(단위 시험 결과 · 연기 시험 판정 · WebGPU 진단)
 # testflight (선택): 수동 실행(Run workflow)이고, 시크릿 네 개(APPSTORE_KEY_ID · APPSTORE_ISSUER_ID · APPSTORE_KEY_P8_BASE64 ·
 #   APPLE_TEAM_ID)가 모두 있을 때만 — 자동 서명으로 보관(archive)해 TestFlight 에 올린다. 시크릿이 없으면 깨끗이 건너뜀.
 #   (Apple Developer 계정이 생기기 전에 쓴 것이라 아직 한 번도 돌려 보지 못했다)
@@ -95,6 +97,13 @@ jobs:
           xcrun simctl boot "$UDID"
           xcrun simctl bootstatus "$UDID" -b
           echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+          # iPad 도 켜지는지 (연기 시험 quick) — 아무 iPad (13형 Pro 가 있으면 그것)
+          PT=$(xcrun simctl list devicetypes -j | python3 -c '
+          import json,sys
+          ds=[d["identifier"] for d in json.load(sys.stdin)["devicetypes"] if d["name"].startswith("iPad")]
+          pro=[d for d in ds if "iPad-Pro-13-inch" in d]
+          print((pro or ds or [""])[-1])')
+          if [ -n "$PT" ]; then PAD=$(xcrun simctl create skw-ipad "$PT" "$RT") && echo "ipad=$PAD" >> "$GITHUB_OUTPUT" && echo "iPad: $PT · $PAD"; fi
 
       - name: Build for testing (Simulator, Debug)
         working-directory: ios
@@ -111,8 +120,24 @@ jobs:
             -destination "id=${{ steps.sim.outputs.udid }}" -derivedDataPath ../build/dd -resultBundlePath ../build/unit-tests.xcresult 2>&1 \
             | grep -E "Test (Suite|Case)|error:|failed|passed|skipped|Executed|\*\* TEST" | grep -v "^\s*$"
 
-      - name: Simulator smoke test
+      - name: Simulator smoke test (iPhone)
         run: bash ios/scripts/smoke.sh "${{ steps.sim.outputs.udid }}" build/dd/Build/Products/Debug-iphonesimulator/SecondKoreanWars.app build/smoke
+
+      - name: Simulator smoke test (iPad, quick)
+        if: steps.sim.outputs.ipad != ''
+        run: |
+          xcrun simctl shutdown "${{ steps.sim.outputs.udid }}" || true
+          xcrun simctl boot "${{ steps.sim.outputs.ipad }}"
+          xcrun simctl bootstatus "${{ steps.sim.outputs.ipad }}" -b
+          bash ios/scripts/smoke.sh "${{ steps.sim.outputs.ipad }}" build/dd/Build/Products/Debug-iphonesimulator/SecondKoreanWars.app build/smoke-ipad quick
+
+      # 진단: Simulator 의 requestAdapter() 가 null 이면, 러너 Mac(가상 머신) 자체의 Metal 장치 · macOS WebKit 은 어떤지
+      - name: WebGPU on the runner itself (diagnostic)
+        continue-on-error: true
+        run: |
+          mkdir -p build/diag
+          swiftc -O ios/scripts/webgpu-host-probe.swift -o build/diag/probe 2>&1 | tail -n 20
+          (build/diag/probe || true) 2>&1 | grep -E "^HOST-" | tee build/diag/host.txt
 
       - name: Device build (iphoneos, Release, unsigned)
         working-directory: ios
@@ -137,9 +162,47 @@ jobs:
           if-no-files-found: ignore
           path: |
             build/out/*.zip
-            build/smoke/*.json
-            build/smoke/*.jpg
-            build/smoke/console-*.log
+            build/smoke*/*.json
+            build/smoke*/*.jpg
+            build/smoke*/console-*.log
+            build/smoke*/check.txt
+
+      # 화면 사진: 작은 JPEG 를 base64 로 (Artifacts 를 못 받는 곳에서도 로그만으로 풀어 볼 수 있게: SKW-SCREENSHOT-BEGIN <이름> … END)
+      - name: Screenshots (base64)
+        if: always()
+        run: |
+          for f in build/smoke*/*.jpg; do
+            [ -f "$f" ] || continue
+            n=$(basename "$(dirname "$f")")-$(basename "$f" .jpg)
+            echo "SKW-SCREENSHOT-BEGIN $n $(stat -f%z "$f") bytes"
+            base64 -i "$f" | fold -w 400
+            echo "SKW-SCREENSHOT-END $n"
+          done
+
+      # 요약 (로그 맨 끝): 단위 시험 · 연기 시험 판정 · 러너 WebGPU 진단
+      - name: Summary
+        if: always()
+        run: |
+          echo "== 단위 시험 (XCTest) =="
+          if [ -d build/unit-tests.xcresult ]; then
+            xcrun xcresulttool get test-results summary --path build/unit-tests.xcresult --compact 2>/dev/null | python3 -c '
+          import json,sys
+          d=json.load(sys.stdin)
+          print("result", d.get("result"), "· total", d.get("totalTestCount"), "· passed", d.get("passedTests"), "· failed", d.get("failedTests"), "· skipped", d.get("skippedTests"), "·", d.get("devicesAndConfigurations",[{}])[0].get("device",{}).get("deviceName",""))' || true
+            xcrun xcresulttool get test-results tests --path build/unit-tests.xcresult --compact 2>/dev/null | python3 -c '
+          import json,sys
+          def walk(n):
+              if n.get("nodeType")=="Test Case": print("  ", n.get("result"), n.get("name"), n.get("duration",""))
+              for c in n.get("children",[]): walk(c)
+          for n in json.load(sys.stdin).get("testNodes",[]): walk(n)' || true
+          fi
+          for d in build/smoke build/smoke-ipad; do
+            [ -f "$d/check.txt" ] || continue
+            echo "== 연기 시험 $d =="
+            grep -E "^(PASS|FAIL|INFO|===)" "$d/check.txt" | cut -c1-300
+          done
+          echo "== 러너 WebGPU 진단 =="
+          cat build/diag/host.txt 2>/dev/null || echo "(없음)"
 
   # TestFlight 시크릿이 있는지 (수동 실행일 때만 본다). 없으면 testflight 는 건너뜀
   gate:

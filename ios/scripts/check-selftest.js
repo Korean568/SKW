@@ -9,7 +9,8 @@
 const fs = require('fs');
 const path = require('path');
 
-const [dir = 'build/smoke', nonce = ''] = process.argv.slice(2);
+const [dir = 'build/smoke', nonce = ''] = process.argv.slice(2).filter((a) => !a.startsWith('--'));
+const quick = process.argv.includes('--quick'); // main 만 (다른 기기에서 켜지는지)
 const read = (n) => { try { return JSON.parse(fs.readFileSync(path.join(dir, n + '.json'), 'utf8')); } catch (e) { return null; } };
 const R = { main: read('main'), relaunch: read('relaunch'), nogpu: read('nogpu'), file: read('file') };
 let bad = 0;
@@ -18,7 +19,7 @@ const say = (ok, what, detail) => {
   else { if (!ok) bad++; console.log((ok ? 'PASS ' : 'FAIL ') + what + (detail !== undefined ? ' — ' + JSON.stringify(detail) : '')); }
 };
 
-for (const [k, v] of Object.entries(R)) console.log(`SKW-SMOKE-JSON ${k} ${JSON.stringify(v)}`);
+for (const [k, v] of Object.entries(R)) if (v) console.log(`SKW-SMOKE-JSON ${k} ${JSON.stringify(v)}`);
 
 const m = R.main;
 say(!!m && !m.probeError, 'main: 앱이 게임을 띄우고 자동 시험이 끝남', m && (m.probeError || `${m.seconds}s`));
@@ -56,6 +57,17 @@ if (m) {
   say(n.statusBarHidden === true && n.homeIndicatorAutoHidden === true && n.landscape === true, '앱: 상태 막대 숨김 · 홈 표시줄 자동 숨김 · 가로', { screen: n.screen, safeArea: n.safeArea });
   say(n.bundleId === 'com.secondkoreanwars.game' && n.shortVersion === m.label && /^\d+$/.test(String(n.build)), '앱: 번들 ID · 버전', { id: n.bundleId, name: n.displayName, v: n.shortVersion, build: n.build, shell: n.shellVersion });
   say(null, '기기', { model: n.model, system: n.system, ua: m.ua, viewport: m.viewport, langs: n.preferredLanguages });
+  // 뒤로 보냈을 때(sceneWillResignActive) 앱이 부른 window.__skwIOS.pause() 의 답 (콘솔: "[SKW] lifecycle pause: <멈춘 소리 수>")
+  let con = '';
+  try { con = fs.readFileSync(path.join(dir, 'console-main.log'), 'utf8'); } catch (e) { /* 없음 */ }
+  const lp = /\[SKW\] lifecycle pause: (\S+)/.exec(con);
+  if (/\[SKW\]/.test(con)) say(!!lp && /^\d+$/.test(lp[1]), '앱: 뒤로 갈 때 일시정지 고리를 부름 (sceneWillResignActive → __skwIOS.pause())', lp && lp[0]);
+  else say(null, '콘솔 기록이 없어 일시정지 고리 확인을 건너뜀');
+}
+
+if (quick) {
+  console.log(bad ? `=== iOS smoke (quick): ${bad} FAILED ===` : '=== iOS smoke (quick): ALL PASS ===');
+  process.exit(bad ? 1 : 0);
 }
 
 const r = R.relaunch;
